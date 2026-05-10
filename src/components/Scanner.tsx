@@ -365,53 +365,58 @@ export default function Scanner() {
                   )}
                 </div>
 
-                {/* Activity info */}
-                {(() => {
-                  const tags = result.product.activity_tags ?? [];
-                  const exerciseTag = tags.find(t => t.startsWith("exercise-"));
-                  const photo = result.photosensitive ?? [];
-                  const sunLevel = photo.some(p => p.sunLevel === "avoid") ? "avoid"
-                    : photo.some(p => p.sunLevel === "caution") ? "caution"
-                    : null;
-
-                  const exerciseLabel: Record<string, string> = {
-                    "exercise-safe":    "Safe",
-                    "exercise-caution": "Use caution",
-                    "exercise-avoid":   "Avoid",
-                  };
-
-                  if (!exerciseTag && !sunLevel && !result.product!.activity_note) return null;
-                  return (
-                    <div className="space-y-0.5">
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-400">
-                        {exerciseTag && (
-                          <span>
-                            Exercise:{" "}
-                            <span className="font-medium">
-                              {exerciseLabel[exerciseTag] ?? exerciseTag}
-                            </span>
-                          </span>
-                        )}
-                        {sunLevel && (
-                          <span>
-                            Sun:{" "}
-                            <span className={`font-medium ${sunLevel === "avoid" ? "text-yellow-700" : ""}`}>
-                              {sunLevel === "avoid" ? "Avoid" : "Caution"}
-                            </span>
-                          </span>
-                        )}
-                      </div>
-                      {result.product!.activity_note && (
-                        <p className="text-xs text-gray-400 leading-snug">
-                          {result.product!.activity_note}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
               </div>
             </div>
           )}
+
+          {/* Activity row */}
+          {(() => {
+            if (!result.product) return null;
+            const tags = result.product.activity_tags ?? [];
+            const exerciseTag = tags.find(t => t.startsWith("exercise-"));
+            const photo = result.photosensitive ?? [];
+            const sunLevel = photo.some(p => p.sunLevel === "avoid") ? "avoid"
+              : photo.some(p => p.sunLevel === "caution") ? "caution"
+              : null;
+            if (!exerciseTag && !sunLevel && !result.product.activity_note) return null;
+
+            const exerciseLabel: Record<string, { label: string; color: string }> = {
+              "exercise-safe":    { label: "Safe for exercise", color: "text-green-700" },
+              "exercise-caution": { label: "Exercise with caution", color: "text-amber-700" },
+              "exercise-avoid":   { label: "Avoid exercise", color: "text-rose-700" },
+            };
+            const sunLabel = sunLevel === "avoid"
+              ? { label: "Avoid sun exposure", color: "text-yellow-700" }
+              : { label: "Sun caution", color: "text-amber-700" };
+
+            return (
+              <div className="rounded-xl border border-gray-100 px-4 py-3 space-y-2">
+                <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+                  {exerciseTag && exerciseLabel[exerciseTag] && (
+                    <div className="flex items-center gap-1.5 text-sm">
+                      <span className="text-gray-400">Exercise</span>
+                      <span className={`font-medium ${exerciseLabel[exerciseTag].color}`}>
+                        {exerciseLabel[exerciseTag].label.replace("for exercise", "").replace("exercise", "").trim()}
+                      </span>
+                    </div>
+                  )}
+                  {sunLevel && (
+                    <div className="flex items-center gap-1.5 text-sm">
+                      <span className="text-gray-400">Sun</span>
+                      <span className={`font-medium ${sunLabel.color}`}>
+                        {sunLabel.label}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {result.product.activity_note && (
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    {result.product.activity_note}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Summary line */}
           {(result.flagged.length + result.safe.length + result.unreviewed.length) > 0 && (
