@@ -31,6 +31,16 @@ export type PhotosensitiveItem = {
   photo_note?: string | null;
 };
 
+export type AlternativeProduct = {
+  id: string;
+  name: string;
+  brand: string | null;
+  type: string | null;
+  image_url: string | null;
+  flaggedCount: number;
+  sameType: boolean;
+};
+
 export type ScanResult = {
   product?: {
     name: string;

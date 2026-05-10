@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { useUser, SignInButton } from "@clerk/nextjs";
-import type { IngredientMatch, PhotosensitiveItem, ScanResult } from "@/types";
+import type { IngredientMatch, PhotosensitiveItem, ScanResult, AlternativeProduct } from "@/types";
 
 type Tab = "search" | "paste" | "url";
 
@@ -56,6 +56,11 @@ export default function Scanner() {
   const [showUnreviewed, setShowUnreviewed] = useState(false);
   const [showObfVariants, setShowObfVariants] = useState(false);
   const [explanations, setExplanations] = useState<Record<string, string | null>>({});
+  const [alternatives, setAlternatives] = useState<AlternativeProduct[]>([]);
+  const [alternativesFallback, setAlternativesFallback] = useState(false);
+  const [alternativesLoading, setAlternativesLoading] = useState(false);
+  const [alternativesFetched, setAlternativesFetched] = useState(false);
+  const [alternativesOpen, setAlternativesOpen] = useState(true);
 
   async function handleScan() {
     setLoading(true);
@@ -66,6 +71,11 @@ export default function Scanner() {
     setShowObfVariants(false);
     setExpanded(new Set());
     setExplanations({});
+    setAlternatives([]);
+    setAlternativesFallback(false);
+    setAlternativesLoading(false);
+    setAlternativesFetched(false);
+    setAlternativesOpen(true);
 
     const body =
       tab === "search"
@@ -138,6 +148,11 @@ export default function Scanner() {
     setShowObfVariants(false);
     setExpanded(new Set());
     setExplanations({});
+    setAlternatives([]);
+    setAlternativesFallback(false);
+    setAlternativesLoading(false);
+    setAlternativesFetched(false);
+    setAlternativesOpen(true);
 
     const body = opts.productId
       ? { type: "search", query, productId: opts.productId }
@@ -162,6 +177,22 @@ export default function Scanner() {
       };
     }
     setResult(data);
+  }
+
+  async function fetchAlternatives() {
+    if (!result?.flagged.length) return;
+    const flaggedIds = result.flagged.map((m) => m.ingredient.id);
+    setAlternativesLoading(true);
+    const res = await fetch("/api/alternatives", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ flaggedIds, productType: result.product?.type ?? null }),
+    });
+    const data = await res.json();
+    setAlternatives(data.results ?? []);
+    setAlternativesFallback(data.sameTypeFallback ?? false);
+    setAlternativesLoading(false);
+    setAlternativesFetched(true);
   }
 
   function switchToPaste(prefill?: string) {
@@ -437,6 +468,86 @@ export default function Scanner() {
                 Add the full list manually
               </button>
             </div>
+          )}
+
+          {/* Safe alternatives */}
+          {result.flagged.length > 0 && (
+            <section>
+              {!alternativesFetched && !alternativesLoading && (
+                <button
+                  type="button"
+                  onClick={fetchAlternatives}
+                  className="text-sm text-gray-500 underline underline-offset-2 hover:text-gray-800"
+                >
+                  Find safe alternatives →
+                </button>
+              )}
+              {alternativesLoading && (
+                <p className="text-sm text-gray-400">Finding alternatives…</p>
+              )}
+              {alternativesFetched && alternatives.length === 0 && (
+                <p className="text-sm text-gray-400">No alternatives found in the database.</p>
+              )}
+              {alternatives.length > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-widest mb-3"
+                    onClick={() => setAlternativesOpen((v) => !v)}
+                  >
+                    Safe alternatives — {alternatives.length}
+                    <span className="text-gray-300">{alternativesOpen ? "▲" : "▼"}</span>
+                  </button>
+                  {alternativesOpen && <div className="divide-y divide-gray-100">
+                    {alternatives.map((alt, i) => {
+                      const showSeparator =
+                        alternativesFallback &&
+                        !alt.sameType &&
+                        i > 0 &&
+                        alternatives[i - 1].sameType;
+                      return (
+                        <Fragment key={alt.id}>
+                          {showSeparator && (
+                            <p className="text-xs text-gray-400 pt-3 pb-1">Also in other categories</p>
+                          )}
+                          <div className="flex items-center gap-3 py-2">
+                            {alt.image_url ? (
+                              <img
+                                src={alt.image_url}
+                                alt=""
+                                className="w-10 h-10 object-contain rounded-lg border border-gray-100 bg-gray-50 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center shrink-0">
+                                <span className="text-xs text-gray-400 text-center leading-tight px-1">
+                                  {alt.type ?? "—"}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">{alt.name}</p>
+                              {alt.brand && <p className="text-xs text-gray-400">{alt.brand}</p>}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`text-xs px-1.5 py-0.5 rounded-md ${alt.flaggedCount === 0 ? "bg-green-50 text-green-700" : "bg-rose-50 text-rose-700"}`}>
+                                {alt.flaggedCount === 0 ? "0 flagged" : `${alt.flaggedCount} flagged`}
+                              </span>
+                              <button
+                                type="button"
+                                className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                                onClick={() => scanVariant({ productId: alt.id })}
+                              >
+                                Scan
+                              </button>
+                            </div>
+                          </div>
+                        </Fragment>
+                      );
+                    })}
+                  </div>}
+                </div>
+              )}
+            </section>
           )}
 
           {/* Full ingredient list — paragraph view */}
