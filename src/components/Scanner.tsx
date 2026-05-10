@@ -396,19 +396,23 @@ export default function Scanner() {
               >
                 {result.safe.length} safe
               </button>
-              {" · "}
-              <button
-                type="button"
-                className="hover:underline underline-offset-2"
-                onClick={() => {
-                  setShowUnreviewed(true);
-                  requestAnimationFrame(() => {
-                    document.getElementById("section-unreviewed")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  });
-                }}
-              >
-                {result.unreviewed.length} unreviewed
-              </button>
+              {result.unreviewed.length > 0 && (
+                <>
+                  {" · "}
+                  <button
+                    type="button"
+                    className="hover:underline underline-offset-2"
+                    onClick={() => {
+                      setShowUnreviewed(true);
+                      requestAnimationFrame(() => {
+                        document.getElementById("section-unreviewed")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      });
+                    }}
+                  >
+                    {result.unreviewed.length} unreviewed
+                  </button>
+                </>
+              )}
             </p>
           )}
 
