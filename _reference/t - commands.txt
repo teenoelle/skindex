@@ -1,0 +1,38 @@
+cd "D:\tee\work\code\canary beauty"
+claude --dangerously-skip-permissions
+
+OPEN FOLDER
+cd "D:\tee\work\code\skindex"
+claude --dangerously-skip-permissions
+
+GENERATE REASONS
+ node --env-file=.env.local
+  scripts/generate-explanations.mjs
+
+SYNC SHEET
+  The sync-products.mjs script is now reusable
+  — run it with --dry-run to preview whenever
+  you update the spreadsheet.
+
+SYNC STAGING TO PRDOUCTION
+  The session workflow going forward:
+
+  Start of session:
+    node scripts/sync-queue.mjs       ← pulls
+  live queue into staging sheet
+
+  During session (in conversation):
+    I analyze queued ingredients
+    I edit skindex-staging.xlsx directly
+    (status, category, explanation, new rows)
+
+  End of session:
+    node scripts/promote.mjs --sync   ← staging
+   → production → DB in one step
+
+
+CLASSIFY QUEUE
+ To run it in future, use the
+  terminal: node scripts/classify-queue.mjs, or
+   type ! node scripts/classify-queue.mjs in
+  the Claude Code prompt.
