@@ -22,10 +22,12 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Disallowed host", { status: 403 });
   }
 
-  // Upgrade iHerb Cloudinary quality from economy to best
+  // Upgrade iHerb Cloudinary quality and request a larger size
   let fetchUrl = parsed.toString();
   if (parsed.hostname === "cloudinary.images-iherb.com") {
-    fetchUrl = fetchUrl.replace("q_auto:eco", "q_auto:best");
+    fetchUrl = fetchUrl
+      .replace("q_auto:eco", "q_auto:best")
+      .replace("/image/upload/", "/image/upload/w_600,");
   }
 
   try {
@@ -44,7 +46,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(body, {
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=86400",
+        "Cache-Control": "public, max-age=3600",
       },
     });
   } catch {
