@@ -17,6 +17,11 @@ function smartCase(str: string): string {
   return toTitleCase(str);
 }
 
+function proxyImage(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+}
+
 function normalizeForMatch(s: string) {
   return s.replace(/[​‌‍﻿]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 }
@@ -314,7 +319,7 @@ export default function Scanner() {
               <div className="shrink-0">
                 {result.product.image_url ? (
                   <img
-                    src={result.product.image_url}
+                    src={proxyImage(result.product.image_url)!}
                     alt=""
                     className="w-14 h-14 object-contain rounded-xl border border-gray-100 bg-gray-50"
                   />
@@ -513,7 +518,7 @@ export default function Scanner() {
                           <div className="flex items-center gap-3 py-2">
                             {alt.image_url ? (
                               <img
-                                src={alt.image_url}
+                                src={proxyImage(alt.image_url)!}
                                 alt=""
                                 className="w-10 h-10 object-contain rounded-lg border border-gray-100 bg-gray-50 shrink-0"
                               />

@@ -251,6 +251,7 @@ export async function POST(req: NextRequest) {
           name: p.product_name || query,
           brand: p.brands || null,
           ingredient_list: p.ingredients_text,
+          image_url: p.image_front_url || p.image_url || null,
           source: "auto-imported",
         });
 
