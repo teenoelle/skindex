@@ -22,8 +22,14 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Disallowed host", { status: 403 });
   }
 
+  // Upgrade iHerb Cloudinary quality from economy to best
+  let fetchUrl = parsed.toString();
+  if (parsed.hostname === "cloudinary.images-iherb.com") {
+    fetchUrl = fetchUrl.replace("q_auto:eco", "q_auto:best");
+  }
+
   try {
-    const upstream = await fetch(parsed.toString(), {
+    const upstream = await fetch(fetchUrl, {
       headers: { "User-Agent": "Mozilla/5.0" },
       signal: AbortSignal.timeout(8000),
     });
