@@ -341,11 +341,6 @@ export default function Scanner() {
                   <p className="text-sm text-gray-400">{result.product.brand}</p>
                 )}
                 <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
-                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md">
-                    {result.product.source === "community" ? "Community database"
-                      : result.product.source === "url-extract" ? "Extracted from URL"
-                      : "Open Beauty Facts"}
-                  </span>
                   {result.communityVariants && result.communityVariants.length > 0 && (
                     <span className="text-xs text-gray-400">
                       Also:{" "}
