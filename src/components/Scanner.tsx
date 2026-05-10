@@ -314,25 +314,24 @@ export default function Scanner() {
 
           {/* Product header */}
           {result.product && (
-            <div className="flex gap-3 items-start">
-              {/* Image or type placeholder */}
-              <div className="shrink-0">
+            <div className="flex rounded-xl border border-gray-100 overflow-hidden min-h-[128px]">
+              {/* Image panel */}
+              <div className="w-28 shrink-0 bg-gray-50 flex items-center justify-center">
                 {result.product.image_url ? (
                   <img
                     src={proxyImage(result.product.image_url)!}
                     alt=""
-                    className="w-14 h-14 object-contain rounded-xl border border-gray-100 bg-gray-50"
+                    className="w-full h-full object-contain p-3"
                   />
                 ) : (
-                  <div className="w-14 h-14 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center">
-                    <span className="text-xs text-gray-400 text-center leading-tight px-1">
-                      {result.product.type ?? "—"}
-                    </span>
-                  </div>
+                  <span className="text-xs text-gray-400 text-center leading-tight px-2">
+                    {result.product.type ?? "—"}
+                  </span>
                 )}
               </div>
 
-              <div>
+              {/* Details panel */}
+              <div className="flex-1 p-3 flex flex-col justify-center gap-1 min-w-0">
                 <h2 className="text-base font-semibold text-gray-900 leading-snug">
                   {result.product.source === "url-extract"
                     ? (() => { try { return new URL(result.product.name).hostname.replace("www.", ""); } catch { return result.product.name; } })()
@@ -341,7 +340,7 @@ export default function Scanner() {
                 {result.product.brand && (
                   <p className="text-sm text-gray-400">{result.product.brand}</p>
                 )}
-                <div className="mt-1 flex items-center flex-wrap gap-x-2 gap-y-1">
+                <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
                   <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md">
                     {result.product.source === "community" ? "Community database"
                       : result.product.source === "url-extract" ? "Extracted from URL"
@@ -383,7 +382,7 @@ export default function Scanner() {
 
                   if (!exerciseTag && !sunLevel && !result.product!.activity_note) return null;
                   return (
-                    <div className="mt-2 space-y-1">
+                    <div className="space-y-0.5">
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-400">
                         {exerciseTag && (
                           <span>
@@ -403,7 +402,7 @@ export default function Scanner() {
                         )}
                       </div>
                       {result.product!.activity_note && (
-                        <p className="text-xs text-gray-400 leading-snug mt-0.5">
+                        <p className="text-xs text-gray-400 leading-snug">
                           {result.product!.activity_note}
                         </p>
                       )}
@@ -520,10 +519,10 @@ export default function Scanner() {
                               <img
                                 src={proxyImage(alt.image_url)!}
                                 alt=""
-                                className="w-10 h-10 object-contain rounded-lg border border-gray-100 bg-gray-50 shrink-0"
+                                className="w-12 h-14 object-contain rounded-lg border border-gray-100 bg-gray-50 shrink-0"
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center shrink-0">
+                              <div className="w-12 h-14 rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center shrink-0">
                                 <span className="text-xs text-gray-400 text-center leading-tight px-1">
                                   {alt.type ?? "—"}
                                 </span>
