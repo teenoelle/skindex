@@ -314,9 +314,9 @@ export default function Scanner() {
 
           {/* Product header */}
           {result.product && (
-            <div className="flex rounded-xl border border-gray-100 overflow-hidden min-h-[128px]">
+            <div className="flex rounded-xl border border-gray-100 overflow-hidden min-h-[160px]">
               {/* Image panel */}
-              <div className="w-28 shrink-0 bg-gray-50 flex items-center justify-center">
+              <div className="w-36 shrink-0 bg-gray-50 flex items-center justify-center">
                 {result.product.image_url ? (
                   <img
                     src={proxyImage(result.product.image_url)!}
