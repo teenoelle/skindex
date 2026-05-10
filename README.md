@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SKINdex
 
-## Getting Started
+A skincare ingredient scanner built around a "canary in the coal mine" philosophy — hypersensitive reactive skin as the baseline. If a product passes, it's likely safe for anyone with reactive skin.
 
-First, run the development server:
+## Features
+
+- **Ingredient scanner** — search the community database, paste an ingredient list, or extract from a product URL
+- **Three-tab results** — flagged, photosensitive, safe, and unreviewed ingredients with collapsible explanations
+- **Community product database** — 130+ products with ingredient analysis, activity tags (exercise-safe, photosensitive), and product images
+- **Open Beauty Facts integration** — automatic lookup and import for products not in the community database
+- **AI extraction** — Claude Haiku extracts ingredients from any product URL (rate-limited for free users)
+- **Canary defaults** — flagged ingredients include parabens, chemical UV filters, EU fragrance allergens, essential oils, harsh sulfates, occlusives, AHAs, and retinoids
+
+## Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend + API | Next.js 16 (TypeScript), deployed on Vercel |
+| Database | Supabase (PostgreSQL) |
+| Auth | Clerk v7 |
+| AI | Claude Haiku (Anthropic) |
+| External data | Open Beauty Facts |
+
+## Setup
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Environment variables
+
+Create `.env.local` in the project root:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
+```
+
+### 3. Database
+
+Run the SQL files in `_reference/migrations/` in order in the Supabase SQL editor:
+
+1. `add-ingredient-queue.sql`
+2. `add-fuzzy-search.sql`
+3. `add-activity-tags.sql`
+4. `add-product-image.sql`
+5. `add-photo-note.sql`
+6. `add-product-ingredients.sql`
+7. `add-rls.sql` (before public launch)
+
+Then seed the database with the reference spreadsheet data:
+
+```bash
+node scripts/seed.mjs
+node scripts/sync-products.mjs
+node scripts/populate-product-ingredients.mjs
+node scripts/tag-photo-ingredients.mjs
+```
+
+### 4. Run locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Scripts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Script | Purpose |
+|---|---|
+| `sync-queue.mjs` | Pull unrecognized ingredients from Supabase into the staging spreadsheet |
+| `classify-queue.mjs` | Insert classified ingredients into the DB and mark queue items done |
+| `promote.mjs [--dry-run] [--sync]` | Promote staging spreadsheet to production and sync to DB |
+| `sync-products.mjs` | Sync products from the production spreadsheet to DB |
+| `fetch-images.mjs [--force]` | Fetch product images from iHerb / INCI Decoder URLs |
+| `populate-product-ingredients.mjs` | Populate the product-ingredient junction table |
+| `tag-photo-ingredients.mjs` | Tag photosensitive ingredients in DB with explanations |
+| `scan-all-products.mjs` | Scan all products to push unrecognized ingredients to the queue |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Ingredient classification workflow
 
-## Learn More
+1. `node scripts/sync-queue.mjs` — pulls new unrecognized ingredients into `_reference/skindex-staging.xlsx`
+2. Classify ingredients in the queue tab (safe / flagged, category, explanation)
+3. `node scripts/classify-queue.mjs` — inserts new ingredients into DB, marks queue items done
+4. `node scripts/promote.mjs --sync` — promotes staging to production and syncs to DB
 
-To learn more about Next.js, take a look at the following resources:
+## License
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+GNU General Public License v3.0 — see [LICENSE](LICENSE) for details.
