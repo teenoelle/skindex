@@ -38,7 +38,7 @@ const COMEDOGENIC_PATTERNS: { pattern: RegExp; note: string; maxPosition?: numbe
     note: "Heavy or cyclic silicones form an occlusive film on the skin's surface that can trap sebum and dead skin cells, contributing to closed comedones on acne-prone or reactive skin.",
   },
   {
-    pattern: /palmitoyl\s+(tri|tetra|hexa|octa|di|oligo)?peptide|palmitoyl\s+dipeptide/i,
+    pattern: /palmitoyl\s+\w*peptide/i,
     note: "Palmitoyl peptide carriers use fatty acid chains to deliver active peptides into skin. These chains can be occlusive and may trigger closed comedones in pore-prone skin.",
   },
   {
