@@ -43,6 +43,7 @@ export type AlternativeProduct = {
 
 export type ScanResult = {
   product?: {
+    id?: string | null;
     name: string;
     brand?: string | null;
     source: string;

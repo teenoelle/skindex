@@ -2,7 +2,44 @@
 
 import { Fragment, useState } from "react";
 import { useUser, SignInButton } from "@clerk/nextjs";
+import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { IngredientMatch, PhotosensitiveItem, ScanResult, AlternativeProduct } from "@/types";
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Ampoule: Pipette,
+  Balm: Sparkles,
+  Blush: Sparkles,
+  "Body Wash": Waves,
+  Chapstick: Pipette,
+  Concealer: Brush,
+  Cream: Droplets,
+  Emulsion: Droplets,
+  Extract: FlaskConical,
+  "Face Mask": Sparkles,
+  "Face Wash": Droplets,
+  Foundation: Brush,
+  Gel: Droplet,
+  "Makeup Remover": Droplets,
+  Mist: Wind,
+  Oil: Droplet,
+  Ointment: Droplets,
+  Serum: Pipette,
+  Shampoo: Waves,
+  "Spot Patches": Bandage,
+  "Sun Screen": Sun,
+  Toner: Droplets,
+};
+
+function CategoryIcon({ type, size = 28 }: { type?: string | null; size?: number }) {
+  const Icon = (type && CATEGORY_ICONS[type]) ? CATEGORY_ICONS[type] : Droplet;
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <Icon size={size} className="text-gray-300" />
+      {type && <span className="text-[10px] text-gray-400 text-center leading-tight">{type}</span>}
+    </div>
+  );
+}
 
 type Tab = "search" | "paste" | "url";
 
@@ -66,6 +103,12 @@ export default function Scanner() {
   const [alternativesLoading, setAlternativesLoading] = useState(false);
   const [alternativesFetched, setAlternativesFetched] = useState(false);
   const [alternativesOpen, setAlternativesOpen] = useState(true);
+  const [imageUploadOpen, setImageUploadOpen] = useState(false);
+  const [imageUploadUrl, setImageUploadUrl] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewResult, setReviewResult] = useState<{ reviewed: number } | null>(null);
 
   async function handleScan() {
     setLoading(true);
@@ -81,6 +124,12 @@ export default function Scanner() {
     setAlternativesLoading(false);
     setAlternativesFetched(false);
     setAlternativesOpen(true);
+    setImageUploadOpen(false);
+    setImageUploadUrl("");
+    setImageUploading(false);
+    setUploadError(null);
+    setReviewLoading(false);
+    setReviewResult(null);
 
     const body =
       tab === "search"
@@ -158,6 +207,12 @@ export default function Scanner() {
     setAlternativesLoading(false);
     setAlternativesFetched(false);
     setAlternativesOpen(true);
+    setImageUploadOpen(false);
+    setImageUploadUrl("");
+    setImageUploading(false);
+    setUploadError(null);
+    setReviewLoading(false);
+    setReviewResult(null);
 
     const body = opts.productId
       ? { type: "search", query, productId: opts.productId }
@@ -198,6 +253,45 @@ export default function Scanner() {
     setAlternativesFallback(data.sameTypeFallback ?? false);
     setAlternativesLoading(false);
     setAlternativesFetched(true);
+  }
+
+  async function handleImageUpload() {
+    if (!result?.product?.id || !imageUploadUrl.trim()) return;
+    setImageUploading(true);
+    setUploadError(null);
+    try {
+      const res = await fetch("/api/set-product-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: result.product.id, url: imageUploadUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data.error ?? "Upload failed");
+      } else {
+        setResult((prev) =>
+          prev ? { ...prev, product: prev.product ? { ...prev.product, image_url: data.imageUrl } : prev.product } : prev
+        );
+        setImageUploadOpen(false);
+        setImageUploadUrl("");
+      }
+    } catch {
+      setUploadError("Upload failed");
+    }
+    setImageUploading(false);
+  }
+
+  async function handleReview() {
+    setReviewLoading(true);
+    setReviewResult(null);
+    try {
+      const res = await fetch("/api/review-ingredients", { method: "POST" });
+      const data = await res.json();
+      setReviewResult({ reviewed: data.reviewed ?? 0 });
+    } catch {
+      setReviewResult({ reviewed: 0 });
+    }
+    setReviewLoading(false);
   }
 
   function switchToPaste(prefill?: string) {
@@ -324,9 +418,7 @@ export default function Scanner() {
                     className="w-full h-full object-contain p-3"
                   />
                 ) : (
-                  <span className="text-xs text-gray-400 text-center leading-tight px-2">
-                    {result.product.type ?? "—"}
-                  </span>
+                  <CategoryIcon type={result.product.type} size={32} />
                 )}
               </div>
 
@@ -360,6 +452,51 @@ export default function Scanner() {
                   )}
                 </div>
 
+                {/* Image upload (shown when product has no image and has an ID) */}
+                {result.product.id && !result.product.image_url && (
+                  <div className="mt-1">
+                    {!imageUploadOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => setImageUploadOpen(true)}
+                        className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600"
+                      >
+                        Add image
+                      </button>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex gap-1.5">
+                          <input
+                            type="url"
+                            value={imageUploadUrl}
+                            onChange={(e) => setImageUploadUrl(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && !imageUploading && handleImageUpload()}
+                            placeholder="Image or product page URL"
+                            className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 min-w-0"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleImageUpload}
+                            disabled={imageUploading || !imageUploadUrl.trim()}
+                            className="text-xs px-2.5 py-1.5 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0"
+                          >
+                            {imageUploading ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setImageUploadOpen(false); setUploadError(null); }}
+                            className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        {uploadError && (
+                          <p className="text-xs text-rose-600">{uploadError}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -478,9 +615,7 @@ export default function Scanner() {
                               />
                             ) : (
                               <div className="w-12 h-14 rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center shrink-0">
-                                <span className="text-xs text-gray-400 text-center leading-tight px-1">
-                                  {alt.type ?? "—"}
-                                </span>
+                                <CategoryIcon type={alt.type} size={18} />
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
@@ -697,13 +832,31 @@ export default function Scanner() {
           {/* Unreviewed ingredients */}
           {result.unreviewed.length > 0 && (
             <section id="section-unreviewed">
-              <button
-                className="flex items-center gap-2 text-xs font-semibold text-stone-400 uppercase tracking-widest"
-                onClick={() => setShowUnreviewed((v) => !v)}
-              >
-                Unreviewed — {result.unreviewed.length}
-                <span className="text-stone-300">{showUnreviewed ? "▲" : "▼"}</span>
-              </button>
+              <div className="flex items-center justify-between gap-4">
+                <button
+                  className="flex items-center gap-2 text-xs font-semibold text-stone-400 uppercase tracking-widest"
+                  onClick={() => setShowUnreviewed((v) => !v)}
+                >
+                  Unreviewed — {result.unreviewed.length}
+                  <span className="text-stone-300">{showUnreviewed ? "▲" : "▼"}</span>
+                </button>
+                {reviewResult ? (
+                  <span className="text-xs text-gray-400">
+                    {reviewResult.reviewed > 0
+                      ? `${reviewResult.reviewed} reviewed — rescan to see results`
+                      : "Nothing new to review"}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleReview}
+                    disabled={reviewLoading}
+                    className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 disabled:opacity-40 shrink-0"
+                  >
+                    {reviewLoading ? "Reviewing…" : "Review now"}
+                  </button>
+                )}
+              </div>
               {showUnreviewed && (
                 <div className="mt-2 divide-y divide-stone-100">
                   {result.unreviewed.map((name) => (

@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
   let communityVariants: CommunityVariant[] | undefined;
   let obfVariants: ObfVariant[] | undefined;
   let product: {
+    id?: string | null;
     name: string;
     brand?: string | null;
     source: string;
@@ -205,6 +206,7 @@ export async function POST(req: NextRequest) {
     if (dbProduct?.ingredient_list) {
       rawIngredients = dbProduct.ingredient_list;
       product = {
+        id: dbProduct.id ?? null,
         name: dbProduct.name,
         brand: dbProduct.brand,
         source: "community",
@@ -213,6 +215,26 @@ export async function POST(req: NextRequest) {
         activity_tags: dbProduct.activity_tags ?? null,
         activity_note: dbProduct.activity_note ?? null,
       };
+
+      // Fire-and-forget: if no image yet, try OBF as a background update for next scan
+      if (!dbProduct.image_url) {
+        const productId = dbProduct.id;
+        const productName = dbProduct.name;
+        import("@/lib/supabase-admin").then(({ supabaseAdmin }) => {
+          fetch(
+            `https://world.openbeautyfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(productName)}&search_simple=1&action=process&json=1&page_size=3`
+          )
+            .then((r) => r.json())
+            .then((data) => {
+              const img =
+                data.products?.[0]?.image_front_url ?? data.products?.[0]?.image_url ?? null;
+              if (img) {
+                supabaseAdmin.from("products").update({ image_url: img }).eq("id", productId).then(() => {});
+              }
+            })
+            .catch(() => {});
+        }).catch(() => {});
+      }
 
       // Collect OBF variants (shown as alternatives at bottom of results)
       const obfData = await obfFetch;

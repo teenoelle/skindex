@@ -5,6 +5,7 @@ const ALLOWED_HOSTS = new Set([
   "images.openfoodfacts.org",
   "static.openfoodfacts.org",
   "world.openfoodfacts.org",
+  "fqpqlllixjnzsdpqrovv.supabase.co",
 ]);
 
 export async function GET(req: NextRequest) {
