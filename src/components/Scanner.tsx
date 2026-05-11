@@ -603,7 +603,7 @@ export default function Scanner() {
                 <p className="text-sm text-gray-400">No alternatives found in the database.</p>
               )}
               {alternatives.length > 0 && (
-                <div>
+                <div className="mt-6">
                   <button
                     type="button"
                     className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-widest mb-3"
