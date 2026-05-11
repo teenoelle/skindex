@@ -409,7 +409,7 @@ export default function Scanner() {
 
           {/* Product header */}
           {result.product && (
-            <div className="flex rounded-xl border border-gray-100 overflow-hidden min-h-[200px]">
+            <div className="flex rounded-xl border border-gray-100 overflow-hidden min-h-[380px]">
               {/* Image panel */}
               <div className="w-64 shrink-0 bg-gray-50 flex items-center justify-center relative">
                 {result.product.image_url ? (
