@@ -130,6 +130,7 @@ export async function POST(req: NextRequest) {
   const { type, query, ingredients, url, productId } = await req.json();
 
   let rawIngredients = "";
+  let autoImportedProductId: string | null = null;
   let communityVariants: CommunityVariant[] | undefined;
   let obfVariants: ObfVariant[] | undefined;
   let product: {
@@ -300,13 +301,14 @@ export async function POST(req: NextRequest) {
           image_url: obfFullImage(p.image_front_url || p.image_url || null),
         };
 
-        await supabase.from("products").insert({
+        const { data: inserted } = await supabase.from("products").insert({
           name: p.product_name || query,
           brand: p.brands || null,
           ingredient_list: p.ingredients_text,
           image_url: obfFullImage(p.image_front_url || p.image_url || null),
           source: "auto-imported",
-        });
+        }).select("id").single();
+        autoImportedProductId = inserted?.id ?? null;
 
         // Offer remaining OBF results as variants
         const obfProducts = (obfData?.products ?? []).slice(1).filter(
@@ -423,6 +425,19 @@ export async function POST(req: NextRequest) {
         }
         break;
       }
+    }
+  }
+
+  // Fire-and-forget: populate product_ingredients for newly auto-imported products
+  if (autoImportedProductId) {
+    const pid = autoImportedProductId;
+    const rows = [...safeFiltered, ...flagged]
+      .filter((m) => !m.ingredient.id.startsWith("comedo-"))
+      .map((m, idx) => ({ product_id: pid, ingredient_id: m.ingredient.id, position: idx + 1 }));
+    if (rows.length > 0) {
+      import("@/lib/supabase-admin").then(({ supabaseAdmin }) => {
+        supabaseAdmin.from("product_ingredients").upsert(rows, { onConflict: "product_id,ingredient_id" }).then(() => {});
+      }).catch(() => {});
     }
   }
 
