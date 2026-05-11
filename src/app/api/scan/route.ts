@@ -376,11 +376,13 @@ export async function POST(req: NextRequest) {
 
   // Build comedogenic list from originalItems and merge into flagged
   const dbFlaggedNames = new Set(flagged.map((f) => f.displayName.toLowerCase().trim()));
+  const dbSafeNames = new Set(safe.map((f) => f.displayName.toLowerCase().trim()));
   const seenComedoKeys = new Set<string>();
   for (let i = 0; i < originalItems.length; i++) {
     const item = originalItems[i];
     const cleaned = item.replace(/\([^)]*\)/g, "").trim();
     if (dbFlaggedNames.has(cleaned.toLowerCase())) continue; // already flagged from DB
+    if (dbSafeNames.has(cleaned.toLowerCase())) continue; // explicitly safe in DB — DB classification wins
     for (const rule of COMEDOGENIC_PATTERNS) {
       if (rule.maxPosition !== undefined && i >= rule.maxPosition) continue;
       if (!rule.pattern.test(cleaned)) continue;
