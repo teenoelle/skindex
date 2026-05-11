@@ -702,16 +702,10 @@ export default function Scanner() {
                     : photoItem ? "photo-sensitive"
                     : match?.status === "safe" ? "safe"
                     : "unreviewed";
-                  const isItemExpanded =
-                    colorKey !== "unreviewed" && (
-                      match ? expanded.has(match.ingredient.id) : expanded.has(`photo-${item}`)
-                    );
                   const colorClass =
-                    colorKey === "unreviewed"
-                      ? paragraphColor.unreviewed
-                      : isItemExpanded
-                        ? paragraphColor[colorKey]
-                        : "text-gray-700 font-medium";
+                    colorKey === "unreviewed" ? paragraphColor.unreviewed
+                    : colorKey === "safe" ? "text-gray-700 font-medium"
+                    : paragraphColor[colorKey];
                   return (
                     <Fragment key={i}>
                       {photoItem ? (
@@ -772,7 +766,7 @@ export default function Scanner() {
                         className="w-full flex items-center justify-between px-3 py-1 text-left"
                         onClick={() => toggleExpand(id, dbExplanation)}
                       >
-                        <span className="text-sm font-medium text-gray-800">
+                        <span className={`text-sm font-medium ${isOpen ? "text-rose-700" : "text-gray-800"}`}>
                           {smartCase(item.displayName)}
                         </span>
                         <span className="text-gray-300 text-xs ml-4 shrink-0">
@@ -820,7 +814,7 @@ export default function Scanner() {
                           return next;
                         })}
                       >
-                        <span className="text-sm font-medium text-gray-800">
+                        <span className={`text-sm font-medium ${isOpen ? "text-yellow-700" : "text-gray-800"}`}>
                           {smartCase(item.rawName)}
                         </span>
                         <span className="text-gray-300 text-xs ml-4 shrink-0">
@@ -862,7 +856,7 @@ export default function Scanner() {
                         className="w-full flex items-center justify-between pl-3 pr-2 py-0.5 text-left"
                         onClick={() => toggleExpand(id, dbExplanation)}
                       >
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className={`text-sm font-medium ${isOpen ? "text-teal-700" : "text-gray-700"}`}>
                           {smartCase(item.displayName)}
                         </span>
                         <span className="text-gray-300 text-xs ml-4 shrink-0">
