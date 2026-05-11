@@ -411,14 +411,14 @@ export default function Scanner() {
           {result.product && (
             <div className="flex rounded-xl border border-gray-100 overflow-hidden min-h-[200px]">
               {/* Image panel */}
-              <div className="w-44 shrink-0 bg-gray-50 flex items-center justify-center relative">
+              <div className="w-64 shrink-0 bg-gray-50 flex items-center justify-center relative">
                 {result.product.image_url ? (
                   <Image
                     src={proxyImage(result.product.image_url)!}
                     fill
                     alt=""
                     className="object-contain p-3"
-                    sizes="176px"
+                    sizes="256px"
                     unoptimized
                   />
                 ) : (

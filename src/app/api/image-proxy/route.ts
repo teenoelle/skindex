@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   if (parsed.hostname === "cloudinary.images-iherb.com") {
     fetchUrl = fetchUrl
       .replace("q_auto:eco", "q_auto:best")
-      .replace("/image/upload/", "/image/upload/w_600,")
+      .replace("/image/upload/", "/image/upload/w_900,")
       .replace(/\/s\/(\d+\.\w+)$/, "/l/$1");
   }
 
