@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+// Images from these hosts are served by reliable CDNs — store the URL as-is, no upload needed
+const RELIABLE_CDN_HOSTS = new Set([
+  "cloudinary.images-iherb.com",
+  "images.openbeautyfacts.org",
+  "images.openfoodfacts.org",
+  "static.openbeautyfacts.org",
+  "world.openbeautyfacts.org",
+  "fqpqlllixjnzsdpqrovv.supabase.co",
+]);
+
 const DIRECT_IMAGE_HOSTS = ["cloudinary", "images-iherb", "openfoodfacts", "openbeautyfacts", "cdn", "supabase"];
 const DIRECT_IMAGE_EXT = /\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i;
+
+// Supabase image transform endpoint — resizes and converts to WebP on the fly
+const STORAGE_TRANSFORM_BASE =
+  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/render/image/public/product-images`;
+
+function isReliableCdn(url: string): boolean {
+  try {
+    return RELIABLE_CDN_HOSTS.has(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
 
 function isDirectImage(url: string): boolean {
   try {
@@ -48,7 +70,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing productId or url" }, { status: 400 });
   }
 
-  // Resolve to a direct image URL
+  // Resolve to a direct image URL (extract og:image if given a product page)
   let imageUrl: string = url;
   if (!isDirectImage(url)) {
     const extracted = await extractOgImage(url);
@@ -61,7 +83,17 @@ export async function POST(req: NextRequest) {
     imageUrl = extracted;
   }
 
-  // Fetch image bytes
+  // Reliable CDN: store the URL directly, no upload needed
+  if (isReliableCdn(imageUrl)) {
+    const { error } = await supabaseAdmin
+      .from("products")
+      .update({ image_url: imageUrl })
+      .eq("id", productId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ imageUrl });
+  }
+
+  // Unknown source: fetch and upload to Supabase Storage
   let imageBytes: ArrayBuffer;
   let contentType = "image/jpeg";
   try {
@@ -76,7 +108,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not fetch the image" }, { status: 400 });
   }
 
-  // Upload to Supabase Storage
   const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
   const filename = `${productId}.${ext}`;
   const { error: uploadError } = await supabaseAdmin.storage
@@ -86,15 +117,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
-  const { data: { publicUrl } } = supabaseAdmin.storage.from("product-images").getPublicUrl(filename);
+  // Use Supabase's transform endpoint: resizes to 600px and converts to WebP on the fly
+  const transformUrl = `${STORAGE_TRANSFORM_BASE}/${filename}?width=600&quality=80&format=webp`;
 
   const { error: updateError } = await supabaseAdmin
     .from("products")
-    .update({ image_url: publicUrl })
+    .update({ image_url: transformUrl })
     .eq("id", productId);
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ imageUrl: publicUrl });
+  return NextResponse.json({ imageUrl: transformUrl });
 }
