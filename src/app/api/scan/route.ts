@@ -376,19 +376,19 @@ export async function POST(req: NextRequest) {
 
   // Build comedogenic list from originalItems and merge into flagged
   const dbFlaggedNames = new Set(flagged.map((f) => f.displayName.toLowerCase().trim()));
-  const dbSafeNames = new Set(safe.map((f) => f.displayName.toLowerCase().trim()));
   const seenComedoKeys = new Set<string>();
+  const comedoFlaggedKeys = new Set<string>();
   for (let i = 0; i < originalItems.length; i++) {
     const item = originalItems[i];
     const cleaned = item.replace(/\([^)]*\)/g, "").trim();
     if (dbFlaggedNames.has(cleaned.toLowerCase())) continue; // already flagged from DB
-    if (dbSafeNames.has(cleaned.toLowerCase())) continue; // explicitly safe in DB — DB classification wins
     for (const rule of COMEDOGENIC_PATTERNS) {
       if (rule.maxPosition !== undefined && i >= rule.maxPosition) continue;
       if (!rule.pattern.test(cleaned)) continue;
       const key = cleaned.toLowerCase();
       if (!seenComedoKeys.has(key)) {
         seenComedoKeys.add(key);
+        comedoFlaggedKeys.add(key);
         flagged.push({
           displayName: cleaned,
           ingredient: {
@@ -404,6 +404,10 @@ export async function POST(req: NextRequest) {
       break;
     }
   }
+  // Remove pattern-flagged ingredients from safe to avoid dual-listing
+  const safeFiltered = safe.filter(
+    (s) => !comedoFlaggedKeys.has(s.displayName.toLowerCase().trim())
+  );
 
   // Build photosensitive list from originalItems using pattern matching
   const photosensitive: PhotosensitiveItem[] = [];
@@ -448,5 +452,5 @@ export async function POST(req: NextRequest) {
     ).catch(() => { /* never block the scan response */ });
   }
 
-  return NextResponse.json({ product, safe, flagged, unreviewed, photosensitive, communityVariants, obfVariants, originalItems, isIncomplete });
+  return NextResponse.json({ product, safe: safeFiltered, flagged, unreviewed, photosensitive, communityVariants, obfVariants, originalItems, isIncomplete });
 }
