@@ -28,6 +28,27 @@ const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; 
   },
 ];
 
+const COMEDOGENIC_PATTERNS: { pattern: RegExp; note: string; maxPosition?: number }[] = [
+  {
+    pattern: /polysorbate[ -]?\d+/i,
+    note: "Polysorbates are emulsifiers commonly linked to closed comedones (hard, flesh-colored bumps), particularly on the forehead and chin.",
+  },
+  {
+    pattern: /cyclopentasiloxane|cyclohexasiloxane|cyclomethicone|trimethylsiloxysilicate|dimethicone\/vinyl dimethicone crosspolymer/i,
+    note: "Heavy or cyclic silicones form an occlusive film on the skin's surface that can trap sebum and dead skin cells, contributing to closed comedones on acne-prone or reactive skin.",
+  },
+  {
+    pattern: /palmitoyl\s+(tri|tetra|hexa|octa|di|oligo)?peptide|palmitoyl\s+dipeptide/i,
+    note: "Palmitoyl peptide carriers use fatty acid chains to deliver active peptides into skin. These chains can be occlusive and may trigger closed comedones in pore-prone skin.",
+  },
+  {
+    // Only flag glycols when they appear high in the formula (first 5 ingredients)
+    pattern: /^(butylene glycol|dipropylene glycol)$/i,
+    note: "At high concentrations — indicated by appearing in the first five ingredients — Butylene Glycol and Dipropylene Glycol can disrupt the skin barrier and contribute to closed comedones.",
+    maxPosition: 5,
+  },
+];
+
 function stripHtml(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -348,6 +369,35 @@ export async function POST(req: NextRequest) {
   const isIncomplete = originalItems.length > 0 && originalItems.length < 5;
 
   const { safe, flagged, unreviewed } = await matchIngredients(rawIngredients);
+
+  // Build comedogenic list from originalItems and merge into flagged
+  const dbFlaggedNames = new Set(flagged.map((f) => f.displayName.toLowerCase().trim()));
+  const seenComedoKeys = new Set<string>();
+  for (let i = 0; i < originalItems.length; i++) {
+    const item = originalItems[i];
+    const cleaned = item.replace(/\([^)]*\)/g, "").trim();
+    if (dbFlaggedNames.has(cleaned.toLowerCase())) continue; // already flagged from DB
+    for (const rule of COMEDOGENIC_PATTERNS) {
+      if (rule.maxPosition !== undefined && i >= rule.maxPosition) continue;
+      if (!rule.pattern.test(cleaned)) continue;
+      const key = cleaned.toLowerCase();
+      if (!seenComedoKeys.has(key)) {
+        seenComedoKeys.add(key);
+        flagged.push({
+          displayName: cleaned,
+          ingredient: {
+            id: `comedo-${key.replace(/[^a-z0-9]/g, "-")}`,
+            name: cleaned,
+            inci_name: null,
+            status: "flagged",
+            explanation: rule.note,
+            category: null,
+          },
+        });
+      }
+      break;
+    }
+  }
 
   // Build photosensitive list from originalItems using pattern matching
   const photosensitive: PhotosensitiveItem[] = [];
