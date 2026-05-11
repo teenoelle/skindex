@@ -653,10 +653,16 @@ export default function Scanner() {
             </section>
           )}
 
+          {/* Ingredients parent section */}
+          <section className="space-y-8">
+          <p className="text-xs font-semibold text-gray-700 uppercase tracking-widest">
+            Ingredients
+          </p>
+
           {/* Full ingredient list — paragraph view */}
           {result.originalItems.length > 0 && (
             <section>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
                 Full ingredient list
               </p>
               <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-sm leading-relaxed select-text">
@@ -885,6 +891,8 @@ export default function Scanner() {
           {result.flagged.length === 0 && result.safe.length === 0 && result.unreviewed.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-4">No ingredients found.</p>
           )}
+
+          </section>{/* end Ingredients */}
 
           {/* OBF variants — collapsible "More variants from Open Beauty Facts" */}
           {result.obfVariants && result.obfVariants.length > 0 && (
