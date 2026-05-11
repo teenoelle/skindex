@@ -433,18 +433,18 @@ export default function Scanner() {
 
           {/* Product header */}
           {result.product && (
-            <div className="flex rounded-xl border border-gray-100 overflow-hidden">
+            <div className="flex flex-col sm:flex-row rounded-xl border border-gray-100 overflow-hidden">
               {/* Image panel */}
-              <div className={`w-64 shrink-0 bg-gray-50${result.product.image_url ? "" : " flex items-center justify-center min-h-[200px]"}`}>
+              <div className={`sm:w-64 shrink-0 bg-gray-50${result.product.image_url ? "" : " flex items-center justify-center min-h-[200px]"}`}>
                 {result.product.image_url ? (
                   <Image
                     src={proxyImage(result.product.image_url)!}
                     width={256}
                     height={384}
                     alt=""
-                    className="w-full object-contain p-3"
+                    className="w-full object-contain p-3 max-h-[260px] sm:max-h-none"
                     style={{ height: "auto" }}
-                    sizes="256px"
+                    sizes="(max-width: 640px) 100vw, 256px"
                     unoptimized
                   />
                 ) : (
@@ -453,8 +453,8 @@ export default function Scanner() {
               </div>
 
               {/* Details panel */}
-              <div className="flex-1 p-3 flex flex-col justify-center gap-1 min-w-0">
-                <h2 className="text-base font-semibold text-gray-900 leading-snug">
+              <div className="flex-1 p-2 sm:p-3 flex flex-col justify-center gap-1 min-w-0">
+                <h2 className="text-lg font-semibold text-gray-900 leading-snug">
                   {result.product.source === "url-extract"
                     ? (() => { try { return new URL(result.product.name).hostname.replace("www.", ""); } catch { return result.product.name; } })()
                     : result.product.name}
@@ -482,8 +482,8 @@ export default function Scanner() {
                   )}
                 </div>
 
-                {/* Image upload / change */}
-                {result.product.id && (
+                {/* Image upload / change — signed-in users only */}
+                {result.product.id && isSignedIn && (
                   <div className="mt-1">
                     {!imageUploadOpen ? (
                       <button
@@ -702,7 +702,16 @@ export default function Scanner() {
                     : photoItem ? "photo-sensitive"
                     : match?.status === "safe" ? "safe"
                     : "unreviewed";
-                  const colorClass = paragraphColor[colorKey];
+                  const isItemExpanded =
+                    colorKey !== "unreviewed" && (
+                      match ? expanded.has(match.ingredient.id) : expanded.has(`photo-${item}`)
+                    );
+                  const colorClass =
+                    colorKey === "unreviewed"
+                      ? paragraphColor.unreviewed
+                      : isItemExpanded
+                        ? paragraphColor[colorKey]
+                        : "text-gray-700 font-medium";
                   return (
                     <Fragment key={i}>
                       {photoItem ? (

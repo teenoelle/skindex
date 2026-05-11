@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 // Images from these hosts are served by reliable CDNs — store the URL as-is, no upload needed
@@ -65,6 +66,11 @@ async function extractOgImage(pageUrl: string): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Sign in to update product images" }, { status: 401 });
+  }
+
   const { productId, url } = await req.json();
   if (!productId || !url) {
     return NextResponse.json({ error: "Missing productId or url" }, { status: 400 });
@@ -90,6 +96,7 @@ export async function POST(req: NextRequest) {
       .update({ image_url: imageUrl })
       .eq("id", productId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    console.log(`[image] product ${productId} updated by ${userId} at ${new Date().toISOString()}`);
     return NextResponse.json({ imageUrl });
   }
 
@@ -128,5 +135,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
+  console.log(`[image] product ${productId} updated by ${userId} at ${new Date().toISOString()}`);
   return NextResponse.json({ imageUrl: transformUrl });
 }
