@@ -100,7 +100,6 @@ export default function Scanner() {
   const [showObfVariants, setShowObfVariants] = useState(false);
   const [explanations, setExplanations] = useState<Record<string, string | null>>({});
   const [alternatives, setAlternatives] = useState<AlternativeProduct[]>([]);
-  const [alternativesFallback, setAlternativesFallback] = useState(false);
   const [alternativesLoading, setAlternativesLoading] = useState(false);
   const [alternativesFetched, setAlternativesFetched] = useState(false);
   const [alternativesOpen, setAlternativesOpen] = useState(true);
@@ -121,7 +120,6 @@ export default function Scanner() {
     setExpanded(new Set());
     setExplanations({});
     setAlternatives([]);
-    setAlternativesFallback(false);
     setAlternativesLoading(false);
     setAlternativesFetched(false);
     setAlternativesOpen(true);
@@ -228,7 +226,6 @@ export default function Scanner() {
     setExpanded(new Set());
     setExplanations({});
     setAlternatives([]);
-    setAlternativesFallback(false);
     setAlternativesLoading(false);
     setAlternativesFetched(false);
     setAlternativesOpen(true);
@@ -275,7 +272,6 @@ export default function Scanner() {
     });
     const data = await res.json();
     setAlternatives(data.results ?? []);
-    setAlternativesFallback(data.sameTypeFallback ?? false);
     setAlternativesLoading(false);
     setAlternativesFetched(true);
   }
@@ -614,16 +610,8 @@ export default function Scanner() {
                   </button>
                   {alternativesOpen && <div className="divide-y divide-gray-100">
                     {alternatives.map((alt, i) => {
-                      const showSeparator =
-                        alternativesFallback &&
-                        !alt.sameType &&
-                        i > 0 &&
-                        alternatives[i - 1].sameType;
                       return (
                         <Fragment key={alt.id}>
-                          {showSeparator && (
-                            <p className="text-xs text-gray-400 pt-3 pb-1">Also in other categories</p>
-                          )}
                           <div className="flex items-center gap-3 py-2">
                             {alt.image_url ? (
                               <Image
