@@ -535,7 +535,7 @@ export default function Scanner() {
           <div className="space-y-2">
           {(result.flagged.length + result.safe.length + result.unreviewed.length) > 0 && (
             <p className="text-xs text-gray-400 -mt-2">
-              {result.flagged.length + result.safe.length + result.unreviewed.length} ingredients scanned
+              <span className="text-gray-700">{result.flagged.length + result.safe.length + result.unreviewed.length}</span> ingredients scanned
               {" · "}
               <button
                 type="button"
