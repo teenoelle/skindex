@@ -89,14 +89,15 @@ export async function POST(req: NextRequest) {
     imageUrl = extracted;
   }
 
+  const now = new Date().toISOString();
+
   // Reliable CDN: store the URL directly, no upload needed
   if (isReliableCdn(imageUrl)) {
     const { error } = await supabaseAdmin
       .from("products")
-      .update({ image_url: imageUrl })
+      .update({ image_url: imageUrl, image_updated_by: userId, image_updated_at: now })
       .eq("id", productId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    console.log(`[image] product ${productId} updated by ${userId} at ${new Date().toISOString()}`);
     return NextResponse.json({ imageUrl });
   }
 
@@ -129,12 +130,11 @@ export async function POST(req: NextRequest) {
 
   const { error: updateError } = await supabaseAdmin
     .from("products")
-    .update({ image_url: transformUrl })
+    .update({ image_url: transformUrl, image_updated_by: userId, image_updated_at: now })
     .eq("id", productId);
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  console.log(`[image] product ${productId} updated by ${userId} at ${new Date().toISOString()}`);
   return NextResponse.json({ imageUrl: transformUrl });
 }
