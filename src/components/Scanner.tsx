@@ -409,15 +409,17 @@ export default function Scanner() {
 
           {/* Product header */}
           {result.product && (
-            <div className="flex rounded-xl border border-gray-100 overflow-hidden min-h-[380px]">
+            <div className="flex rounded-xl border border-gray-100 overflow-hidden">
               {/* Image panel */}
-              <div className="w-64 shrink-0 bg-gray-50 flex items-center justify-center relative">
+              <div className={`w-64 shrink-0 bg-gray-50${result.product.image_url ? "" : " flex items-center justify-center min-h-[200px]"}`}>
                 {result.product.image_url ? (
                   <Image
                     src={proxyImage(result.product.image_url)!}
-                    fill
+                    width={256}
+                    height={384}
                     alt=""
-                    className="object-contain p-3"
+                    className="w-full object-contain p-3"
+                    style={{ height: "auto" }}
                     sizes="256px"
                     unoptimized
                   />
