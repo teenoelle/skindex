@@ -442,7 +442,7 @@ export default function Scanner() {
                     width={256}
                     height={384}
                     alt=""
-                    className="w-full object-contain p-3 sm:max-h-[70vh]"
+                    className="w-full object-contain p-3 sm:max-h-[60vh]"
                     style={{ height: "auto" }}
                     sizes="(max-width: 640px) 100vw, 256px"
                     unoptimized
