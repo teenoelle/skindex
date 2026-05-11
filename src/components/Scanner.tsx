@@ -606,7 +606,7 @@ export default function Scanner() {
                 <div className="mt-6">
                   <button
                     type="button"
-                    className="flex items-center gap-2 text-xs font-medium text-teal-700 uppercase tracking-widest mb-3"
+                    className="flex items-center gap-2 text-xs font-semibold text-teal-700 uppercase tracking-widest mb-3"
                     onClick={() => setAlternativesOpen((v) => !v)}
                   >
                     Safer alternatives — {alternatives.length}
