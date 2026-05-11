@@ -80,7 +80,7 @@ function getItemMatch(
 const paragraphColor = {
   "photo-sensitive": "text-yellow-700 font-medium",
   flagged: "text-rose-700 font-medium",
-  safe: "text-gray-700 font-medium",
+  safe: "text-teal-700 font-medium",
   unreviewed: "text-gray-400",
 };
 
@@ -185,6 +185,30 @@ export default function Scanner() {
         behavior: "smooth",
         block: "nearest",
       });
+    });
+  }
+
+  function handlePhotoClick(rawName: string, safeMatch: { id: string; explanation: string | null } | null) {
+    const photoKey = `photo-${rawName}`;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.add(photoKey);
+      if (safeMatch) next.add(safeMatch.id);
+      return next;
+    });
+    if (safeMatch && !safeMatch.explanation && !(safeMatch.id in explanations)) {
+      setExplanations((prev) => ({ ...prev, [safeMatch.id]: null }));
+      fetch("/api/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: safeMatch.id }),
+      })
+        .then((r) => r.json())
+        .then((data) => setExplanations((prev) => ({ ...prev, [safeMatch.id]: data.explanation ?? null })))
+        .catch(() => {});
+    }
+    requestAnimationFrame(() => {
+      document.getElementById("section-photosensitive")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
@@ -458,8 +482,8 @@ export default function Scanner() {
                   )}
                 </div>
 
-                {/* Image upload (shown when product has no image and has an ID) */}
-                {result.product.id && !result.product.image_url && (
+                {/* Image upload / change */}
+                {result.product.id && (
                   <div className="mt-1">
                     {!imageUploadOpen ? (
                       <button
@@ -467,7 +491,7 @@ export default function Scanner() {
                         onClick={() => setImageUploadOpen(true)}
                         className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600"
                       >
-                        Add image
+                        {result.product.image_url ? "Change image" : "Add image"}
                       </button>
                     ) : (
                       <div className="flex flex-col gap-1.5">
@@ -535,7 +559,7 @@ export default function Scanner() {
               {" · "}
               <button
                 type="button"
-                className="hover:underline underline-offset-2"
+                className="text-teal-700 hover:underline underline-offset-2"
                 onClick={() => document.getElementById("section-safe")?.scrollIntoView({ behavior: "smooth", block: "start" })}
               >
                 {result.safe.length} safe
@@ -681,7 +705,15 @@ export default function Scanner() {
                   const colorClass = paragraphColor[colorKey];
                   return (
                     <Fragment key={i}>
-                      {match ? (
+                      {photoItem ? (
+                        <button
+                          type="button"
+                          className={`${colorClass} hover:underline underline-offset-2`}
+                          onClick={() => handlePhotoClick(item, match ? { id: match.ingredient.id, explanation: match.ingredient.explanation } : null)}
+                        >
+                          {smartCase(item)}
+                        </button>
+                      ) : match ? (
                         <button
                           type="button"
                           className={`${colorClass} hover:underline underline-offset-2`}
@@ -801,7 +833,7 @@ export default function Scanner() {
           {/* Safe ingredients */}
           {result.safe.length > 0 && (
             <section id="section-safe">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">
+              <p className="text-xs font-semibold text-teal-700 uppercase tracking-widest mb-2">
                 Safe ingredients — {result.safe.length}
               </p>
               <div className="divide-y divide-gray-100">
