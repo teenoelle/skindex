@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { countComedogenicPatternMatches } from "@/lib/comedogenic";
 
 export async function POST(req: NextRequest) {
   const { flaggedIds, productType } = await req.json();
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     excludedIds.length > 0
       ? base.not("id", "in", `(${excludedIds.join(",")})`)
       : base
-  );
+  ).select("id, name, brand, type, image_url, ingredient_list");
 
   if (!candidates?.length) {
     return NextResponse.json({ results: [], sameTypeFallback: false });
@@ -55,15 +56,19 @@ export async function POST(req: NextRequest) {
   // 5. Build and sort results: same type first, then by flagged count ascending
   const normalizedType = productType?.toLowerCase().trim() ?? null;
 
-  const results = candidates.map((p) => ({
-    id: p.id,
-    name: p.name,
-    brand: p.brand ?? null,
-    type: p.type ?? null,
-    image_url: p.image_url ?? null,
-    flaggedCount: flaggedCounts.get(p.id) ?? 0,
-    sameType: normalizedType ? p.type?.toLowerCase().trim() === normalizedType : false,
-  }));
+  const results = candidates.map((p) => {
+    const dbCount = flaggedCounts.get(p.id) ?? 0;
+    const patternCount = p.ingredient_list ? countComedogenicPatternMatches(p.ingredient_list) : 0;
+    return {
+      id: p.id,
+      name: p.name,
+      brand: p.brand ?? null,
+      type: p.type ?? null,
+      image_url: p.image_url ?? null,
+      flaggedCount: dbCount + patternCount,
+      sameType: normalizedType ? p.type?.toLowerCase().trim() === normalizedType : false,
+    };
+  });
 
   results.sort((a, b) => {
     if (a.sameType !== b.sameType) return a.sameType ? -1 : 1;
