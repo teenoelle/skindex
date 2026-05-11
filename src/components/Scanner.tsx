@@ -507,7 +507,8 @@ export default function Scanner() {
             </div>
           )}
 
-          {/* Summary line */}
+          {/* Summary line + safe alternatives group */}
+          <div className="space-y-2">
           {(result.flagged.length + result.safe.length + result.unreviewed.length) > 0 && (
             <p className="text-xs text-gray-400 -mt-2">
               {result.flagged.length + result.safe.length + result.unreviewed.length} ingredients scanned
@@ -568,7 +569,7 @@ export default function Scanner() {
                   onClick={fetchAlternatives}
                   className="text-sm text-gray-500 underline underline-offset-2 hover:text-gray-800"
                 >
-                  Find safe alternatives →
+                  Find safer alternatives →
                 </button>
               )}
               {alternativesLoading && (
@@ -639,6 +640,7 @@ export default function Scanner() {
               )}
             </section>
           )}
+          </div>{/* end summary + alternatives group */}
 
           {/* Incomplete warning */}
           {result.isIncomplete && (
