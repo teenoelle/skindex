@@ -559,19 +559,6 @@ export default function Scanner() {
             </p>
           )}
 
-          {/* Incomplete warning */}
-          {result.isIncomplete && (
-            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3">
-              This ingredient list may be incomplete.{" "}
-              <button
-                className="underline font-medium"
-                onClick={() => switchToPaste(result.product?.name)}
-              >
-                Add the full list manually
-              </button>
-            </div>
-          )}
-
           {/* Safe alternatives */}
           {result.flagged.length > 0 && (
             <section>
@@ -651,6 +638,19 @@ export default function Scanner() {
                 </div>
               )}
             </section>
+          )}
+
+          {/* Incomplete warning */}
+          {result.isIncomplete && (
+            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3">
+              This ingredient list may be incomplete.{" "}
+              <button
+                className="underline font-medium"
+                onClick={() => switchToPaste(result.product?.name)}
+              >
+                Add the full list manually
+              </button>
+            </div>
           )}
 
           {/* Ingredients parent section */}
