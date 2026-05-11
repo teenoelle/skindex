@@ -42,6 +42,10 @@ const COMEDOGENIC_PATTERNS: { pattern: RegExp; note: string; maxPosition?: numbe
     note: "Palmitoyl peptide carriers use fatty acid chains to deliver active peptides into skin. These chains can be occlusive and may trigger closed comedones in pore-prone skin.",
   },
   {
+    pattern: /\b(algae|laminaria|fucus|ascophyllum|sargassum|chlorella|spirulina|ecklonia|macrocystis|undaria|porphyra|ulva|chondrus|carrageenan)\b/i,
+    note: "Algae-derived ingredients provide a smooth, slippery skin feel but are associated with closed comedones on acne-prone and reactive skin due to their polysaccharide content, which can trap sebum in the pore.",
+  },
+  {
     // Only flag glycols when they appear high in the formula (first 5 ingredients)
     pattern: /^(butylene glycol|dipropylene glycol)$/i,
     note: "At high concentrations — indicated by appearing in the first five ingredients — Butylene Glycol and Dipropylene Glycol can disrupt the skin barrier and contribute to closed comedones.",
