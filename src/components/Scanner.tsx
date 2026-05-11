@@ -606,10 +606,10 @@ export default function Scanner() {
                 <div className="mt-6">
                   <button
                     type="button"
-                    className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-widest mb-3"
+                    className="flex items-center gap-2 text-xs font-medium text-teal-700 uppercase tracking-widest mb-3"
                     onClick={() => setAlternativesOpen((v) => !v)}
                   >
-                    Safe alternatives — {alternatives.length}
+                    Safer alternatives — {alternatives.length}
                     <span className="text-gray-300">{alternativesOpen ? "▲" : "▼"}</span>
                   </button>
                   {alternativesOpen && <div className="divide-y divide-gray-100">
