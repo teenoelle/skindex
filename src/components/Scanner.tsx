@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { useUser, SignInButton } from "@clerk/nextjs";
+import Image from "next/image";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IngredientMatch, PhotosensitiveItem, ScanResult, AlternativeProduct } from "@/types";
@@ -410,12 +411,15 @@ export default function Scanner() {
           {result.product && (
             <div className="flex rounded-xl border border-gray-100 overflow-hidden min-h-[200px]">
               {/* Image panel */}
-              <div className="w-44 shrink-0 bg-gray-50 flex items-center justify-center">
+              <div className="w-44 shrink-0 bg-gray-50 flex items-center justify-center relative">
                 {result.product.image_url ? (
-                  <img
+                  <Image
                     src={proxyImage(result.product.image_url)!}
+                    fill
                     alt=""
-                    className="w-full h-full object-contain p-3"
+                    className="object-contain p-3"
+                    sizes="176px"
+                    unoptimized
                   />
                 ) : (
                   <CategoryIcon type={result.product.type} size={32} />
@@ -608,10 +612,13 @@ export default function Scanner() {
                           )}
                           <div className="flex items-center gap-3 py-2">
                             {alt.image_url ? (
-                              <img
+                              <Image
                                 src={proxyImage(alt.image_url)!}
+                                width={48}
+                                height={56}
                                 alt=""
-                                className="w-12 h-14 object-contain rounded-lg border border-gray-100 bg-gray-50 shrink-0"
+                                className="object-contain rounded-lg border border-gray-100 bg-gray-50 shrink-0"
+                                unoptimized
                               />
                             ) : (
                               <div className="w-12 h-14 rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center shrink-0">

@@ -23,12 +23,13 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Disallowed host", { status: 403 });
   }
 
-  // Upgrade iHerb Cloudinary quality and request a larger size
+  // Upgrade iHerb Cloudinary: use large (/l/) variant, best quality, cap to 600px
   let fetchUrl = parsed.toString();
   if (parsed.hostname === "cloudinary.images-iherb.com") {
     fetchUrl = fetchUrl
       .replace("q_auto:eco", "q_auto:best")
-      .replace("/image/upload/", "/image/upload/w_600,");
+      .replace("/image/upload/", "/image/upload/w_600,")
+      .replace(/\/s\/(\d+\.\w+)$/, "/l/$1");
   }
 
   try {

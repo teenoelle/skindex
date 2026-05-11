@@ -5,6 +5,11 @@ import { supabase } from "@/lib/supabase";
 import { anthropic } from "@/lib/anthropic";
 import type { CommunityVariant, ObfVariant, PhotosensitiveItem } from "@/types";
 
+function obfFullImage(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return url.replace(/\.\d+\.jpg$/, ".full.jpg");
+}
+
 const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; note: string }[] = [
   {
     pattern: /retinol|retinyl palmitate|retinyl acetate|retinaldehyde|tretinoin/i,
@@ -226,8 +231,9 @@ export async function POST(req: NextRequest) {
           )
             .then((r) => r.json())
             .then((data) => {
-              const img =
-                data.products?.[0]?.image_front_url ?? data.products?.[0]?.image_url ?? null;
+              const img = obfFullImage(
+                data.products?.[0]?.image_front_url ?? data.products?.[0]?.image_url ?? null
+              );
               if (img) {
                 supabaseAdmin.from("products").update({ image_url: img }).eq("id", productId).then(() => {});
               }
@@ -251,7 +257,7 @@ export async function POST(req: NextRequest) {
         }) => ({
           name: p.product_name,
           brand: p.brands ?? null,
-          image_url: p.image_front_url ?? p.image_url ?? null,
+          image_url: obfFullImage(p.image_front_url ?? p.image_url ?? null),
           ingredients_text: p.ingredients_text,
         }));
       }
@@ -266,14 +272,14 @@ export async function POST(req: NextRequest) {
           brand: p.brands || null,
           source: "openbeautyfacts",
           type: null,
-          image_url: p.image_front_url || p.image_url || null,
+          image_url: obfFullImage(p.image_front_url || p.image_url || null),
         };
 
         await supabase.from("products").insert({
           name: p.product_name || query,
           brand: p.brands || null,
           ingredient_list: p.ingredients_text,
-          image_url: p.image_front_url || p.image_url || null,
+          image_url: obfFullImage(p.image_front_url || p.image_url || null),
           source: "auto-imported",
         });
 
@@ -291,7 +297,7 @@ export async function POST(req: NextRequest) {
           }) => ({
             name: q.product_name,
             brand: q.brands ?? null,
-            image_url: q.image_front_url ?? q.image_url ?? null,
+            image_url: obfFullImage(q.image_front_url ?? q.image_url ?? null),
             ingredients_text: q.ingredients_text,
           }));
         }
