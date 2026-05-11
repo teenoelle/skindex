@@ -681,7 +681,7 @@ export default function Scanner() {
 
           {/* Ingredients parent section */}
           <section className="space-y-8">
-          <p className="text-xs font-semibold text-gray-700 uppercase tracking-widest">
+          <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest">
             Ingredients
           </p>
 
