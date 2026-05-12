@@ -58,6 +58,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   "pore-clogger": "Pore-clogger",
   "occlusive": "Occlusive",
   "stripping": "Stripping",
+  "bacteria-trap": "Bacteria trap",
+  "cleansing": "Cleansing",
   "photosensitizer": "Photosensitizer",
   "photo-retinoid": "Retinoid",
   "photo-exfoliant": "Exfoliant",
@@ -106,6 +108,66 @@ const CATEGORY_LABELS: Record<string, string> = {
   "Anti-Inflammatory": "Anti-inflammatory",
   "Prebiotic": "Prebiotic",
   "Zinc": "Zinc",
+  // Informative structural/functional categories
+  "Silicone": "Silicone",
+  "Fatty Acid": "Fatty acid",
+  "Fatty Alcohol": "Fatty alcohol",
+  "Wax": "Wax",
+  "Pigment": "Pigment",
+  "Colorant": "Colorant",
+  "Conditioning": "Conditioning",
+  "pH Adjuster": "pH adjuster",
+  "Mineral": "Mineral",
+  "Magnesium": "Magnesium",
+  "Propolis": "Propolis",
+  "Oatmeal": "Oatmeal",
+  "Squalane": "Squalane",
+  "Panthenol": "Panthenol",
+  "Salicylic Acid": "Salicylic acid",
+  "Sulfur": "Sulfur",
+  "Azelaic Acid": "Azelaic acid",
+  "Benzoyl Peroxide": "Benzoyl peroxide",
+  "Copper": "Copper",
+  "Hypochlorous Acid": "Hypochlorous acid",
+  "Hydrocolloid": "Hydrocolloid",
+  "Camellia Sinensis Leaf Extract": "Green tea",
+  "Preservative Booster": "Preservative booster",
+  "Botanical Water": "Botanical water",
+  "Trace Mineral": "Trace mineral",
+};
+
+const STRUCTURAL_DESCRIPTIONS: Record<string, string> = {
+  "Emulsifier": "Emulsifiers help oil and water blend together to keep the formula stable.",
+  "Thickener": "Thickeners increase viscosity so the product spreads and feels even on skin.",
+  "Film Former": "Film formers create a thin protective film on the skin surface.",
+  "Surfactant": "Surfactants reduce surface tension to cleanse skin and rinse away dirt and oil.",
+  "Wax": "Waxes provide texture, structure, and a protective occlusive layer.",
+  "Pigment": "Pigments provide color in makeup or tinted skincare products.",
+  "Colorant": "Colorants add or enhance color in the formula.",
+  "pH Adjuster": "pH adjusters keep the formula at its optimal pH for stability and skin compatibility.",
+  "Conditioning Agent": "Conditioning agents coat and smooth hair and skin surfaces to reduce friction.",
+  "Silicone": "Silicones provide a silky texture and slip; they form a breathable barrier on skin.",
+  "Fatty Acid": "Fatty acids replenish the skin's lipid barrier and help lock in moisture.",
+  "Fatty Alcohol": "Fatty alcohols act as emollients and co-emulsifiers to soften texture.",
+  "Botanical Water": "Botanical waters provide a plant-derived aqueous base with mild skin benefits.",
+  "Mineral": "Minerals supply trace elements that support skin function.",
+  "Preservative Booster": "Preservative boosters enhance the effectiveness of preservatives to extend shelf life.",
+  "Emollient": "Emollients soften and smooth skin by filling gaps in the lipid barrier.",
+  "Humectant": "Humectants draw moisture from the air into the upper layers of skin.",
+  "UV Filter": "UV filters absorb or reflect UV radiation to protect skin from sun damage.",
+  "Plant Extract": "Plant extracts deliver concentrated plant-derived actives with targeted skin benefits.",
+  "Solvent": "Solvents dissolve other ingredients and help the formula spread on skin.",
+  "Chelating Agent": "Chelating agents bind trace metals in water to prevent formula degradation.",
+  "Preservative": "Preservatives prevent microbial growth to extend product shelf life.",
+  "Fragrance": "Fragrances add scent to the product; they may include synthetic or natural aromatic compounds.",
+  "Peptide": "Peptides are short amino acid chains that signal skin cells to build collagen, support repair, or retain moisture.",
+  "Ceramide": "Ceramides are lipids that fill gaps in the skin barrier to lock in moisture and protect against irritants.",
+  "Retinoid": "Retinoids are vitamin A derivatives that speed up cell turnover to smooth texture and reduce discoloration.",
+  "Exfoliant": "Exfoliants are acids or enzymes that dissolve the bonds between dead skin cells to reveal smoother skin.",
+  "Protein": "Proteins and hydrolyzed proteins form a conditioning film on skin and hair to strengthen and smooth.",
+  "Clay": "Clays absorb excess sebum and draw out impurities from pores.",
+  "Amino Acid": "Amino acids are the building blocks of skin proteins; they support hydration and barrier function.",
+  "Active": "Actives are targeted ingredients included for a specific skin benefit like brightening, barrier repair, or anti-aging.",
 };
 
 const PRODUCT_TYPES = [
@@ -133,6 +195,20 @@ function smartCase(str: string): string {
 function proxyImage(url: string | null | undefined): string | null {
   if (!url) return null;
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+}
+
+function groupByKey<T>(items: T[], getKey: (item: T) => string | null | undefined): [string | null, T[]][] {
+  const map = new Map<string | null, T[]>();
+  for (const item of items) {
+    const k = getKey(item) ?? null;
+    if (!map.has(k)) map.set(k, []);
+    map.get(k)!.push(item);
+  }
+  return Array.from(map.entries()).sort(([a], [b]) => {
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a.localeCompare(b);
+  });
 }
 
 function normalizeForMatch(s: string) {
@@ -189,6 +265,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewResult, setReviewResult] = useState<{ reviewed: number } | null>(null);
+  const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<{ updated: number } | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submitName, setSubmitName] = useState("");
   const [submitBrand, setSubmitBrand] = useState("");
@@ -454,14 +532,42 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   async function handleReview() {
     setReviewLoading(true);
     setReviewResult(null);
+    let total = 0;
     try {
-      const res = await fetch("/api/review-ingredients", { method: "POST" });
-      const data = await res.json();
-      setReviewResult({ reviewed: data.reviewed ?? 0 });
-    } catch {
-      setReviewResult({ reviewed: 0 });
-    }
+      for (let i = 0; i < 60; i++) {
+        const res = await fetch("/api/review-ingredients", { method: "POST" });
+        const data = await res.json();
+        total += data.reviewed ?? 0;
+        setReviewResult({ reviewed: total });
+        if ((data.remaining ?? data.total) === 0) break;
+      }
+    } catch { /* stop on error */ }
     setReviewLoading(false);
+  }
+
+  async function handleBackfill() {
+    setBackfillLoading(true);
+    setBackfillResult(null);
+    let total = 0;
+    try {
+      for (let i = 0; i < 100; i++) {
+        const res = await fetch("/api/backfill-explanations", { method: "POST" });
+        const data = await res.json();
+        total += data.updated ?? 0;
+        setBackfillResult({ updated: total });
+        if ((data.remaining ?? data.total) === 0) break;
+      }
+    } catch { /* stop on error */ }
+    setBackfillLoading(false);
+    // Browser notification so you know it's done even if you're in another tab
+    const notify = (msg: string) => new Notification("SKINdex", { body: msg });
+    const msg = total > 0 ? `${total} explanations generated` : "All explanations already up to date";
+    if (Notification.permission === "granted") {
+      notify(msg);
+    } else if (Notification.permission !== "denied") {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") notify(msg);
+    }
   }
 
   async function handleSubmitProduct() {
@@ -1008,6 +1114,93 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     )}
                   </div>
                 )}
+                {result.product.id && isSignedIn && (
+                  <div className="mt-2">
+                    {savedTo ? (
+                      <p className="text-xs text-teal-700">✓ Saved to {savedTo}</p>
+                    ) : !saveListOpen ? (
+                      <button
+                        type="button"
+                        onClick={openSaveList}
+                        className="text-xs text-gray-500 underline underline-offset-2 hover:text-gray-800"
+                      >
+                        + Save to a list
+                      </button>
+                    ) : (
+                      <div className="border border-gray-200 rounded-xl overflow-hidden">
+                        <div className="divide-y divide-gray-100">
+                          {!userListsLoaded && (
+                            <p className="px-4 py-3 text-xs text-gray-400">Loading…</p>
+                          )}
+                          {userListsLoaded && userLists.length === 0 && !newListInputOpen && (
+                            <p className="px-4 py-3 text-xs text-gray-400">No lists yet — create one below.</p>
+                          )}
+                          {userLists.map((list) => (
+                            <button
+                              key={list.id}
+                              type="button"
+                              onClick={() => addToList(list.id, list.name)}
+                              disabled={saveListLoading === list.id}
+                              className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-gray-50 disabled:opacity-40"
+                            >
+                              <span className="text-gray-800">{list.name}</span>
+                              <span className="text-xs text-gray-400">
+                                {saveListLoading === list.id ? "Adding…" : `${list.itemCount} product${list.itemCount !== 1 ? "s" : ""}`}
+                              </span>
+                            </button>
+                          ))}
+                          {!newListInputOpen ? (
+                            <button
+                              type="button"
+                              onClick={() => setNewListInputOpen(true)}
+                              className="w-full px-4 py-2.5 text-sm text-gray-400 text-left hover:bg-gray-50"
+                            >
+                              + New list
+                            </button>
+                          ) : (
+                            <div className="flex gap-2 px-4 py-2.5">
+                              <input
+                                autoFocus
+                                value={newListName}
+                                onChange={(e) => setNewListName(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && newListName.trim() && createListAndAdd(newListName)}
+                                placeholder="List name"
+                                className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-gray-400 min-w-0"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => createListAndAdd(newListName)}
+                                disabled={!newListName.trim() || saveListLoading === "new"}
+                                className="text-xs px-2.5 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0"
+                              >
+                                {saveListLoading === "new" ? "Creating…" : "Create"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setNewListInputOpen(false); setNewListName(""); setSaveListError(null); }}
+                                className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                          {saveListError && (
+                            <p className="px-4 py-2 text-xs text-rose-600">{saveListError}</p>
+                          )}
+                        </div>
+                        <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
+                          <button
+                            type="button"
+                            onClick={() => setSaveListOpen(false)}
+                            className="text-xs text-gray-400 hover:text-gray-700"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1031,100 +1224,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
           )}
 
-          {/* Save to list */}
-          {result.product?.id && isSignedIn && (
-            <div>
-              {savedTo ? (
-                <p className="text-xs text-teal-700">✓ Saved to {savedTo}</p>
-              ) : !saveListOpen ? (
-                <button
-                  type="button"
-                  onClick={openSaveList}
-                  className="text-sm text-gray-500 underline underline-offset-2 hover:text-gray-800"
-                >
-                  + Save to a list
-                </button>
-              ) : (
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="divide-y divide-gray-100">
-                    {!userListsLoaded && (
-                      <p className="px-4 py-3 text-xs text-gray-400">Loading…</p>
-                    )}
-                    {userListsLoaded && userLists.length === 0 && !newListInputOpen && (
-                      <p className="px-4 py-3 text-xs text-gray-400">No lists yet — create one below.</p>
-                    )}
-                    {userLists.map((list) => (
-                      <button
-                        key={list.id}
-                        type="button"
-                        onClick={() => addToList(list.id, list.name)}
-                        disabled={saveListLoading === list.id}
-                        className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-gray-50 disabled:opacity-40"
-                      >
-                        <span className="text-gray-800">{list.name}</span>
-                        <span className="text-xs text-gray-400">
-                          {saveListLoading === list.id ? "Adding…" : `${list.itemCount} product${list.itemCount !== 1 ? "s" : ""}`}
-                        </span>
-                      </button>
-                    ))}
-                    {!newListInputOpen ? (
-                      <button
-                        type="button"
-                        onClick={() => setNewListInputOpen(true)}
-                        className="w-full px-4 py-2.5 text-sm text-gray-400 text-left hover:bg-gray-50"
-                      >
-                        + New list
-                      </button>
-                    ) : (
-                      <div className="flex gap-2 px-4 py-2.5">
-                        <input
-                          autoFocus
-                          value={newListName}
-                          onChange={(e) => setNewListName(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && newListName.trim() && createListAndAdd(newListName)}
-                          placeholder="List name"
-                          className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-gray-400 min-w-0"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => createListAndAdd(newListName)}
-                          disabled={!newListName.trim() || saveListLoading === "new"}
-                          className="text-xs px-2.5 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0"
-                        >
-                          {saveListLoading === "new" ? "Creating…" : "Create"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setNewListInputOpen(false); setNewListName(""); setSaveListError(null); }}
-                          className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
-                    {saveListError && (
-                      <p className="px-4 py-2 text-xs text-rose-600">{saveListError}</p>
-                    )}
-                  </div>
-                  <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
-                    <button
-                      type="button"
-                      onClick={() => setSaveListOpen(false)}
-                      className="text-xs text-gray-400 hover:text-gray-700"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Summary line + safe alternatives group */}
           <div className="space-y-2">
           {(result.flagged.length + result.safe.length + result.unreviewed.length) > 0 && (
             <p className="text-xs -mt-2">
-              <span className="text-gray-700">{result.flagged.length + result.safe.length + result.unreviewed.length} ingredients scanned</span>
+              <span className="text-gray-700">{result.flagged.length + result.safe.length + result.unreviewed.length} ingredient{(result.flagged.length + result.safe.length + result.unreviewed.length) !== 1 ? "s" : ""} scanned</span>
               {" · "}
               <button
                 type="button"
@@ -1247,19 +1351,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
           </div>{/* end summary + alternatives group */}
 
-          {/* Incomplete warning */}
-          {result.isIncomplete && (
-            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3">
-              This ingredient list may be incomplete.{" "}
-              <button
-                className="underline font-medium"
-                onClick={() => switchToPaste(result.product?.name)}
-              >
-                Add the full list manually
-              </button>
-            </div>
-          )}
-
           {/* Ingredients parent section */}
           <section className="space-y-8">
           <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest">
@@ -1324,50 +1415,66 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </section>
           )}
 
+          {result.isIncomplete && (
+            <p className="text-xs text-gray-400">
+              This ingredient list may be incomplete.{" "}
+              <button
+                className="underline hover:text-gray-600"
+                onClick={() => switchToPaste(result.product?.name)}
+              >
+                Add the full list manually
+              </button>
+            </p>
+          )}
+
           {/* Flagged ingredients */}
           {result.flagged.length > 0 && (
             <section id="section-flagged">
               <p className="text-xs font-semibold text-rose-700 uppercase tracking-widest mb-2">
-                Flagged ingredients — {result.flagged.length}
+                Flagged — {result.flagged.length}
               </p>
               <div className="divide-y divide-gray-100">
                 {result.flagged.map((item) => {
-                  const { id, explanation: dbExplanation } = item.ingredient;
+                  const { id, explanation: dbExplanation, flagged_category, category: ingCat, structural_category } = item.ingredient;
                   const isOpen = expanded.has(id);
                   const explanation = dbExplanation ?? explanations[id];
                   const isLoading = isOpen && !dbExplanation && !(id in explanations);
+                  const catKey = flagged_category ?? ingCat;
+                  const catLabel = catKey ? CATEGORY_LABELS[catKey] : null;
 
                   return (
-                    <div
-                      key={id}
-                      id={`ingredient-${id}`}
-                      className="border-l-4 border-l-gray-200 overflow-hidden"
-                    >
+                    <div key={id} id={`ingredient-${id}`} className="border-l-4 border-l-gray-200 overflow-hidden">
                       <button
                         className="w-full flex items-center justify-between px-3 py-1 text-left"
                         onClick={() => toggleExpand(id, dbExplanation)}
                       >
-                        <span className="flex items-center gap-2 min-w-0">
-                          <span className={`text-sm font-medium ${isOpen ? "text-rose-700" : "text-gray-800"}`}>
+                        <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className={`text-sm font-medium truncate ${isOpen ? "text-rose-700" : "text-gray-800"}`}>
                             {smartCase(item.displayName)}
                           </span>
-                          {item.ingredient.category && CATEGORY_LABELS[item.ingredient.category] && (
-                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
-                              {CATEGORY_LABELS[item.ingredient.category]}
-                            </span>
+                          {structural_category && (
+                            <>
+                              <span className="text-gray-300 text-xs shrink-0">·</span>
+                              <span className="text-xs text-gray-400 shrink-0">{structural_category}</span>
+                            </>
+                          )}
+                          {catLabel && (
+                            <>
+                              <span className="text-gray-300 text-xs shrink-0">·</span>
+                              <span className="text-xs text-rose-700 shrink-0">{catLabel}</span>
+                            </>
                           )}
                         </span>
-                        <span className="text-gray-300 text-xs ml-4 shrink-0">
-                          {isOpen ? "▲" : "▼"}
-                        </span>
+                        <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                       </button>
                       {isOpen && (
                         <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed">
+                          {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
+                            <p className="text-xs text-gray-400 mb-1 italic">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
+                          )}
                           {isLoading ? (
                             <span className="italic text-gray-400">Generating explanation…</span>
-                          ) : explanation ? (
-                            explanation
-                          ) : (
+                          ) : explanation ? explanation : (
                             <span className="italic text-gray-400">No explanation yet.</span>
                           )}
                         </div>
@@ -1389,11 +1496,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 {result.photosensitive.map((item) => {
                   const key = `photo-${item.rawName}`;
                   const isOpen = expanded.has(key);
+                  const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
+                  const match =
+                    result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned) ??
+                    result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned);
+                  const structCat = match?.ingredient.structural_category ?? null;
+                  const catLabel = item.photoCategory ? CATEGORY_LABELS[item.photoCategory] : null;
                   return (
-                    <div
-                      key={item.rawName}
-                      className="border-l-4 border-l-gray-200 overflow-hidden"
-                    >
+                    <div key={item.rawName} className="border-l-4 border-l-gray-200 overflow-hidden">
                       <button
                         className="w-full flex items-center justify-between px-3 py-1 text-left"
                         onClick={() => setExpanded((prev) => {
@@ -1402,21 +1512,31 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           return next;
                         })}
                       >
-                        <span className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className={`text-sm font-medium ${isOpen ? "text-yellow-700" : "text-gray-800"}`}>
+                        <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className={`text-sm font-medium truncate ${isOpen ? "text-yellow-700" : "text-gray-800"}`}>
                             {smartCase(item.rawName)}
                           </span>
-                          {item.photoCategory && CATEGORY_LABELS[item.photoCategory] && (
-                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
-                              {CATEGORY_LABELS[item.photoCategory]}
-                            </span>
+                          {structCat && (
+                            <>
+                              <span className="text-gray-300 text-xs shrink-0">·</span>
+                              <span className="text-xs text-gray-400 shrink-0">{structCat}</span>
+                            </>
+                          )}
+                          {catLabel && (
+                            <>
+                              <span className="text-gray-300 text-xs shrink-0">·</span>
+                              <span className="text-xs text-yellow-700 shrink-0">{catLabel}</span>
+                            </>
                           )}
                         </span>
-                        <span className="text-gray-300 text-xs ml-4 shrink-0">{isOpen ? "▲" : "▼"}</span>
+                        <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                       </button>
-                      {isOpen && item.photo_note && (
+                      {isOpen && (
                         <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed">
-                          {item.photo_note}
+                          {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
+                            <p className="text-xs text-gray-400 mb-1 italic">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
+                          )}
+                          {item.photo_note && <span>{item.photo_note}</span>}
                         </div>
                       )}
                     </div>
@@ -1430,46 +1550,49 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {result.safe.length > 0 && (
             <section id="section-safe">
               <p className="text-xs font-semibold text-teal-700 uppercase tracking-widest mb-2">
-                Safe ingredients — {result.safe.length}
+                Safe — {result.safe.length}
               </p>
               <div className="divide-y divide-gray-100">
                 {result.safe.map((item) => {
-                  const { id, explanation: dbExplanation } = item.ingredient;
+                  const { id, explanation: dbExplanation, category: ingCat, structural_category } = item.ingredient;
                   const isOpen = expanded.has(id);
                   const explanation = dbExplanation ?? explanations[id];
                   const isLoading = isOpen && !dbExplanation && !(id in explanations);
+                  const catLabel = ingCat ? CATEGORY_LABELS[ingCat] : null;
 
                   return (
-                    <div
-                      key={id}
-                      id={`ingredient-${id}`}
-                      className="border-l-2 border-l-gray-200 overflow-hidden"
-                    >
+                    <div key={id} id={`ingredient-${id}`} className="border-l-2 border-l-gray-200 overflow-hidden">
                       <button
                         className="w-full flex items-center justify-between pl-3 pr-2 py-0.5 text-left"
                         onClick={() => toggleExpand(id, dbExplanation)}
                       >
-                        <span className="flex items-center gap-2 min-w-0">
-                          <span className={`text-sm font-medium ${isOpen ? "text-teal-700" : "text-gray-700"}`}>
+                        <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className={`text-sm font-medium truncate ${isOpen ? "text-teal-700" : "text-gray-700"}`}>
                             {smartCase(item.displayName)}
                           </span>
-                          {item.ingredient.category && CATEGORY_LABELS[item.ingredient.category] && (
-                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
-                              {CATEGORY_LABELS[item.ingredient.category]}
-                            </span>
+                          {structural_category && (
+                            <>
+                              <span className="text-gray-300 text-xs shrink-0">·</span>
+                              <span className="text-xs text-gray-400 shrink-0">{structural_category}</span>
+                            </>
+                          )}
+                          {catLabel && (
+                            <>
+                              <span className="text-gray-300 text-xs shrink-0">·</span>
+                              <span className="text-xs text-teal-700 shrink-0">{catLabel}</span>
+                            </>
                           )}
                         </span>
-                        <span className="text-gray-300 text-xs ml-4 shrink-0">
-                          {isOpen ? "▲" : "▼"}
-                        </span>
+                        <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                       </button>
                       {isOpen && (
                         <div className="pl-3 pr-2 pb-1.5 text-sm text-gray-500 leading-relaxed">
+                          {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
+                            <p className="text-xs text-gray-400 mb-1 italic">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
+                          )}
                           {isLoading ? (
                             <span className="italic text-gray-400">Generating explanation…</span>
-                          ) : explanation ? (
-                            explanation
-                          ) : (
+                          ) : explanation ? explanation : (
                             <span className="italic text-gray-400">No explanation yet.</span>
                           )}
                         </div>
@@ -1492,7 +1615,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   Unreviewed — {result.unreviewed.length}
                   <span className="text-stone-300">{showUnreviewed ? "▲" : "▼"}</span>
                 </button>
-                {reviewResult ? (
+                {reviewLoading ? (
+                  <span className="text-xs text-gray-400">
+                    Reviewing{reviewResult && reviewResult.reviewed > 0 ? ` — ${reviewResult.reviewed} done` : "…"}
+                  </span>
+                ) : reviewResult ? (
                   <span className="text-xs text-gray-400">
                     {reviewResult.reviewed > 0
                       ? `${reviewResult.reviewed} reviewed — rescan to see results`
@@ -1502,10 +1629,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <button
                     type="button"
                     onClick={handleReview}
-                    disabled={reviewLoading}
-                    className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 disabled:opacity-40 shrink-0"
+                    className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 shrink-0"
                   >
-                    {reviewLoading ? "Reviewing…" : "Review now"}
+                    Review now
                   </button>
                 )}
               </div>
@@ -1527,6 +1653,28 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
           {result.flagged.length === 0 && result.safe.length === 0 && result.unreviewed.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-4">No ingredients found.</p>
+          )}
+
+          {isSignedIn && (
+            <div className="flex items-center gap-2 pt-1">
+              {backfillLoading ? (
+                <span className="text-xs text-gray-400">
+                  Generating{backfillResult && backfillResult.updated > 0 ? ` — ${backfillResult.updated} done` : "…"}
+                </span>
+              ) : backfillResult ? (
+                <span className="text-xs text-gray-400">
+                  {backfillResult.updated > 0 ? `${backfillResult.updated} explanations generated` : "All explanations up to date"}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleBackfill}
+                  className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                >
+                  Generate explanations
+                </button>
+              )}
+            </div>
           )}
 
           </section>{/* end Ingredients */}
