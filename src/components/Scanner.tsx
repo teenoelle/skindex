@@ -110,7 +110,7 @@ export default function Scanner() {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewResult, setReviewResult] = useState<{ reviewed: number } | null>(null);
 
-  async function handleScan() {
+  async function handleScan(override?: { tab?: Tab; query?: string }) {
     setLoading(true);
     setNotFound(false);
     setResult(null);
@@ -130,10 +130,12 @@ export default function Scanner() {
     setReviewLoading(false);
     setReviewResult(null);
 
+    const activeTab = override?.tab ?? tab;
+    const activeQuery = override?.query ?? query;
     const body =
-      tab === "search"
-        ? { type: "search", query }
-        : tab === "paste"
+      activeTab === "search"
+        ? { type: "search", query: activeQuery }
+        : activeTab === "paste"
         ? { type: "paste", ingredients }
         : { type: "url", url };
 
@@ -393,7 +395,7 @@ export default function Scanner() {
         </SignInButton>
       ) : (
         <button
-          onClick={handleScan}
+          onClick={() => handleScan()}
           disabled={!canScan || loading}
           className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
@@ -456,7 +458,15 @@ export default function Scanner() {
                     : result.product.name}
                 </h2>
                 {result.product.brand && (
-                  <p className="text-sm text-gray-400">{result.product.brand}</p>
+                  <p className="text-sm text-gray-400">
+                    <button
+                      type="button"
+                      onClick={() => { setTab("search"); setQuery(result.product!.brand!); handleScan({ tab: "search", query: result.product!.brand! }); }}
+                      className="hover:underline underline-offset-2"
+                    >
+                      {result.product.brand}
+                    </button>
+                  </p>
                 )}
                 <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
                   {result.communityVariants && result.communityVariants.length > 0 && (
@@ -482,13 +492,33 @@ export default function Scanner() {
                 {result.product.id && isSignedIn && (
                   <div className="mt-1">
                     {!imageUploadOpen ? (
-                      <button
-                        type="button"
-                        onClick={() => setImageUploadOpen(true)}
-                        className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600"
-                      >
-                        {result.product.image_url ? "Change image" : "Add image"}
-                      </button>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setImageUploadOpen(true)}
+                          className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600"
+                        >
+                          {result.product.image_url ? "Change image" : "Add image"}
+                        </button>
+                        {result.product.image_url && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await fetch("/api/set-product-image", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ productId: result.product!.id, remove: true }),
+                              });
+                              setResult((prev) =>
+                                prev ? { ...prev, product: prev.product ? { ...prev.product, image_url: null } : prev.product } : prev
+                              );
+                            }}
+                            className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600"
+                          >
+                            Remove image
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       <div className="flex flex-col gap-1.5">
                         <div className="flex gap-1.5">

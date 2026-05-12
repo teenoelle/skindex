@@ -71,9 +71,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Sign in to update product images" }, { status: 401 });
   }
 
-  const { productId, url } = await req.json();
-  if (!productId || !url) {
-    return NextResponse.json({ error: "Missing productId or url" }, { status: 400 });
+  const { productId, url, remove } = await req.json();
+  if (!productId) {
+    return NextResponse.json({ error: "Missing productId" }, { status: 400 });
+  }
+
+  if (remove) {
+    const { error } = await supabaseAdmin
+      .from("products")
+      .update({ image_url: null, image_updated_by: userId, image_updated_at: new Date().toISOString() })
+      .eq("id", productId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ imageUrl: null });
+  }
+
+  if (!url) {
+    return NextResponse.json({ error: "Missing url" }, { status: 400 });
   }
 
   // Resolve to a direct image URL (extract og:image if given a product page)
