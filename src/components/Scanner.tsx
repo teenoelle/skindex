@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import Image from "next/image";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
@@ -43,6 +43,7 @@ function CategoryIcon({ type, size = 28 }: { type?: string | null; size?: number
 }
 
 type Tab = "search" | "paste" | "url" | "browse";
+type UserList = { id: string; name: string; is_public: boolean; itemCount: number };
 
 type BrowseType = { name: string; count: number };
 type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; flaggedCount: number };
@@ -62,6 +63,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   "firming": "Firming",
   "emollient": "Emollient",
 };
+
+const PRODUCT_TYPES = [
+  "Ampoule", "Balm", "BB Cream", "Blush", "Body Lotion", "Body Wash",
+  "Brow Gel", "CC Cream", "Chapstick", "Concealer", "Conditioner", "Cream",
+  "Emulsion", "Exfoliant", "Extract", "Eye Cream", "Eye Gel", "Eye Primer",
+  "Eyeliner", "Eyeshadow", "Face Mask", "Face Wash", "Foundation", "Gel",
+  "Hair Mask", "Hair Oil", "Hair Serum", "Lip Treatment", "Makeup Remover",
+  "Mascara", "Mist", "Oil", "Ointment", "Primer", "Scalp Serum",
+  "Scalp Treatment", "Serum", "Setting Spray", "Shampoo", "Sleeping Mask",
+  "Spot Patches", "Sun Screen", "Toner",
+].sort();
 
 function toTitleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -103,7 +115,7 @@ const paragraphColor = {
   unreviewed: "text-gray-400",
 };
 
-export default function Scanner() {
+export default function Scanner({ initialProductId }: { initialProductId?: string | null }) {
   const { isSignedIn } = useUser();
 
   const [tab, setTab] = useState<Tab>("search");
@@ -132,6 +144,33 @@ export default function Scanner() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewResult, setReviewResult] = useState<{ reviewed: number } | null>(null);
+  const [submitOpen, setSubmitOpen] = useState(false);
+  const [submitName, setSubmitName] = useState("");
+  const [submitBrand, setSubmitBrand] = useState("");
+  const [submitType, setSubmitType] = useState("");
+  const [submitIngredients, setSubmitIngredients] = useState("");
+  const [submitUrl, setSubmitUrl] = useState("");
+  const [submitMode, setSubmitMode] = useState<"paste" | "url">("paste");
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportNote, setReportNote] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportDone, setReportDone] = useState(false);
+  const [saveListOpen, setSaveListOpen] = useState(false);
+  const [userLists, setUserLists] = useState<UserList[]>([]);
+  const [userListsLoaded, setUserListsLoaded] = useState(false);
+  const [newListInputOpen, setNewListInputOpen] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [saveListLoading, setSaveListLoading] = useState<string | null>(null);
+  const [savedTo, setSavedTo] = useState<string | null>(null);
+
+  const initialProductIdRef = useRef(initialProductId);
+  useEffect(() => {
+    if (initialProductIdRef.current) {
+      scanVariant({ productId: initialProductIdRef.current });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleScan(override?: { tab?: Tab; query?: string }) {
     setLoading(true);
@@ -152,6 +191,24 @@ export default function Scanner() {
     setUploadError(null);
     setReviewLoading(false);
     setReviewResult(null);
+    setSubmitOpen(false);
+    setSubmitName("");
+    setSubmitBrand("");
+    setSubmitType("");
+    setSubmitIngredients("");
+    setSubmitUrl("");
+    setSubmitMode("paste");
+    setSubmitLoading(false);
+    setSubmitError(null);
+    setReportOpen(false);
+    setReportNote("");
+    setReportLoading(false);
+    setReportDone(false);
+    setSaveListOpen(false);
+    setNewListInputOpen(false);
+    setNewListName("");
+    setSaveListLoading(null);
+    setSavedTo(null);
 
     const activeTab = override?.tab ?? tab;
     const activeQuery = override?.query ?? query;
@@ -245,6 +302,7 @@ export default function Scanner() {
 
   async function scanVariant(opts: { productId?: string; pasteIngredients?: string; productName?: string; productBrand?: string | null }) {
     setLoading(true);
+    setNotFound(false);
     setResult(null);
     setShowUnreviewed(false);
     setShowObfVariants(false);
@@ -260,6 +318,14 @@ export default function Scanner() {
     setUploadError(null);
     setReviewLoading(false);
     setReviewResult(null);
+    setSubmitOpen(false);
+    setReportOpen(false);
+    setReportDone(false);
+    setSaveListOpen(false);
+    setNewListInputOpen(false);
+    setNewListName("");
+    setSaveListLoading(null);
+    setSavedTo(null);
 
     const body = opts.productId
       ? { type: "search", query, productId: opts.productId }
@@ -338,6 +404,102 @@ export default function Scanner() {
       setReviewResult({ reviewed: 0 });
     }
     setReviewLoading(false);
+  }
+
+  async function handleSubmitProduct() {
+    setSubmitLoading(true);
+    setSubmitError(null);
+    const body: Record<string, string> = { name: submitName.trim() };
+    if (submitBrand.trim()) body.brand = submitBrand.trim();
+    if (submitType) body.type = submitType;
+    if (submitMode === "paste") body.ingredient_list = submitIngredients.trim();
+    else body.url = submitUrl.trim();
+
+    const res = await fetch("/api/submit-product", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    setSubmitLoading(false);
+
+    if (res.status === 409 && data.productId) {
+      setSubmitOpen(false);
+      scanVariant({ productId: data.productId });
+      return;
+    }
+    if (!res.ok) {
+      setSubmitError(data.error ?? "Submission failed");
+      return;
+    }
+    setSubmitOpen(false);
+    scanVariant({ productId: data.productId });
+  }
+
+  async function handleReport() {
+    if (!result?.product?.id) return;
+    setReportLoading(true);
+    try {
+      await fetch("/api/report-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: result.product.id, note: reportNote.trim() || null }),
+      });
+      setReportDone(true);
+      setReportOpen(false);
+    } catch {
+      // ignore
+    }
+    setReportLoading(false);
+  }
+
+  async function openSaveList() {
+    setSaveListOpen(true);
+    if (!userListsLoaded) {
+      const res = await fetch("/api/lists");
+      const data = await res.json();
+      setUserLists(data.lists ?? []);
+      setUserListsLoaded(true);
+    }
+  }
+
+  async function addToList(listId: string, listName: string) {
+    if (!result?.product?.id) return;
+    setSaveListLoading(listId);
+    await fetch(`/api/lists/${listId}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId: result.product.id }),
+    });
+    setSaveListLoading(null);
+    setUserLists((prev) => prev.map((l) => l.id === listId ? { ...l, itemCount: l.itemCount + 1 } : l));
+    setSavedTo(listName);
+    setTimeout(() => { setSaveListOpen(false); setSavedTo(null); }, 1800);
+  }
+
+  async function createListAndAdd(name: string) {
+    if (!result?.product?.id || !name.trim()) return;
+    setSaveListLoading("new");
+    const createRes = await fetch("/api/lists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    const createData = await createRes.json();
+    if (!createRes.ok) { setSaveListLoading(null); return; }
+
+    await fetch(`/api/lists/${createData.list.id}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId: result.product.id }),
+    });
+
+    setUserLists((prev) => [{ ...createData.list, itemCount: 1 }, ...prev]);
+    setSaveListLoading(null);
+    setNewListInputOpen(false);
+    setNewListName("");
+    setSavedTo(name.trim());
+    setTimeout(() => { setSaveListOpen(false); setSavedTo(null); }, 1800);
   }
 
   function switchToPaste(prefill?: string) {
@@ -530,8 +692,99 @@ export default function Scanner() {
           No ingredients found.{" "}
           <button className="underline text-gray-700" onClick={() => switchToPaste()}>
             Paste the ingredient list
-          </button>{" "}
-          instead.
+          </button>
+          {" "}instead.
+          {isSignedIn && !submitOpen && (
+            <>
+              {" "}Or{" "}
+              <button
+                className="underline text-gray-700"
+                onClick={() => { setSubmitOpen(true); setSubmitName(query); }}
+              >
+                add it to the database
+              </button>.
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Community submission form */}
+      {submitOpen && (
+        <div className="mt-4 border border-gray-200 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-semibold text-gray-800">Add this product</p>
+          <input
+            value={submitName}
+            onChange={(e) => setSubmitName(e.target.value)}
+            placeholder="Product name"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={submitBrand}
+              onChange={(e) => setSubmitBrand(e.target.value)}
+              placeholder="Brand (optional)"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+            />
+            <select
+              value={submitType}
+              onChange={(e) => setSubmitType(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400 bg-white"
+            >
+              <option value="">Type (optional)</option>
+              {PRODUCT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setSubmitMode("paste")}
+              className={`flex-1 py-1 text-xs font-medium rounded-md transition-all ${submitMode === "paste" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}
+            >
+              Paste list
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubmitMode("url")}
+              className={`flex-1 py-1 text-xs font-medium rounded-md transition-all ${submitMode === "url" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}
+            >
+              From URL
+            </button>
+          </div>
+          {submitMode === "paste" ? (
+            <textarea
+              value={submitIngredients}
+              onChange={(e) => setSubmitIngredients(e.target.value)}
+              placeholder="Paste the full ingredients list here…"
+              rows={5}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400 resize-none font-mono leading-relaxed"
+            />
+          ) : (
+            <input
+              type="url"
+              value={submitUrl}
+              onChange={(e) => setSubmitUrl(e.target.value)}
+              placeholder="https://sephora.com/product/..."
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+            />
+          )}
+          {submitError && <p className="text-xs text-rose-600">{submitError}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleSubmitProduct}
+              disabled={submitLoading || !submitName.trim() || (submitMode === "paste" ? !submitIngredients.trim() : !submitUrl.trim())}
+              className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {submitLoading ? "Submitting…" : "Submit product"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubmitOpen(false)}
+              className="text-sm text-gray-400 hover:text-gray-700 px-3"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
@@ -600,7 +853,7 @@ export default function Scanner() {
 
                 {/* Image upload / change — signed-in users only */}
                 {result.product.id && isSignedIn && (
-                  <div className="mt-1">
+                  <div className="mt-1 space-y-1">
                     {!imageUploadOpen ? (
                       <div className="flex gap-3">
                         <button
@@ -661,9 +914,134 @@ export default function Scanner() {
                         )}
                       </div>
                     )}
+                    {/* Inaccurate Info report */}
+                    {reportDone ? (
+                      <span className="text-xs text-gray-400">Thanks, we&apos;ll review it.</span>
+                    ) : !reportOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => setReportOpen(true)}
+                        className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600"
+                      >
+                        Inaccurate info
+                      </button>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        <textarea
+                          value={reportNote}
+                          onChange={(e) => setReportNote(e.target.value)}
+                          placeholder="What's wrong? (optional)"
+                          rows={2}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 resize-none"
+                        />
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handleReport}
+                            disabled={reportLoading}
+                            className="text-xs px-2.5 py-1.5 bg-gray-900 text-white rounded-lg disabled:opacity-40"
+                          >
+                            {reportLoading ? "Sending…" : "Send report"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReportOpen(false)}
+                            className="text-xs text-gray-400 hover:text-gray-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Save to list */}
+          {result.product?.id && isSignedIn && (
+            <div>
+              {savedTo ? (
+                <p className="text-xs text-teal-700">✓ Saved to {savedTo}</p>
+              ) : !saveListOpen ? (
+                <button
+                  type="button"
+                  onClick={openSaveList}
+                  className="text-sm text-gray-500 underline underline-offset-2 hover:text-gray-800"
+                >
+                  + Save to a list
+                </button>
+              ) : (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="divide-y divide-gray-100">
+                    {!userListsLoaded && (
+                      <p className="px-4 py-3 text-xs text-gray-400">Loading…</p>
+                    )}
+                    {userListsLoaded && userLists.length === 0 && !newListInputOpen && (
+                      <p className="px-4 py-3 text-xs text-gray-400">No lists yet — create one below.</p>
+                    )}
+                    {userLists.map((list) => (
+                      <button
+                        key={list.id}
+                        type="button"
+                        onClick={() => addToList(list.id, list.name)}
+                        disabled={saveListLoading === list.id}
+                        className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-gray-50 disabled:opacity-40"
+                      >
+                        <span className="text-gray-800">{list.name}</span>
+                        <span className="text-xs text-gray-400">
+                          {saveListLoading === list.id ? "Adding…" : `${list.itemCount} product${list.itemCount !== 1 ? "s" : ""}`}
+                        </span>
+                      </button>
+                    ))}
+                    {!newListInputOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => setNewListInputOpen(true)}
+                        className="w-full px-4 py-2.5 text-sm text-gray-400 text-left hover:bg-gray-50"
+                      >
+                        + New list
+                      </button>
+                    ) : (
+                      <div className="flex gap-2 px-4 py-2.5">
+                        <input
+                          autoFocus
+                          value={newListName}
+                          onChange={(e) => setNewListName(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && newListName.trim() && createListAndAdd(newListName)}
+                          placeholder="List name"
+                          className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-gray-400 min-w-0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => createListAndAdd(newListName)}
+                          disabled={!newListName.trim() || saveListLoading === "new"}
+                          className="text-xs px-2.5 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0"
+                        >
+                          {saveListLoading === "new" ? "Creating…" : "Create"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setNewListInputOpen(false); setNewListName(""); }}
+                          className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
+                    <button
+                      type="button"
+                      onClick={() => setSaveListOpen(false)}
+                      className="text-xs text-gray-400 hover:text-gray-700"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

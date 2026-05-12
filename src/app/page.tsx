@@ -1,7 +1,10 @@
 import NavAuth from "@/components/NavAuth";
 import Scanner from "@/components/Scanner";
 
-export default function Home() {
+type Props = { searchParams: Promise<{ scan?: string }> };
+
+export default async function Home({ searchParams }: Props) {
+  const { scan } = await searchParams;
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-100 px-6 py-4">
@@ -23,7 +26,7 @@ export default function Home() {
             Check any product for ingredients flagged by the most reactive skin on the internet.
           </p>
         </div>
-        <Scanner />
+        <Scanner initialProductId={scan ?? null} />
       </main>
     </div>
   );
