@@ -42,7 +42,26 @@ function CategoryIcon({ type, size = 28 }: { type?: string | null; size?: number
   );
 }
 
-type Tab = "search" | "paste" | "url";
+type Tab = "search" | "paste" | "url" | "browse";
+
+type BrowseType = { name: string; count: number };
+type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; flaggedCount: number };
+
+const CATEGORY_LABELS: Record<string, string> = {
+  "sensitizer": "Sensitizer",
+  "pore-clogger": "Pore-clogger",
+  "occlusive": "Occlusive",
+  "stripping": "Stripping",
+  "photosensitizer": "Photosensitizer",
+  "fragrance-allergen": "Fragrance allergen",
+  "humectant": "Humectant",
+  "barrier-repairing": "Barrier-repairing",
+  "soothing": "Soothing",
+  "brightening": "Brightening",
+  "antioxidant": "Antioxidant",
+  "firming": "Firming",
+  "emollient": "Emollient",
+};
 
 function toTitleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -103,6 +122,10 @@ export default function Scanner() {
   const [alternativesLoading, setAlternativesLoading] = useState(false);
   const [alternativesFetched, setAlternativesFetched] = useState(false);
   const [alternativesOpen, setAlternativesOpen] = useState(true);
+  const [browseTypes, setBrowseTypes] = useState<BrowseType[]>([]);
+  const [browseSelectedType, setBrowseSelectedType] = useState<string | null>(null);
+  const [browseProducts, setBrowseProducts] = useState<BrowseProduct[]>([]);
+  const [browseLoading, setBrowseLoading] = useState(false);
   const [imageUploadOpen, setImageUploadOpen] = useState(false);
   const [imageUploadUrl, setImageUploadUrl] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
@@ -330,12 +353,30 @@ export default function Scanner() {
     setResult(null);
     setNotFound(false);
     setLimitReached(false);
+    if (t === "browse" && browseTypes.length === 0) {
+      setBrowseLoading(true);
+      fetch("/api/browse").then((r) => r.json()).then((d) => {
+        setBrowseTypes(d.types ?? []);
+        setBrowseLoading(false);
+      });
+    }
+  }
+
+  async function selectBrowseType(typeName: string) {
+    setBrowseSelectedType(typeName);
+    setBrowseProducts([]);
+    setBrowseLoading(true);
+    const res = await fetch(`/api/browse?type=${encodeURIComponent(typeName)}`);
+    const data = await res.json();
+    setBrowseProducts(data.products ?? []);
+    setBrowseLoading(false);
   }
 
   const canScan =
     tab === "search" ? query.trim().length > 0
     : tab === "paste" ? ingredients.trim().length > 0
-    : url.trim().length > 0;
+    : tab === "url" ? url.trim().length > 0
+    : false;
 
   const urlTabGated = tab === "url" && !isSignedIn;
 
@@ -343,7 +384,7 @@ export default function Scanner() {
     <div>
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-4">
-        {(["search", "paste", "url"] as Tab[]).map((t) => (
+        {(["search", "paste", "url", "browse"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => resetTab(t)}
@@ -351,7 +392,7 @@ export default function Scanner() {
               tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600"
             }`}
           >
-            {t === "search" ? "Search" : t === "paste" ? "Paste list" : "Paste URL"}
+            {t === "search" ? "Search" : t === "paste" ? "Paste list" : t === "url" ? "Paste URL" : "Browse"}
           </button>
         ))}
       </div>
@@ -387,7 +428,76 @@ export default function Scanner() {
         />
       )}
 
-      {urlTabGated ? (
+      {tab === "browse" ? (
+        <div>
+          {browseLoading && !browseSelectedType && (
+            <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
+          )}
+          {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {browseTypes.map((t) => (
+                <button
+                  key={t.name}
+                  onClick={() => selectBrowseType(t.name)}
+                  className="text-left border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                >
+                  <p className="text-sm font-medium text-gray-800">{t.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.count} product{t.count !== 1 ? "s" : ""}</p>
+                </button>
+              ))}
+            </div>
+          )}
+          {browseSelectedType && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <button
+                  onClick={() => { setBrowseSelectedType(null); setBrowseProducts([]); }}
+                  className="text-xs text-gray-400 hover:text-gray-700"
+                >
+                  ← All types
+                </button>
+                <span className="text-xs text-gray-300">·</span>
+                <span className="text-sm font-medium text-gray-700">{browseSelectedType}</span>
+              </div>
+              {browseLoading && <p className="text-sm text-gray-400 text-center py-6">Loading…</p>}
+              {!browseLoading && browseProducts.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-6">No products found.</p>
+              )}
+              <div className="divide-y divide-gray-100">
+                {browseProducts.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 py-3">
+                    {p.image_url && (
+                      <img
+                        src={`/api/image-proxy?url=${encodeURIComponent(p.image_url)}`}
+                        alt={p.name}
+                        className="w-10 h-10 object-contain rounded-lg bg-gray-50 shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                      {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {p.flaggedCount > 0 && (
+                        <span className="text-xs text-rose-600">{p.flaggedCount} flagged</span>
+                      )}
+                      {p.flaggedCount === 0 && (
+                        <span className="text-xs text-teal-600">Clean</span>
+                      )}
+                      <button
+                        onClick={() => { resetTab("search"); setQuery(p.name); handleScan({ tab: "search", query: p.name }); }}
+                        className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 shrink-0"
+                      >
+                        Scan
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : urlTabGated ? (
         <SignInButton mode="modal">
           <button className="w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors">
             Sign in to use URL scanning
@@ -784,8 +894,15 @@ export default function Scanner() {
                         className="w-full flex items-center justify-between px-3 py-1 text-left"
                         onClick={() => toggleExpand(id, dbExplanation)}
                       >
-                        <span className={`text-sm font-medium ${isOpen ? "text-rose-700" : "text-gray-800"}`}>
-                          {smartCase(item.displayName)}
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className={`text-sm font-medium ${isOpen ? "text-rose-700" : "text-gray-800"}`}>
+                            {smartCase(item.displayName)}
+                          </span>
+                          {item.ingredient.category && CATEGORY_LABELS[item.ingredient.category] && (
+                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
+                              {CATEGORY_LABELS[item.ingredient.category]}
+                            </span>
+                          )}
                         </span>
                         <span className="text-gray-300 text-xs ml-4 shrink-0">
                           {isOpen ? "▲" : "▼"}
@@ -874,8 +991,15 @@ export default function Scanner() {
                         className="w-full flex items-center justify-between pl-3 pr-2 py-0.5 text-left"
                         onClick={() => toggleExpand(id, dbExplanation)}
                       >
-                        <span className={`text-sm font-medium ${isOpen ? "text-teal-700" : "text-gray-700"}`}>
-                          {smartCase(item.displayName)}
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className={`text-sm font-medium ${isOpen ? "text-teal-700" : "text-gray-700"}`}>
+                            {smartCase(item.displayName)}
+                          </span>
+                          {item.ingredient.category && CATEGORY_LABELS[item.ingredient.category] && (
+                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
+                              {CATEGORY_LABELS[item.ingredient.category]}
+                            </span>
+                          )}
                         </span>
                         <span className="text-gray-300 text-xs ml-4 shrink-0">
                           {isOpen ? "▲" : "▼"}
