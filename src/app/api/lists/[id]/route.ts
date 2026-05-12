@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 async function ownedList(id: string, userId: string) {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin
     .from("user_lists")
     .select("id, user_id, name, is_public")
     .eq("id", id)
@@ -17,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { userId } = await auth();
   const { id } = await params;
 
-  const { data: list } = await supabase
+  const { data: list } = await supabaseAdmin
     .from("user_lists")
     .select("id, user_id, name, is_public, created_at")
     .eq("id", id)
@@ -28,7 +27,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { data: items } = await supabase
+  const { data: items } = await supabaseAdmin
     .from("user_list_items")
     .select("id, product_id, note, position, added_at, products(id, name, brand, image_url, type)")
     .eq("list_id", id)

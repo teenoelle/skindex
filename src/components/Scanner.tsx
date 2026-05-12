@@ -141,6 +141,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [imageUploadOpen, setImageUploadOpen] = useState(false);
   const [imageUploadUrl, setImageUploadUrl] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
+  const [imageRefetching, setImageRefetching] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewResult, setReviewResult] = useState<{ reviewed: number } | null>(null);
@@ -164,6 +165,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [newListName, setNewListName] = useState("");
   const [saveListLoading, setSaveListLoading] = useState<string | null>(null);
   const [savedTo, setSavedTo] = useState<string | null>(null);
+  const [saveListError, setSaveListError] = useState<string | null>(null);
 
   const initialProductIdRef = useRef(initialProductId);
   useEffect(() => {
@@ -480,19 +482,29 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   async function createListAndAdd(name: string) {
     if (!result?.product?.id || !name.trim()) return;
     setSaveListLoading("new");
+    setSaveListError(null);
     const createRes = await fetch("/api/lists", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: name.trim() }),
     });
     const createData = await createRes.json();
-    if (!createRes.ok) { setSaveListLoading(null); return; }
+    if (!createRes.ok) {
+      setSaveListLoading(null);
+      setSaveListError(createData.error ?? "Could not create list");
+      return;
+    }
 
-    await fetch(`/api/lists/${createData.list.id}/items`, {
+    const addRes = await fetch(`/api/lists/${createData.list.id}/items`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ productId: result.product.id }),
     });
+    if (!addRes.ok) {
+      setSaveListLoading(null);
+      setSaveListError("List created but could not add product");
+      return;
+    }
 
     setUserLists((prev) => [{ ...createData.list, itemCount: 1 }, ...prev]);
     setSaveListLoading(null);
@@ -866,19 +878,23 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         {result.product.image_url && (
                           <button
                             type="button"
+                            disabled={imageRefetching}
                             onClick={async () => {
-                              await fetch("/api/set-product-image", {
+                              setImageRefetching(true);
+                              const res = await fetch("/api/set-product-image", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ productId: result.product!.id, remove: true }),
                               });
+                              const data = await res.json();
                               setResult((prev) =>
-                                prev ? { ...prev, product: prev.product ? { ...prev.product, image_url: null } : prev.product } : prev
+                                prev ? { ...prev, product: prev.product ? { ...prev.product, image_url: data.imageUrl ?? null } : prev.product } : prev
                               );
+                              setImageRefetching(false);
                             }}
-                            className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600"
+                            className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600 disabled:opacity-40"
                           >
-                            Remove image
+                            {imageRefetching ? "Searching…" : "Remove image"}
                           </button>
                         )}
                       </div>
@@ -1023,12 +1039,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setNewListInputOpen(false); setNewListName(""); }}
+                          onClick={() => { setNewListInputOpen(false); setNewListName(""); setSaveListError(null); }}
                           className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
                         >
                           Cancel
                         </button>
                       </div>
+                    )}
+                    {saveListError && (
+                      <p className="px-4 py-2 text-xs text-rose-600">{saveListError}</p>
                     )}
                   </div>
                   <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">

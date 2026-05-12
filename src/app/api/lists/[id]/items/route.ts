@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 async function ownedList(id: string, userId: string) {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin
     .from("user_lists")
     .select("id, user_id")
     .eq("id", id)
@@ -24,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { productId, note } = await req.json();
   if (!productId) return NextResponse.json({ error: "Missing productId" }, { status: 400 });
 
-  const { data: maxRow } = await supabase
+  const { data: maxRow } = await supabaseAdmin
     .from("user_list_items")
     .select("position")
     .eq("list_id", id)

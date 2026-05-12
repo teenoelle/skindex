@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: lists } = await supabase
+  const { data: lists } = await supabaseAdmin
     .from("user_lists")
     .select("id, name, is_public, created_at, updated_at")
     .eq("user_id", userId)
@@ -15,7 +14,7 @@ export async function GET() {
 
   const listIds = (lists ?? []).map((l) => l.id);
   const { data: countRows } = listIds.length
-    ? await supabase.from("user_list_items").select("list_id").in("list_id", listIds)
+    ? await supabaseAdmin.from("user_list_items").select("list_id").in("list_id", listIds)
     : { data: [] };
 
   const countMap: Record<string, number> = {};

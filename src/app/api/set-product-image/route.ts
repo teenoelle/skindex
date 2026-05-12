@@ -82,6 +82,39 @@ export async function POST(req: NextRequest) {
       .update({ image_url: null, image_updated_by: userId, image_updated_at: new Date().toISOString() })
       .eq("id", productId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Try to find a replacement image from Open Beauty Facts
+    const { data: product } = await supabaseAdmin
+      .from("products")
+      .select("name, brand")
+      .eq("id", productId)
+      .maybeSingle();
+
+    if (product?.name) {
+      try {
+        const query = [product.name, product.brand].filter(Boolean).join(" ");
+        const obfRes = await fetch(
+          `https://world.openbeautyfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=3`,
+          { signal: AbortSignal.timeout(8000) }
+        );
+        if (obfRes.ok) {
+          const obfData = await obfRes.json();
+          const found = obfData?.products?.[0];
+          const raw = found?.image_front_url ?? found?.image_url ?? null;
+          const refetchedUrl = raw ? raw.replace(/\.\d+\.jpg$/, ".full.jpg") : null;
+          if (refetchedUrl) {
+            await supabaseAdmin
+              .from("products")
+              .update({ image_url: refetchedUrl, image_updated_by: userId, image_updated_at: new Date().toISOString() })
+              .eq("id", productId);
+            return NextResponse.json({ imageUrl: refetchedUrl });
+          }
+        }
+      } catch {
+        // OBF search failed — return null, not an error
+      }
+    }
+
     return NextResponse.json({ imageUrl: null });
   }
 

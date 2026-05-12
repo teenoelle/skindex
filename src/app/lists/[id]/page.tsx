@@ -5,6 +5,26 @@ import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
+import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Ampoule: Pipette, Balm: Sparkles, Blush: Sparkles, "Body Wash": Waves, Chapstick: Pipette,
+  Concealer: Brush, Cream: Droplets, Emulsion: Droplets, Extract: FlaskConical, "Face Mask": Sparkles,
+  "Face Wash": Droplets, Foundation: Brush, Gel: Droplet, "Makeup Remover": Droplets, Mist: Wind,
+  Oil: Droplet, Ointment: Droplets, Serum: Pipette, Shampoo: Waves, "Spot Patches": Bandage,
+  "Sun Screen": Sun, Toner: Droplets,
+};
+
+function CategoryIcon({ type }: { type?: string | null }) {
+  const Icon = (type && CATEGORY_ICONS[type]) ? CATEGORY_ICONS[type] : Droplet;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <Icon size={18} className="text-gray-300" />
+      {type && <span className="text-[9px] text-gray-400 text-center leading-tight px-0.5">{type}</span>}
+    </div>
+  );
+}
 
 type Product = {
   id: string;
@@ -282,7 +302,9 @@ export default function ListDetailPage() {
                         unoptimized
                       />
                     ) : (
-                      <div className="w-12 h-14 rounded-lg border border-gray-100 bg-gray-50 shrink-0" />
+                      <div className="w-12 h-14 rounded-lg border border-gray-100 bg-gray-50 shrink-0 flex items-center justify-center">
+                        <CategoryIcon type={product.type} />
+                      </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 leading-snug">{product.name}</p>
