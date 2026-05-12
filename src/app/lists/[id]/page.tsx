@@ -311,7 +311,7 @@ export default function ListDetailPage() {
                       {product.brand && <p className="text-xs text-gray-400">{product.brand}</p>}
                       <div className="flex items-center gap-3 mt-1.5">
                         <Link
-                          href={`/?scan=${encodeURIComponent(product.id)}`}
+                          href={`/product/${productSlug(product)}`}
                           className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
                         >
                           Scan
@@ -375,6 +375,15 @@ export default function ListDetailPage() {
       </main>
     </div>
   );
+}
+
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function productSlug(product: Product): string {
+  const parts = [product.brand, product.name].filter(Boolean).join(" ");
+  return `${slugify(parts)}-${product.id}`;
 }
 
 function Header() {

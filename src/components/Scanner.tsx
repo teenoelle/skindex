@@ -7,6 +7,10 @@ import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, B
 import type { LucideIcon } from "lucide-react";
 import type { IngredientMatch, PhotosensitiveItem, ScanResult, AlternativeProduct } from "@/types";
 
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Ampoule: Pipette,
   Balm: Sparkles,
@@ -173,6 +177,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       scanVariant({ productId: initialProductIdRef.current });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (result?.product?.id) {
+      const parts = [result.product.brand, result.product.name].filter(Boolean).join(" ");
+      const target = `/product/${slugify(parts)}-${result.product.id}`;
+      if (window.location.pathname !== target) {
+        window.history.replaceState(null, "", target);
+      }
+    } else if (result === null && window.location.pathname !== "/") {
+      window.history.replaceState(null, "", "/");
+    }
+  }, [result]);
 
   async function handleScan(override?: { tab?: Tab; query?: string }) {
     setLoading(true);
