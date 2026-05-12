@@ -53,11 +53,15 @@ type BrowseType = { name: string; count: number };
 type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; flaggedCount: number };
 
 const CATEGORY_LABELS: Record<string, string> = {
+  // kebab-case (newer workflow)
   "sensitizer": "Sensitizer",
   "pore-clogger": "Pore-clogger",
   "occlusive": "Occlusive",
   "stripping": "Stripping",
   "photosensitizer": "Photosensitizer",
+  "photo-retinoid": "Retinoid",
+  "photo-exfoliant": "Exfoliant",
+  "photo-botanical": "Phototoxic",
   "fragrance-allergen": "Fragrance allergen",
   "humectant": "Humectant",
   "barrier-repairing": "Barrier-repairing",
@@ -66,6 +70,42 @@ const CATEGORY_LABELS: Record<string, string> = {
   "antioxidant": "Antioxidant",
   "firming": "Firming",
   "emollient": "Emollient",
+  // Title-case aliases (original seed)
+  "Sensitizer": "Sensitizer",
+  "Occlusive": "Occlusive",
+  "Soothing": "Soothing",
+  "Soothing Agent": "Soothing",
+  "Antioxidant": "Antioxidant",
+  "Emollient": "Emollient",
+  "Humectant": "Humectant",
+  "Brightening": "Brightening",
+  "Exfoliant": "Exfoliant",
+  // Flagged categories
+  "Fragrance Allergen": "Fragrance allergen",
+  "Fragrance": "Fragrance",
+  "Preservative Allergen": "Preservative allergen",
+  "Preservative": "Preservative",
+  "Irritant": "Irritant",
+  "Essential Oil": "Essential oil",
+  "Shea Butter": "Shea butter",
+  "Cocoa Butter": "Cocoa butter",
+  "Aloe": "Aloe",
+  "Chemical Sunscreen": "Chemical sunscreen",
+  "Drying Solvent": "Drying solvent",
+  "Sulfate Surfactant": "Sulfate surfactant",
+  "Hyaluronic Acid": "Hyaluronic acid",
+  "Synthetic Musk": "Synthetic musk",
+  // Beneficial/safe categories
+  "Amino Acid": "Amino acid",
+  "Ferment": "Ferment",
+  "Plant Oil": "Plant oil",
+  "Mineral Sunscreen": "Mineral sunscreen",
+  "Peptides": "Peptide",
+  "Abrasive": "Abrasive",
+  "Antimicrobial": "Antimicrobial",
+  "Anti-Inflammatory": "Anti-inflammatory",
+  "Prebiotic": "Prebiotic",
+  "Zinc": "Zinc",
 };
 
 const PRODUCT_TYPES = [
@@ -1362,12 +1402,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           return next;
                         })}
                       >
-                        <span className={`text-sm font-medium ${isOpen ? "text-yellow-700" : "text-gray-800"}`}>
-                          {smartCase(item.rawName)}
+                        <span className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className={`text-sm font-medium ${isOpen ? "text-yellow-700" : "text-gray-800"}`}>
+                            {smartCase(item.rawName)}
+                          </span>
+                          {item.photoCategory && CATEGORY_LABELS[item.photoCategory] && (
+                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
+                              {CATEGORY_LABELS[item.photoCategory]}
+                            </span>
+                          )}
                         </span>
-                        <span className="text-gray-300 text-xs ml-4 shrink-0">
-                          {isOpen ? "▲" : "▼"}
-                        </span>
+                        <span className="text-gray-300 text-xs ml-4 shrink-0">{isOpen ? "▲" : "▼"}</span>
                       </button>
                       {isOpen && item.photo_note && (
                         <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed">

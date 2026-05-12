@@ -11,20 +11,25 @@ function obfFullImage(url: string | null | undefined): string | null {
   return url.replace(/\.\d+\.jpg$/, ".full.jpg");
 }
 
-const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; note: string }[] = [
+import type { PhotoCategory } from "@/types";
+
+const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; photoCategory: PhotoCategory; note: string }[] = [
   {
     pattern: /retinol|retinyl palmitate|retinyl acetate|retinaldehyde|tretinoin/i,
     level: "avoid",
+    photoCategory: "photo-retinoid",
     note: "Increases skin cell turnover, leaving new skin more vulnerable to UV damage. Use SPF daily and avoid prolonged sun exposure.",
   },
   {
     pattern: /glycolic acid|lactic acid|mandelic acid|tartaric acid|gluconolactone|polyglutamic acid|\barbutin\b|alpha.arbutin/i,
     level: "avoid",
+    photoCategory: "photo-exfoliant",
     note: "Chemical exfoliant that removes the outer protective skin layer, increasing UV vulnerability. Apply SPF when using.",
   },
   {
     pattern: /limonene|citral|bergapten|bergamot|citrus aurantium|citrus limon|citrus sinensis|citrus grandis|citrus paradisi|grapefruit/i,
     level: "avoid",
+    photoCategory: "photo-botanical",
     note: "Contains phototoxic compounds that can cause burns or lasting hyperpigmentation on sun-exposed skin.",
   },
 ];
@@ -376,7 +381,7 @@ export async function POST(req: NextRequest) {
             inci_name: null,
             status: "flagged",
             explanation: rule.note,
-            category: null,
+            category: "pore-clogger",
           },
         });
       }
@@ -398,7 +403,7 @@ export async function POST(req: NextRequest) {
         const key = cleaned.toLowerCase();
         if (!seenPhotoKeys.has(key)) {
           seenPhotoKeys.add(key);
-          photosensitive.push({ rawName: item, sunLevel: rule.level, photo_note: rule.note });
+          photosensitive.push({ rawName: item, sunLevel: rule.level, photo_note: rule.note, photoCategory: rule.photoCategory });
         }
         break;
       }

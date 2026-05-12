@@ -25,10 +25,13 @@ export type ObfVariant = {
   ingredients_text: string;
 };
 
+export type PhotoCategory = "photo-retinoid" | "photo-exfoliant" | "photo-botanical";
+
 export type PhotosensitiveItem = {
   rawName: string;
   sunLevel: "avoid" | "caution";
   photo_note?: string | null;
+  photoCategory?: PhotoCategory;
 };
 
 export type AlternativeProduct = {
