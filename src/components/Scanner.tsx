@@ -1532,11 +1532,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                       </button>
                       {isOpen && (
-                        <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed">
+                        <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
                           {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
-                            <p className="text-xs text-gray-400 mb-1 italic">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
+                            <p className="text-xs text-gray-400 italic">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
                           )}
-                          {item.photo_note && <span>{item.photo_note}</span>}
+                          {match?.ingredient.explanation && <p>{match.ingredient.explanation}</p>}
+                          {item.photo_note && <p>{item.photo_note}</p>}
                         </div>
                       )}
                     </div>

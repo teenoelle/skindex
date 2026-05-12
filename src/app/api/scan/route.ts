@@ -382,6 +382,8 @@ export async function POST(req: NextRequest) {
             status: "flagged",
             explanation: rule.note,
             category: "pore-clogger",
+            flagged_category: "pore-clogger",
+            structural_category: null,
           },
         });
       }
