@@ -859,25 +859,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     </button>
                   </p>
                 )}
-                <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
-                  {result.communityVariants && result.communityVariants.length > 0 && (
-                    <span className="text-xs text-gray-400">
-                      Also:{" "}
-                      {result.communityVariants.map((v, i) => (
-                        <span key={v.id}>
-                          {i > 0 && <span className="mx-1">·</span>}
-                          <button
-                            type="button"
-                            className="underline underline-offset-2 hover:text-gray-700"
-                            onClick={() => scanVariant({ productId: v.id })}
-                          >
-                            {v.name}{v.brand ? ` (${v.brand})` : ""}
-                          </button>
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                </div>
 
                 {/* Image upload / change — signed-in users only */}
                 {result.product.id && isSignedIn && (
@@ -987,6 +968,25 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Did you mean */}
+          {result.communityVariants && result.communityVariants.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-400 mb-1.5">Did you mean</p>
+              <div className="flex flex-col gap-1">
+                {result.communityVariants.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => scanVariant({ productId: v.id })}
+                    className="text-sm text-left text-gray-700 hover:text-gray-900"
+                  >
+                    › {v.name}{v.brand ? ` (${v.brand})` : ""}
+                  </button>
+                ))}
               </div>
             </div>
           )}
