@@ -131,7 +131,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   "Wax": "Wax",
   "Pigment": "Pigment",
   "Colorant": "Colorant",
-  "Conditioning": "Conditioning",
   "pH Adjuster": "pH adjuster",
   "Mineral": "Mineral",
   "Magnesium": "Magnesium",
