@@ -5,11 +5,14 @@ export type DbIngredient = {
   status: "safe" | "flagged";
   explanation: string | null;
   category: string | null;
+  flagged_category: string | null;
+  structural_category: string | null;
 };
 
 export type IngredientMatch = {
   displayName: string;
   ingredient: DbIngredient;
+  benefit_note?: string;
 };
 
 export type CommunityVariant = {
@@ -25,13 +28,19 @@ export type ObfVariant = {
   ingredients_text: string;
 };
 
-export type PhotoCategory = "photo-retinoid" | "photo-exfoliant" | "photo-botanical";
+export type PhotoCategory = "photo-retinoid" | "photo-AHA" | "photo-BHA" | "photo-brightening" | "photo-botanical";
 
 export type PhotosensitiveItem = {
   rawName: string;
   sunLevel: "avoid" | "caution";
   photo_note?: string | null;
   photoCategory?: PhotoCategory;
+};
+
+export type SensoryTriggerItem = {
+  rawName: string;
+  sensory_note: string;
+  sensory_category?: string;
 };
 
 export type AlternativeProduct = {
@@ -59,6 +68,7 @@ export type ScanResult = {
   safe: IngredientMatch[];
   unreviewed: string[];
   photosensitive: PhotosensitiveItem[];
+  sensoryTrigger: SensoryTriggerItem[];
   communityVariants?: CommunityVariant[];
   obfVariants?: ObfVariant[];
   originalItems: string[];

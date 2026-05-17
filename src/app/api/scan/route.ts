@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { matchIngredients } from "@/lib/scanner";
 import { supabase } from "@/lib/supabase";
 import { anthropic } from "@/lib/anthropic";
-import type { CommunityVariant, ObfVariant, PhotosensitiveItem } from "@/types";
+import type { CommunityVariant, ObfVariant, PhotosensitiveItem, SensoryTriggerItem } from "@/types";
 import { COMEDOGENIC_PATTERNS } from "@/lib/comedogenic";
 
 function obfFullImage(url: string | null | undefined): string | null {
@@ -18,13 +18,25 @@ const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; 
     pattern: /retinol|retinyl palmitate|retinyl acetate|retinaldehyde|tretinoin/i,
     level: "avoid",
     photoCategory: "photo-retinoid",
-    note: "Increases skin cell turnover, leaving new skin more vulnerable to UV damage. Use SPF daily and avoid prolonged sun exposure.",
+    note: "Retinoids accelerate skin cell turnover, which progressively thins the stratum corneum — the skin's protective outer layer. This barrier thinning leaves newly formed cells more vulnerable to UV radiation. Use SPF daily and avoid prolonged sun exposure.",
   },
   {
-    pattern: /glycolic acid|lactic acid|mandelic acid|tartaric acid|gluconolactone|polyglutamic acid|\barbutin\b|alpha.arbutin/i,
+    pattern: /glycolic acid|lactic acid|mandelic acid|tartaric acid/i,
     level: "avoid",
-    photoCategory: "photo-exfoliant",
-    note: "Chemical exfoliant that removes the outer protective skin layer, increasing UV vulnerability. Apply SPF when using.",
+    photoCategory: "photo-AHA",
+    note: "AHA exfoliant that removes the outer protective skin layer, increasing UV vulnerability. Apply SPF daily when using.",
+  },
+  {
+    pattern: /\barbutin\b|alpha.arbutin/i,
+    level: "avoid",
+    photoCategory: "photo-brightening",
+    note: "Can break down into hydroquinone on UV exposure, which is photosensitizing and may cause hyperpigmentation on sun-exposed skin. Use SPF daily.",
+  },
+  {
+    pattern: /salicylic acid/i,
+    level: "avoid",
+    photoCategory: "photo-BHA",
+    note: "BHA exfoliant that increases skin cell turnover, leaving skin more vulnerable to UV damage. Apply SPF daily when using.",
   },
   {
     pattern: /limonene|citral|bergapten|bergamot|citrus aurantium|citrus limon|citrus sinensis|citrus grandis|citrus paradisi|grapefruit/i,
@@ -34,6 +46,169 @@ const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; 
   },
 ];
 
+
+const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category: string }[] = [
+  {
+    pattern: /\baloe\b|aloe barbadensis|aloe vera/i,
+    sensory_category: "Film-forming",
+    note: "Forms a biopolymer film on skin that crusts and tightens as it dries, causing itching that can lead to scratching and barrier damage. Works best in well-formulated products where it's diluted — avoid applying raw aloe gel to reactive skin.",
+  },
+  {
+    pattern: /\bkaolin\b|\bbentonite\b|montmorillonite/i,
+    sensory_category: "Film-forming",
+    note: "Forms a tightening film as it dries that creates discomfort and an urge to touch or rub the face — cumulative mechanical contact that can damage the skin barrier over time.",
+  },
+  {
+    pattern: /\bmenthol\b|\bl-menthol\b/i,
+    sensory_category: "Cooling",
+    note: "Creates an intense cooling sensation that transitions to burning or itching, frequently triggering unconscious touching and scratching. The repeated mechanical contact can damage an already reactive skin barrier.",
+  },
+  {
+    pattern: /peppermint/i,
+    sensory_category: "Cooling",
+    note: "Contains menthol, which produces a cooling-then-burning sensation that prompts touching and scratching. Not recommended for reactive or barrier-compromised skin.",
+  },
+  {
+    pattern: /spearmint|mentha spicata/i,
+    sensory_category: "Cooling",
+    note: "Contains carvone and trace menthol, producing a cooling-then-burning sensation similar to peppermint. The sensation prompts touching or rubbing, which can mechanically disrupt an already reactive skin barrier.",
+  },
+  {
+    pattern: /\bcamphor\b/i,
+    sensory_category: "Cooling",
+    note: "Creates a strong cooling-to-warming sensation that frequently triggers touching or scratching, which can mechanically damage an already reactive skin barrier.",
+  },
+  {
+    pattern: /eucalyptus/i,
+    sensory_category: "Cooling",
+    note: "Contains eucalyptol, which creates a cooling-to-numbing sensation that transitions to itching on reactive skin. Frequently triggers unconscious touching and can worsen barrier damage.",
+  },
+  {
+    pattern: /\bclove\b|eugenia caryophyllus/i,
+    sensory_category: "Warming",
+    note: "Eugenol creates a numbing-then-burning sensation on skin that frequently triggers unconscious touching. Can be acutely irritating to a compromised barrier.",
+  },
+  {
+    pattern: /\bcinnamon\b|cinnamomum/i,
+    sensory_category: "Warming",
+    note: "Cinnamaldehyde creates a warming-to-burning sensation that prompts touching and rubbing. Even low concentrations can cause irritation on reactive skin.",
+  },
+  {
+    pattern: /hamamelis|witch hazel/i,
+    sensory_category: "Astringent",
+    note: "Its astringent tannins cause a visible tightening sensation that prompts touching the face. With regular use, the cumulative drying effect progressively weakens the barrier.",
+  },
+  {
+    pattern: /alcohol denat|denatured alcohol|sd alcohol/i,
+    sensory_category: "Stripping",
+    note: "Creates an immediate stinging or burning sensation on reactive or compromised skin, frequently triggering face-touching and rubbing reflexes.",
+  },
+  {
+    pattern: /sodium lauryl sulfate|\bsls\b(?!es)/i,
+    sensory_category: "Stripping",
+    note: "Leaves skin with an immediate tight, stripped feeling after rinsing that prompts touching and rubbing — compounding barrier damage already caused by the detergent.",
+  },
+  {
+    pattern: /salicylic acid/i,
+    sensory_category: "Stinging",
+    note: "Creates a mild tingling-to-burning sensation on sensitive or barrier-compromised skin, especially at concentrations above 1%.",
+  },
+  {
+    pattern: /glycolic acid/i,
+    sensory_category: "Stinging",
+    note: "Causes a noticeable stinging or burning sensation on reactive or barrier-compromised skin. The sting intensifies at higher concentrations and on areas where the barrier is already damaged — prompting touching that slows recovery.",
+  },
+  {
+    pattern: /lactic acid|mandelic acid|malic acid|tartaric acid/i,
+    sensory_category: "Stinging",
+    note: "AHA exfoliants that cause a tingling or stinging sensation on reactive skin. Gentler than glycolic acid but still capable of causing discomfort on a compromised barrier, especially in acidic formulas.",
+  },
+  {
+    pattern: /benzoyl peroxide/i,
+    sensory_category: "Stinging",
+    note: "Causes a pronounced burning and stinging sensation on contact, especially on reactive or broken skin. The drying effect compounds over time, creating a raw, sensitized surface that is difficult not to touch or pick at.",
+  },
+  {
+    pattern: /propylene glycol/i,
+    sensory_category: "Stinging",
+    note: "Can cause a stinging or burning sensation on sensitized skin and around areas where the barrier is broken or compromised.",
+  },
+  {
+    pattern: /kojic acid/i,
+    sensory_category: "Stinging",
+    note: "Can produce a prickling or stinging sensation on reactive skin, particularly at higher concentrations or when applied to a weakened barrier.",
+  },
+  {
+    pattern: /petrolatum|mineral oil|white petrolatum|\bparaffin\b/i,
+    sensory_category: "Occlusive",
+    note: "Creates a dense physical seal over the skin surface, trapping sweat, sebum, and heat underneath. The resulting warmth and humidity can cause a prickling or itching sensation — and the bacterial buildup over time leads to breakouts that prompt picking.",
+  },
+  {
+    pattern: /\blanolin\b/i,
+    sensory_category: "Occlusive",
+    note: "A dense animal wax that seals the skin surface and restricts airflow. The occlusive warmth can cause a stuffy, itching feeling over time — especially around pores and in warmer weather.",
+  },
+  {
+    pattern: /\bbeeswax\b|cera alba|cera flava/i,
+    sensory_category: "Occlusive",
+    note: "A heavy wax that seals the skin surface and limits breathability. Can cause a stuffy, warm feeling that leads to itching and touching, particularly on reactive or congestion-prone skin.",
+  },
+  {
+    pattern: /butyrospermum parkii|shea butter|theobroma cacao seed butter|cocoa butter/i,
+    sensory_category: "Occlusive",
+    note: "A rich, heavy emollient that creates a semi-occlusive layer on the skin surface, trapping heat and sebum underneath. For reactive or congestion-prone skin, the warmth and humidity this creates can cause a prickling or itching sensation and encourage picking — similar to beeswax.",
+  },
+  {
+    pattern: /carnauba|candelilla/i,
+    sensory_category: "Occlusive",
+    note: "A hard plant wax that creates a stiff, occlusive film on skin. Can trap sweat and sebum beneath the surface, causing warmth and itching that prompt touching.",
+  },
+  {
+    pattern: /\bdimethicone\b|trimethylsiloxysilicate/i,
+    sensory_category: "Pilling",
+    note: "Can ball up into a gritty, visible residue when applied over water-based layers or in excess — especially if the previous layer hasn't fully absorbed. The physical sensation of pilled product on skin frequently triggers rubbing and picking.",
+  },
+  {
+    pattern: /acrylates copolymer|acrylates\/c10|\bpvp\b|polyvinylpyrrolidone/i,
+    sensory_category: "Pilling",
+    note: "A film-forming polymer that can roll and ball up when layered with incompatible formulas or applied over skin that isn't fully dry. The lumpy residue it creates prompts rubbing and picking that disrupts the skin barrier.",
+  },
+];
+
+const BENEFIT_PATTERNS: { pattern: RegExp; note: string }[] = [
+  {
+    pattern: /retinol|retinyl palmitate|retinyl acetate|retinaldehyde|\bretinal\b|tretinoin|retinoic acid/i,
+    note: "Why it's in the formula: Retinoids are among the most evidence-backed skincare actives — they stimulate collagen production, accelerate cell turnover, and treat acne. Worth considering once your skin barrier is stable and they can be introduced gradually.",
+  },
+  {
+    pattern: /glycolic acid/i,
+    note: "Why it's in the formula: Removes dead skin cells, brightens uneven tone, and stimulates collagen. Widely used in anti-aging and resurfacing routines — the key is low concentrations and consistent SPF.",
+  },
+  {
+    pattern: /lactic acid/i,
+    note: "Why it's in the formula: Exfoliates while also drawing moisture into skin, making it gentler than glycolic acid. Used for brightening and texture improvement.",
+  },
+  {
+    pattern: /salicylic acid/i,
+    note: "Why it's in the formula: Oil-soluble — it penetrates into pores to clear blockages from the inside. One of the most effective OTC treatments for acne and blackheads.",
+  },
+  {
+    pattern: /benzoyl peroxide/i,
+    note: "Why it's in the formula: Kills acne-causing bacteria directly and is the most effective non-prescription acne treatment available. Often worth the irritation for active breakouts.",
+  },
+  {
+    pattern: /tea tree|melaleuca/i,
+    note: "Why it's in the formula: Has natural antimicrobial properties and is used as a gentler alternative to benzoyl peroxide for acne. Some skin tolerates it well at low concentrations.",
+  },
+  {
+    pattern: /kojic acid/i,
+    note: "Why it's in the formula: Inhibits melanin production — a common brightening treatment for dark spots and hyperpigmentation.",
+  },
+  {
+    pattern: /oxybenzone|benzophenone-3|octinoxate|ethylhexyl methoxycinnamate|octisalate|ethylhexyl salicylate|avobenzone|butyl methoxydibenzoylmethane|octocrylene|homosalate/i,
+    note: "Why it's in the formula: Chemical UV filters provide broad-spectrum sun protection. The concern is about potential systemic absorption — not about whether they protect against UV damage.",
+  },
+];
 
 function stripHtml(html: string): string {
   return html
@@ -395,6 +570,16 @@ export async function POST(req: NextRequest) {
     (s) => !comedoFlaggedKeys.has(s.displayName.toLowerCase().trim())
   );
 
+  // Annotate flagged ingredients with benefit notes where applicable
+  for (const item of flagged) {
+    for (const rule of BENEFIT_PATTERNS) {
+      if (rule.pattern.test(item.displayName)) {
+        item.benefit_note = rule.note;
+        break;
+      }
+    }
+  }
+
   // Build photosensitive list from originalItems using pattern matching
   const photosensitive: PhotosensitiveItem[] = [];
   const seenPhotoKeys = new Set<string>();
@@ -409,6 +594,32 @@ export async function POST(req: NextRequest) {
         }
         break;
       }
+    }
+  }
+
+  // Build sensory trigger list from originalItems using pattern matching
+  const sensoryTrigger: SensoryTriggerItem[] = [];
+  const seenSensoryKeys = new Set<string>();
+  for (const item of originalItems) {
+    const cleaned = item.replace(/\([^)]*\)/g, "").trim();
+    for (const rule of SENSORY_PATTERNS) {
+      if (rule.pattern.test(cleaned)) {
+        const key = cleaned.toLowerCase();
+        if (!seenSensoryKeys.has(key)) {
+          seenSensoryKeys.add(key);
+          sensoryTrigger.push({ rawName: item, sensory_note: rule.note, sensory_category: rule.sensory_category });
+        }
+        break;
+      }
+    }
+  }
+
+  // Pore-clogging: comedogenic-flagged ingredients also appear as sensory triggers
+  const COMEDO_SENSORY_NOTE = "Tends to block pores over time, forming blackheads and inflamed bumps. The urge to pick or squeeze these is difficult to resist — and the mechanical trauma from picking typically causes more lasting barrier damage than the clogging itself.";
+  const seenSensoryFinal = new Set(sensoryTrigger.map((s) => s.rawName.toLowerCase()));
+  for (const fi of flagged) {
+    if (fi.ingredient.id.startsWith("comedo-") && !seenSensoryFinal.has(fi.displayName.toLowerCase())) {
+      sensoryTrigger.push({ rawName: fi.displayName, sensory_note: COMEDO_SENSORY_NOTE, sensory_category: "Pore-clogging" });
     }
   }
 
@@ -451,5 +662,5 @@ export async function POST(req: NextRequest) {
     ).catch(() => { /* never block the scan response */ });
   }
 
-  return NextResponse.json({ product, safe: safeFiltered, flagged, unreviewed, photosensitive, communityVariants, obfVariants, originalItems, isIncomplete });
+  return NextResponse.json({ product, safe: safeFiltered, flagged, unreviewed, photosensitive, sensoryTrigger, communityVariants, obfVariants, originalItems, isIncomplete });
 }

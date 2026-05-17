@@ -16,6 +16,16 @@ export const COMEDOGENIC_PATTERNS: { pattern: RegExp; note: string; maxPosition?
     note: "Algae-derived ingredients provide a smooth, slippery skin feel but are associated with closed comedones on acne-prone and reactive skin due to their polysaccharide content, which can trap sebum in the pore.",
   },
   {
+    // High-comedogenic esters (rated 4–5/5 on standard comedogenicity scales)
+    pattern: /isopropyl myristate|isopropyl palmitate|isopropyl isostearate|isopropyl linoleate|myristyl myristate/i,
+    note: "Isopropyl esters are among the most comedogenic cosmetic ingredients — they penetrate follicle walls and directly contribute to closed comedones. Even small amounts can cause breakouts on congestion-prone skin.",
+  },
+  {
+    // Moderate-comedogenic esters and ethers
+    pattern: /ethylhexyl palmitate|octyldodecyl myristate|octyl palmitate|cetyl myristate/i,
+    note: "This ester has a moderate comedogenic rating and can contribute to closed comedones with repeated use on congestion-prone or reactive skin.",
+  },
+  {
     // Only flag glycols when they appear high in the formula (first 5 ingredients)
     pattern: /^(butylene glycol|dipropylene glycol)$/i,
     note: "At high concentrations — indicated by appearing in the first five ingredients — Butylene Glycol and Dipropylene Glycol can disrupt the skin barrier and contribute to closed comedones.",

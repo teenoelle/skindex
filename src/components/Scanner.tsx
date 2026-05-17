@@ -5,7 +5,7 @@ import { useUser, SignInButton } from "@clerk/nextjs";
 import Image from "next/image";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { IngredientMatch, PhotosensitiveItem, ScanResult, AlternativeProduct } from "@/types";
+import type { IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct } from "@/types";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -26,6 +26,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Foundation: Brush,
   Gel: Droplet,
   "Makeup Remover": Droplets,
+  Deodorant: Wind,
   Mist: Wind,
   Oil: Droplet,
   Ointment: Droplets,
@@ -61,8 +62,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   "bacteria-trap": "Bacteria trap",
   "cleansing": "Cleansing",
   "photosensitizer": "Photosensitizer",
-  "photo-retinoid": "Retinoid",
-  "photo-exfoliant": "Exfoliant",
+  "photo-retinoid": "Photosensitizing",
+  "photo-AHA": "AHA Exfoliant",
+  "photo-BHA": "BHA Exfoliant",
+  "photo-brightening": "Photosensitizing",
   "photo-botanical": "Phototoxic",
   "fragrance-allergen": "Fragrance allergen",
   "humectant": "Humectant",
@@ -82,6 +85,19 @@ const CATEGORY_LABELS: Record<string, string> = {
   "Humectant": "Humectant",
   "Brightening": "Brightening",
   "Exfoliant": "Exfoliant",
+  "AHA Exfoliant": "AHA Exfoliant",
+  "BHA Exfoliant": "BHA Exfoliant",
+  "PHA Exfoliant": "PHA Exfoliant",
+  "Retinoid": "Retinoid",
+  "Barrier-disrupting": "Barrier-disrupting",
+  "Anti-inflammatory": "Anti-inflammatory",
+  "Softening": "Softening",
+  "Barrier support": "Barrier support",
+  "Smoothing": "Smoothing",
+  "Pore-cleansing": "Pore-cleansing",
+  "Strengthening": "Strengthening",
+  "Conditioning": "Conditioning",
+  "Moisturizing": "Moisturizing",
   // Flagged categories
   "Fragrance Allergen": "Fragrance allergen",
   "Fragrance": "Fragrance",
@@ -173,7 +189,7 @@ const STRUCTURAL_DESCRIPTIONS: Record<string, string> = {
 const PRODUCT_TYPES = [
   "Ampoule", "Balm", "BB Cream", "Blush", "Body Lotion", "Body Wash",
   "Brow Gel", "CC Cream", "Chapstick", "Concealer", "Conditioner", "Cream",
-  "Emulsion", "Exfoliant", "Extract", "Eye Cream", "Eye Gel", "Eye Primer",
+  "Deodorant", "Emulsion", "Exfoliant", "Extract", "Eye Cream", "Eye Gel", "Eye Primer",
   "Eyeliner", "Eyeshadow", "Face Mask", "Face Wash", "Foundation", "Gel",
   "Hair Mask", "Hair Oil", "Hair Serum", "Lip Treatment", "Makeup Remover",
   "Mascara", "Mist", "Oil", "Ointment", "Primer", "Scalp Serum",
@@ -230,6 +246,7 @@ function getItemMatch(
 
 const paragraphColor = {
   "photo-sensitive": "text-yellow-700 font-medium",
+  "sensory-trigger": "text-amber-700 font-medium",
   flagged: "text-rose-700 font-medium",
   safe: "text-teal-700 font-medium",
   unreviewed: "text-gray-400",
@@ -263,10 +280,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [imageUploading, setImageUploading] = useState(false);
   const [imageRefetching, setImageRefetching] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [autoSearching, setAutoSearching] = useState(false);
+  const [autoSearchResult, setAutoSearchResult] = useState<"found" | "not-found" | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewResult, setReviewResult] = useState<{ reviewed: number } | null>(null);
-  const [backfillLoading, setBackfillLoading] = useState(false);
-  const [backfillResult, setBackfillResult] = useState<{ updated: number } | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submitName, setSubmitName] = useState("");
   const [submitBrand, setSubmitBrand] = useState("");
@@ -308,6 +325,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     }
   }, [result]);
 
+  // Auto-trigger review when scan finds unreviewed ingredients
+  useEffect(() => {
+    if (result?.unreviewed?.length && !reviewLoading && reviewResult === null) {
+      handleReview();
+    }
+  }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleScan(override?: { tab?: Tab; query?: string }) {
     setLoading(true);
     setNotFound(false);
@@ -325,6 +349,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setImageUploadUrl("");
     setImageUploading(false);
     setUploadError(null);
+    setAutoSearching(false);
+    setAutoSearchResult(null);
     setReviewLoading(false);
     setReviewResult(null);
     setSubmitOpen(false);
@@ -428,6 +454,29 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     });
   }
 
+  function handleSensoryClick(rawName: string, safeMatch: { id: string; explanation: string | null } | null) {
+    const sensoryKey = `sensory-${rawName}`;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.add(sensoryKey);
+      return next;
+    });
+    if (safeMatch && !safeMatch.explanation && !(safeMatch.id in explanations)) {
+      setExplanations((prev) => ({ ...prev, [safeMatch.id]: null }));
+      fetch("/api/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: safeMatch.id }),
+      })
+        .then((r) => r.json())
+        .then((data) => setExplanations((prev) => ({ ...prev, [safeMatch.id]: data.explanation ?? null })))
+        .catch(() => {});
+    }
+    requestAnimationFrame(() => {
+      document.getElementById("section-sensory")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   function handleUnreviewedClick(name: string) {
     setShowUnreviewed(true);
     requestAnimationFrame(() => {
@@ -452,6 +501,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setImageUploadUrl("");
     setImageUploading(false);
     setUploadError(null);
+    setAutoSearching(false);
+    setAutoSearchResult(null);
     setReviewLoading(false);
     setReviewResult(null);
     setSubmitOpen(false);
@@ -543,31 +594,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       }
     } catch { /* stop on error */ }
     setReviewLoading(false);
-  }
-
-  async function handleBackfill() {
-    setBackfillLoading(true);
-    setBackfillResult(null);
-    let total = 0;
-    try {
-      for (let i = 0; i < 100; i++) {
-        const res = await fetch("/api/backfill-explanations", { method: "POST" });
-        const data = await res.json();
-        total += data.updated ?? 0;
-        setBackfillResult({ updated: total });
-        if ((data.remaining ?? data.total) === 0) break;
-      }
-    } catch { /* stop on error */ }
-    setBackfillLoading(false);
-    // Browser notification so you know it's done even if you're in another tab
-    const notify = (msg: string) => new Notification("SKINdex", { body: msg });
-    const msg = total > 0 ? `${total} explanations generated` : "All explanations already up to date";
-    if (Notification.permission === "granted") {
-      notify(msg);
-    } else if (Notification.permission !== "denied") {
-      const permission = await Notification.requestPermission();
-      if (permission === "granted") notify(msg);
-    }
   }
 
   async function handleSubmitProduct() {
@@ -1010,14 +1036,46 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 {result.product.id && isSignedIn && (
                   <div className="mt-1 space-y-1">
                     {!imageUploadOpen ? (
-                      <div className="flex gap-3">
+                      <div className="flex gap-3 flex-wrap">
                         <button
                           type="button"
-                          onClick={() => setImageUploadOpen(true)}
+                          onClick={() => { setImageUploadOpen(true); setAutoSearchResult(null); }}
                           className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600"
                         >
                           {result.product.image_url ? "Change image" : "Add image"}
                         </button>
+                        <button
+                          type="button"
+                          disabled={autoSearching}
+                          onClick={async () => {
+                            setAutoSearching(true);
+                            setAutoSearchResult(null);
+                            const res = await fetch("/api/find-product-image", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ productId: result.product!.id }),
+                            });
+                            const data = await res.json();
+                            setAutoSearching(false);
+                            if (data.imageUrl) {
+                              setResult((prev) =>
+                                prev ? { ...prev, product: prev.product ? { ...prev.product, image_url: data.imageUrl } : prev.product } : prev
+                              );
+                              setAutoSearchResult("found");
+                            } else {
+                              setAutoSearchResult("not-found");
+                            }
+                          }}
+                          className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600 disabled:opacity-40"
+                        >
+                          {autoSearching ? "Searching…" : "Auto-search"}
+                        </button>
+                        {autoSearchResult === "not-found" && (
+                          <span className="text-xs text-gray-400">No image found online</span>
+                        )}
+                        {autoSearchResult === "found" && (
+                          <span className="text-xs text-gray-400">Image found</span>
+                        )}
                         {result.product.image_url && (
                           <button
                             type="button"
@@ -1237,6 +1295,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               >
                 {result.flagged.length} flagged
               </button>
+              {(result.sensoryTrigger ?? []).length > 0 && (
+                <>
+                  {" · "}
+                  <button
+                    type="button"
+                    className="text-amber-700 hover:underline underline-offset-2"
+                    onClick={() => document.getElementById("section-sensory")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  >
+                    {result.sensoryTrigger.length} sensory trigger{result.sensoryTrigger.length !== 1 ? "s" : ""}
+                  </button>
+                </>
+              )}
               {(result.photosensitive ?? []).length > 0 && (
                 <>
                   {" · "}
@@ -1369,9 +1439,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   const photoItem = (result.photosensitive ?? []).find(
                     (p) => normalizeForMatch(p.rawName) === normalizeForMatch(item)
                   );
+                  const sensoryItem = (result.sensoryTrigger ?? []).find(
+                    (s) => normalizeForMatch(s.rawName) === normalizeForMatch(item)
+                  );
                   const colorKey: keyof typeof paragraphColor =
                     match?.status === "flagged" ? "flagged"
                     : photoItem ? "photo-sensitive"
+                    : sensoryItem ? "sensory-trigger"
                     : match?.status === "safe" ? "safe"
                     : "unreviewed";
                   const colorClass =
@@ -1385,6 +1459,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           type="button"
                           className={`${colorClass} hover:underline underline-offset-2`}
                           onClick={() => handlePhotoClick(item, match ? { id: match.ingredient.id, explanation: match.ingredient.explanation } : null)}
+                        >
+                          {smartCase(item)}
+                        </button>
+                      ) : sensoryItem ? (
+                        <button
+                          type="button"
+                          className={`${colorClass} hover:underline underline-offset-2`}
+                          onClick={() => handleSensoryClick(item, match?.status === "safe" ? { id: match.ingredient.id, explanation: match.ingredient.explanation } : null)}
                         >
                           {smartCase(item)}
                         </button>
@@ -1468,15 +1550,78 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                       </button>
                       {isOpen && (
-                        <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed">
+                        <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
                           {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
-                            <p className="text-xs text-gray-400 mb-1 italic">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
+                            <p className="text-xs text-gray-400 italic">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
                           )}
                           {isLoading ? (
                             <span className="italic text-gray-400">Generating explanation…</span>
                           ) : explanation ? explanation : (
                             <span className="italic text-gray-400">No explanation yet.</span>
                           )}
+                          {item.benefit_note && (
+                            <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">{item.benefit_note}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Sensory trigger ingredients */}
+          {(result.sensoryTrigger ?? []).length > 0 && (
+            <section id="section-sensory">
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest mb-2">
+                Sensory trigger — {result.sensoryTrigger.length}
+              </p>
+              <div className="divide-y divide-gray-100">
+                {result.sensoryTrigger.map((item) => {
+                  const key = `sensory-${item.rawName}`;
+                  const isOpen = expanded.has(key);
+                  const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
+                  const flaggedMatch = result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned);
+                  const safeMatch = result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned);
+                  const match = flaggedMatch ?? safeMatch;
+                  const structCat = match?.ingredient.structural_category ?? null;
+                  return (
+                    <div key={item.rawName} className="border-l-4 border-l-gray-200 overflow-hidden">
+                      <button
+                        className="w-full flex items-center justify-between px-3 py-1 text-left"
+                        onClick={() => setExpanded((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(key)) next.delete(key); else next.add(key);
+                          return next;
+                        })}
+                      >
+                        <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className={`text-sm font-medium truncate ${isOpen ? "text-amber-700" : "text-gray-800"}`}>
+                            {smartCase(item.rawName)}
+                          </span>
+                          {structCat && (
+                            <>
+                              <span className="text-gray-300 text-xs shrink-0">·</span>
+                              <span className="text-xs text-gray-400 shrink-0">{structCat}</span>
+                            </>
+                          )}
+                          {item.sensory_category && (
+                            <>
+                              <span className="text-gray-300 text-xs shrink-0">·</span>
+                              <span className="text-xs text-amber-700 shrink-0">{item.sensory_category}</span>
+                            </>
+                          )}
+                        </span>
+                        <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
+                      </button>
+                      {isOpen && (
+                        <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
+                          {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
+                            <p className="text-xs text-gray-400 italic">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
+                          )}
+                          {!flaggedMatch && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
+                          {item.sensory_note && <p>{item.sensory_note}</p>}
                         </div>
                       )}
                     </div>
@@ -1497,9 +1642,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   const key = `photo-${item.rawName}`;
                   const isOpen = expanded.has(key);
                   const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
-                  const match =
-                    result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned) ??
-                    result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned);
+                  const flaggedMatch = result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned);
+                  const safeMatch = result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned);
+                  const match = flaggedMatch ?? safeMatch;
                   const structCat = match?.ingredient.structural_category ?? null;
                   const catLabel = item.photoCategory ? CATEGORY_LABELS[item.photoCategory] : null;
                   return (
@@ -1536,7 +1681,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
                             <p className="text-xs text-gray-400 italic">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
                           )}
-                          {match?.ingredient.explanation && <p>{match.ingredient.explanation}</p>}
+                          {/* Only show ingredient explanation for safe+photosensitive; flagged ingredients show it in their own section */}
+                          {!flaggedMatch && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
                           {item.photo_note && <p>{item.photo_note}</p>}
                         </div>
                       )}
@@ -1654,28 +1800,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
           {result.flagged.length === 0 && result.safe.length === 0 && result.unreviewed.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-4">No ingredients found.</p>
-          )}
-
-          {isSignedIn && (
-            <div className="flex items-center gap-2 pt-1">
-              {backfillLoading ? (
-                <span className="text-xs text-gray-400">
-                  Generating{backfillResult && backfillResult.updated > 0 ? ` — ${backfillResult.updated} done` : "…"}
-                </span>
-              ) : backfillResult ? (
-                <span className="text-xs text-gray-400">
-                  {backfillResult.updated > 0 ? `${backfillResult.updated} explanations generated` : "All explanations up to date"}
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleBackfill}
-                  className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
-                >
-                  Generate explanations
-                </button>
-              )}
-            </div>
           )}
 
           </section>{/* end Ingredients */}
