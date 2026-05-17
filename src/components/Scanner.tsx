@@ -305,6 +305,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [saveListLoading, setSaveListLoading] = useState<string | null>(null);
   const [savedTo, setSavedTo] = useState<string | null>(null);
   const [saveListError, setSaveListError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editBrand, setEditBrand] = useState("");
+  const [editType, setEditType] = useState("");
+  const [editIngredients, setEditIngredients] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editDone, setEditDone] = useState(false);
 
   const initialProductIdRef = useRef(initialProductId);
   useEffect(() => {
@@ -324,6 +333,29 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       window.history.replaceState(null, "", "/");
     }
   }, [result]);
+
+  // Fetch admin role once on sign-in
+  useEffect(() => {
+    if (isSignedIn) {
+      fetch("/api/auth/me")
+        .then((r) => r.json())
+        .then((d) => setIsAdmin(d.isAdmin === true))
+        .catch(() => {});
+    }
+  }, [isSignedIn]);
+
+  // Reset edit form when a new product is scanned
+  useEffect(() => {
+    if (result?.product?.id) {
+      setEditOpen(false);
+      setEditDone(false);
+      setEditError(null);
+      setEditName(result.product.name ?? "");
+      setEditBrand(result.product.brand ?? "");
+      setEditType(result.product.type ?? "");
+      setEditIngredients("");
+    }
+  }, [result?.product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-trigger review when scan finds unreviewed ingredients
   useEffect(() => {
@@ -594,6 +626,47 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       }
     } catch { /* stop on error */ }
     setReviewLoading(false);
+  }
+
+  async function handleEditProduct() {
+    if (!result?.product?.id) return;
+    setEditLoading(true);
+    setEditError(null);
+    setEditDone(false);
+    try {
+      const res = await fetch("/api/admin/update-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: result.product.id,
+          name: editName || undefined,
+          brand: editBrand || undefined,
+          type: editType || undefined,
+          ingredient_list: editIngredients || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      setEditDone(true);
+      setResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              product: prev.product
+                ? {
+                    ...prev.product,
+                    name: editName || prev.product.name,
+                    brand: editBrand || prev.product.brand,
+                    type: editType || prev.product.type,
+                  }
+                : prev.product,
+            }
+          : prev
+      );
+    } catch (e) {
+      setEditError((e as Error).message);
+    }
+    setEditLoading(false);
   }
 
   async function handleSubmitProduct() {
@@ -1172,6 +1245,72 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     )}
                   </div>
                 )}
+
+                {/* Admin edit form */}
+                {result.product.id && isAdmin && (
+                  <div className="mt-1">
+                    {!editOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditOpen(true)}
+                        className="text-xs text-indigo-500 underline underline-offset-2 hover:text-indigo-700"
+                      >
+                        Edit product
+                      </button>
+                    ) : (
+                      <div className="flex flex-col gap-1.5 mt-1">
+                        <p className="text-xs font-medium text-indigo-600">Admin edit</p>
+                        <input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="Product name"
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
+                        />
+                        <input
+                          value={editBrand}
+                          onChange={(e) => setEditBrand(e.target.value)}
+                          placeholder="Brand"
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
+                        />
+                        <select
+                          value={editType}
+                          onChange={(e) => setEditType(e.target.value)}
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-white"
+                        >
+                          <option value="">Type (optional)</option>
+                          {PRODUCT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <textarea
+                          value={editIngredients}
+                          onChange={(e) => setEditIngredients(e.target.value)}
+                          placeholder="Ingredient list (leave blank to keep current)"
+                          rows={3}
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 resize-none"
+                        />
+                        {editError && <p className="text-xs text-rose-600">{editError}</p>}
+                        {editDone && <p className="text-xs text-teal-600">Saved.</p>}
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handleEditProduct}
+                            disabled={editLoading}
+                            className="text-xs px-2.5 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40"
+                          >
+                            {editLoading ? "Saving…" : "Save changes"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setEditOpen(false); setEditError(null); setEditDone(false); }}
+                            className="text-xs text-gray-400 hover:text-gray-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {result.product.id && isSignedIn && (
                   <div className="mt-2">
                     {savedTo ? (

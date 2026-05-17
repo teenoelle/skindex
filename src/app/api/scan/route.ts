@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { anthropic } from "@/lib/anthropic";
 import type { CommunityVariant, ObfVariant, PhotosensitiveItem, SensoryTriggerItem } from "@/types";
 import { COMEDOGENIC_PATTERNS } from "@/lib/comedogenic";
+import { extractIngredientsFromUrl } from "@/lib/extract-ingredients";
 
 function obfFullImage(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -251,38 +252,6 @@ async function getOrCreateUser(clerkId: string) {
   return data;
 }
 
-async function extractFromUrl(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-    const html = await res.text();
-    const text = stripHtml(html);
-
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: `Extract the skincare product ingredients list from the following web page text. Return ONLY the ingredients as a comma-separated list (like "Water, Glycerin, Niacinamide"). Do not include any other text, labels, or commentary. If no ingredients list is found, return exactly: NONE\n\n${text}`,
-        },
-      ],
-    });
-
-    const result =
-      message.content[0].type === "text" ? message.content[0].text.trim() : null;
-    if (!result || result.toUpperCase() === "NONE") return null;
-    return result;
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(req: NextRequest) {
   const { type, query, ingredients, url, productId } = await req.json();
 
@@ -404,29 +373,34 @@ export async function POST(req: NextRequest) {
         activity_note: dbProduct.activity_note ?? null,
       };
 
-      // Fire-and-forget: if no image yet, try OBF as a background update for next scan
-      if (!dbProduct.image_url) {
-        const productId = dbProduct.id;
-        const productName = dbProduct.name;
-        import("@/lib/supabase-admin").then(({ supabaseAdmin }) => {
-          fetch(
-            `https://world.openbeautyfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(productName)}&search_simple=1&action=process&json=1&page_size=3`
-          )
-            .then((r) => r.json())
-            .then((data) => {
-              const img = obfFullImage(
-                data.products?.[0]?.image_front_url ?? data.products?.[0]?.image_url ?? null
-              );
-              if (img) {
-                supabaseAdmin.from("products").update({ image_url: img }).eq("id", productId).then(() => {});
-              }
-            })
-            .catch(() => {});
-        }).catch(() => {});
-      }
-
       // Collect OBF variants (shown as alternatives at bottom of results)
+      // Also use OBF image for this response if no community image exists — so it shows on first scan
       const obfData = await obfFetch;
+      if (!dbProduct.image_url) {
+        const obfImg = obfFullImage(
+          obfData?.products?.[0]?.image_front_url ?? obfData?.products?.[0]?.image_url ?? null
+        );
+        if (obfImg) {
+          product.image_url = obfImg;
+          const pid = dbProduct.id;
+          import("@/lib/supabase-admin").then(({ supabaseAdmin }) => {
+            supabaseAdmin.from("products").update({ image_url: obfImg }).eq("id", pid).then(() => {});
+          }).catch(() => {});
+        } else {
+          // Fallback: search by exact product name in background (saves for future scans)
+          const pid = dbProduct.id;
+          const productName = dbProduct.name;
+          import("@/lib/supabase-admin").then(({ supabaseAdmin }) => {
+            fetch(`https://world.openbeautyfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(productName)}&search_simple=1&action=process&json=1&page_size=3`)
+              .then((r) => r.json())
+              .then((data) => {
+                const img = obfFullImage(data.products?.[0]?.image_front_url ?? data.products?.[0]?.image_url ?? null);
+                if (img) supabaseAdmin.from("products").update({ image_url: img }).eq("id", pid).then(() => {});
+              })
+              .catch(() => {});
+          }).catch(() => {});
+        }
+      }
       const obfProducts = (obfData?.products ?? []).filter(
         (p: { ingredients_text?: string; product_name?: string }) => p.ingredients_text && p.product_name
       );
@@ -516,24 +490,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not load user" }, { status: 500 });
     }
 
-    if (user.role !== "admin" && user.ai_extractions_today >= 5) {
-      return NextResponse.json({ limitReached: true }, { status: 429 });
-    }
-
-    const extracted = await extractFromUrl(url);
+    const extracted = await extractIngredientsFromUrl(url);
     if (!extracted) {
       return NextResponse.json({ notFound: true });
     }
 
     rawIngredients = extracted;
     product = { name: url, source: "url-extract" };
-
-    if (user.role !== "admin") {
-      await supabase
-        .from("app_users")
-        .update({ ai_extractions_today: user.ai_extractions_today + 1 })
-        .eq("clerk_id", userId);
-    }
   } else {
     return NextResponse.json({ error: "Unknown scan type" }, { status: 400 });
   }
