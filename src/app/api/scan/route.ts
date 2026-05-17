@@ -42,16 +42,16 @@ const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; 
     pattern: /limonene|citral|bergapten|bergamot|citrus aurantium|citrus limon|citrus sinensis|citrus grandis|citrus paradisi|grapefruit/i,
     level: "avoid",
     photoCategory: "photo-botanical",
-    note: "Contains phototoxic compounds that can cause burns or lasting hyperpigmentation on sun-exposed skin.",
+    note: "Contains furanocoumarins — light-reactive compounds that combine with UV to trigger phototoxic burns and lasting dark patches on exposed skin. Apply only in evening routines and keep treated areas covered from direct sun.",
   },
 ];
 
 
 const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category: string }[] = [
   {
-    pattern: /\baloe\b|aloe barbadensis|aloe vera/i,
+    pattern: /(?!.*\bleaf water\b)(\baloe\b|aloe barbadensis|aloe vera)/i,
     sensory_category: "Film-forming",
-    note: "Forms a biopolymer film on skin that crusts and tightens as it dries, causing itching that can lead to scratching and barrier damage. Works best in well-formulated products where it's diluted — avoid applying raw aloe gel to reactive skin.",
+    note: "Aloe's acemannan polysaccharides form a biopolymer film on skin that tightens and crusts as it dries, creating an itch-and-scratch cycle. This is most pronounced with raw or concentrated gel — in well-formulated products where aloe is diluted, the film-forming effect is usually minimal.",
   },
   {
     pattern: /\bkaolin\b|\bbentonite\b|montmorillonite/i,
@@ -485,6 +485,20 @@ export async function POST(req: NextRequest) {
             ingredients_text: q.ingredients_text,
           }));
         }
+      }
+    }
+
+    // Surface "Did you mean" alternatives when a product was found but no variants were collected yet
+    if (dbProduct && !communityVariants?.length && !productId && query) {
+      const { data: alts } = await supabase
+        .from("products")
+        .select("id, name, brand")
+        .ilike("name", `%${query}%`)
+        .not("ingredient_list", "is", null)
+        .neq("id", dbProduct.id)
+        .limit(3);
+      if (alts?.length) {
+        communityVariants = alts.map((p) => ({ id: p.id, name: p.name, brand: p.brand ?? null }));
       }
     }
 

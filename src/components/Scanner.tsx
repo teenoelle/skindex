@@ -1552,7 +1552,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {isOpen && (
                         <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
                           {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
-                            <p className="text-xs text-gray-400 italic">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
+                            <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
                           )}
                           {isLoading ? (
                             <span className="italic text-gray-400">Generating explanation…</span>
@@ -1618,7 +1618,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {isOpen && (
                         <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
                           {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
-                            <p className="text-xs text-gray-400 italic">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
+                            <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
                           )}
                           {!flaggedMatch && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
                           {item.sensory_note && <p>{item.sensory_note}</p>}
@@ -1679,7 +1679,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {isOpen && (
                         <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
                           {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
-                            <p className="text-xs text-gray-400 italic">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
+                            <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
                           )}
                           {/* Only show ingredient explanation for safe+photosensitive; flagged ingredients show it in their own section */}
                           {!flaggedMatch && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
@@ -1735,7 +1735,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {isOpen && (
                         <div className="pl-3 pr-2 pb-1.5 text-sm text-gray-500 leading-relaxed">
                           {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
-                            <p className="text-xs text-gray-400 mb-1 italic">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
+                            <p className="text-xs text-gray-400 mb-1">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
                           )}
                           {isLoading ? (
                             <span className="italic text-gray-400">Generating explanation…</span>
