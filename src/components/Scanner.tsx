@@ -872,7 +872,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600"
             }`}
           >
-            {t === "search" ? "Search" : t === "paste" ? "Paste list" : t === "url" ? "Paste URL" : t === "import" ? "Import" : "Browse"}
+            {t === "search" ? "Search" : t === "paste" ? "Paste ingredients" : t === "url" ? "Paste URL" : t === "import" ? "Import" : "Browse"}
           </button>
         ))}
       </div>
