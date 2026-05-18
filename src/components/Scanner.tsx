@@ -189,12 +189,23 @@ const PRODUCT_TYPES = [
   "Ampoule", "Balm", "BB Cream", "Blush", "Body Lotion", "Body Wash",
   "Brow Gel", "CC Cream", "Chapstick", "Concealer", "Conditioner", "Cream",
   "Deodorant", "Emulsion", "Exfoliant", "Extract", "Eye Cream", "Eye Gel", "Eye Primer",
-  "Eyeliner", "Eyeshadow", "Face Mask", "Face Wash", "Foundation", "Gel",
-  "Hair Mask", "Hair Oil", "Hair Serum", "Lip Treatment", "Makeup Remover",
-  "Mascara", "Mist", "Oil", "Ointment", "Primer", "Scalp Serum",
+  "Eyeliner", "Eyeshadow", "Face Mask", "Face Wash", "Foot Cream", "Foundation", "Gel",
+  "Hair Mask", "Hair Oil", "Hair Serum", "Hand Cream", "Lip Balm", "Lip Treatment",
+  "Makeup Remover", "Mascara", "Mist", "Oil", "Ointment", "Primer", "Scalp Serum",
   "Scalp Treatment", "Serum", "Setting Spray", "Shampoo", "Sleeping Mask",
   "Spot Patches", "Sun Screen", "Toner",
 ].sort();
+
+const RINSE_OFF_TYPES = new Set(["Face Wash", "Body Wash", "Shampoo", "Makeup Remover"]);
+
+const BROWSE_AREA_GROUPS: { label: string; types: string[] }[] = [
+  { label: "Face", types: ["Ampoule", "Cream", "Emulsion", "Exfoliant", "Extract", "Eye Cream", "Eye Gel", "Eye Primer", "Face Mask", "Face Wash", "Gel", "Mist", "Oil", "Ointment", "Primer", "Serum", "Sleeping Mask", "Spot Patches", "Toner"] },
+  { label: "Hair", types: ["Brow Gel", "Conditioner", "Hair Mask", "Hair Oil", "Hair Serum", "Scalp Serum", "Scalp Treatment", "Shampoo"] },
+  { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream", "Hand Cream"] },
+  { label: "Lip", types: ["Balm", "Chapstick", "Lip Balm", "Lip Treatment"] },
+  { label: "Makeup", types: ["BB Cream", "Blush", "CC Cream", "Concealer", "Eyeliner", "Eyeshadow", "Foundation", "Mascara", "Setting Spray"] },
+  { label: "Sun", types: ["Sun Screen"] },
+];
 
 function toTitleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -270,6 +281,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [alternativesLoading, setAlternativesLoading] = useState(false);
   const [alternativesFetched, setAlternativesFetched] = useState(false);
   const [alternativesOpen, setAlternativesOpen] = useState(true);
+  const [isRinseOff, setIsRinseOff] = useState(false);
   const [browseTypes, setBrowseTypes] = useState<BrowseType[]>([]);
   const [browseSelectedType, setBrowseSelectedType] = useState<string | null>(null);
   const [browseProducts, setBrowseProducts] = useState<BrowseProduct[]>([]);
@@ -343,7 +355,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     }
   }, [isSignedIn]);
 
-  // Reset edit form when a new product is scanned
+  // Reset edit form and rinse-off state when a new product is scanned
   useEffect(() => {
     if (result?.product?.id) {
       setEditOpen(false);
@@ -353,6 +365,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       setEditBrand(result.product.brand ?? "");
       setEditType(result.product.type ?? "");
       setEditIngredients("");
+      setIsRinseOff(RINSE_OFF_TYPES.has(result.product.type ?? ""));
     }
   }, [result?.product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -868,17 +881,55 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
           )}
           {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {browseTypes.map((t) => (
-                <button
-                  key={t.name}
-                  onClick={() => selectBrowseType(t.name)}
-                  className="text-left border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-400 hover:bg-gray-50 transition-colors"
-                >
-                  <p className="text-sm font-medium text-gray-800">{t.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{t.count} product{t.count !== 1 ? "s" : ""}</p>
-                </button>
-              ))}
+            <div className="space-y-5">
+              {(() => {
+                const typeMap = new Map(browseTypes.map((t) => [t.name, t]));
+                const seen = new Set<string>();
+                const sections: React.ReactNode[] = [];
+                for (const group of BROWSE_AREA_GROUPS) {
+                  const groupTypes = group.types.map((n) => typeMap.get(n)).filter(Boolean) as BrowseType[];
+                  if (groupTypes.length === 0) continue;
+                  groupTypes.forEach((t) => seen.add(t.name));
+                  sections.push(
+                    <div key={group.label}>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">{group.label}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {groupTypes.map((t) => (
+                          <button
+                            key={t.name}
+                            onClick={() => selectBrowseType(t.name)}
+                            className="text-left border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                          >
+                            <p className="text-sm font-medium text-gray-800">{t.name}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{t.count} product{t.count !== 1 ? "s" : ""}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                const misc = browseTypes.filter((t) => !seen.has(t.name));
+                if (misc.length > 0) {
+                  sections.push(
+                    <div key="other">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Other</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {misc.map((t) => (
+                          <button
+                            key={t.name}
+                            onClick={() => selectBrowseType(t.name)}
+                            className="text-left border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                          >
+                            <p className="text-sm font-medium text-gray-800">{t.name}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{t.count} product{t.count !== 1 ? "s" : ""}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return sections;
+              })()}
             </div>
           )}
           {browseSelectedType && (
@@ -1103,6 +1154,24 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     </button>
                   </p>
                 )}
+
+                {/* Leave-on / Rinse-off toggle */}
+                <div className="flex items-center gap-1 mt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsRinseOff(false)}
+                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${!isRinseOff ? "bg-gray-800 text-white border-gray-800" : "text-gray-400 border-gray-200 hover:border-gray-400"}`}
+                  >
+                    Leave-on
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsRinseOff(true)}
+                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${isRinseOff ? "bg-gray-800 text-white border-gray-800" : "text-gray-400 border-gray-200 hover:border-gray-400"}`}
+                  >
+                    Rinse-off
+                  </button>
+                </div>
 
                 {/* Image upload / change — signed-in users only */}
                 {result.product.id && isSignedIn && (
@@ -1715,6 +1784,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest mb-2">
                 Sensory trigger — {result.sensoryTrigger.length}
               </p>
+              {isRinseOff && (
+                <p className="text-xs text-gray-400 mb-2">Occlusive and pore-clogging effects are lower when this product is rinsed off thoroughly.</p>
+              )}
               <div className="divide-y divide-gray-100">
                 {result.sensoryTrigger.map((item) => {
                   const key = `sensory-${item.rawName}`;

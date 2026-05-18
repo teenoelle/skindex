@@ -1,5 +1,9 @@
 export const COMEDOGENIC_PATTERNS: { pattern: RegExp; note: string; maxPosition?: number }[] = [
   {
+    pattern: /\bsqualene\b/i,
+    note: "Squalene is the unstabilized, unsaturated precursor to squalane. Unlike squalane, it oxidizes readily on skin, and oxidized squalene is a documented contributor to comedone formation and pore congestion. Squalane (with an 'a') is the stable, non-comedogenic form.",
+  },
+  {
     pattern: /polysorbate[ -]?\d+/i,
     note: "Polysorbates are emulsifiers commonly linked to closed comedones (hard, flesh-colored bumps), particularly on the forehead and chin.",
   },

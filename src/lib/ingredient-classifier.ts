@@ -171,7 +171,7 @@ function detectStructural(name: string): string | null {
     ["menthol","l-menthol","camphor","menthyl lactate","4-terpineol"].includes(name)
   )
     return "Fragrance";
-  if (["squalane","squalene","jojoba esters","lanolin","shea butter","mineral oil","petrolatum","white petrolatum","beeswax","cera alba","cera flava","coco-caprylate/caprate","coco-caprylate","paraffinum liquidum","paraffin","ceresin","hydrogenated polyisobutene"].includes(name) || name.includes("squalane") || (name.includes(" oil") && !name.includes("essential oil")) || name.includes("triglyceride") || name.includes("caprylic/capric") || name.includes("caprylic"))
+  if (["squalane","jojoba esters","lanolin","shea butter","mineral oil","petrolatum","white petrolatum","beeswax","cera alba","cera flava","coco-caprylate/caprate","coco-caprylate","paraffinum liquidum","paraffin","ceresin","hydrogenated polyisobutene"].includes(name) || name.includes("squalane") || (name.includes(" oil") && !name.includes("essential oil")) || name.includes("triglyceride") || name.includes("caprylic/capric") || name.includes("caprylic"))
     return "Emollient";
   if (["stearic acid","palmitic acid","linoleic acid","linolenic acid","oleic acid","lauric acid","myristic acid","behenic acid"].includes(name) || name.includes("fatty acid"))
     return "Fatty Acid";
