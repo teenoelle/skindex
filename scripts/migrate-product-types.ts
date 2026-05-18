@@ -14,14 +14,10 @@ const supabase = createClient(
 );
 
 const TYPE_MAP: Record<string, string> = {
-  "Gel": "Moisturizer",
-  "Cream": "Moisturizer",
-  "Emulsion": "Moisturizer",
-  "Balm": "Lip Balm",
-  "Chapstick": "Lip Balm",
-  "Ampoule": "Concentrate",
-  "Extract": "Concentrate",
-  "Eye Gel": "Eye Cream",
+  "Hair Mask": "Hair Treatment",
+  "Hair Serum": "Hair Treatment",
+  "Hair Oil": "Hair Treatment",
+  "Scalp Serum": "Scalp Treatment",
 };
 
 async function run() {

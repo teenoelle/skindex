@@ -197,8 +197,8 @@ const PRODUCT_TYPES = [
   "Brow Gel", "CC Cream", "Concealer", "Concentrate", "Conditioner",
   "Deodorant", "Exfoliant", "Eye Cream", "Eye Primer",
   "Eyeliner", "Eyeshadow", "Face Mask", "Face Wash", "Foot Cream", "Foundation",
-  "Hair Mask", "Hair Oil", "Hair Serum", "Hand Cream", "Lip Balm", "Lip Treatment",
-  "Makeup Remover", "Mascara", "Mist", "Moisturizer", "Oil", "Ointment", "Primer", "Scalp Serum",
+  "Hair Treatment", "Hand Cream", "Lip Balm", "Lip Treatment",
+  "Makeup Remover", "Mascara", "Mist", "Moisturizer", "Oil", "Ointment", "Primer",
   "Scalp Treatment", "Serum", "Setting Spray", "Shampoo", "Sleeping Mask",
   "Spot Patches", "Sun Screen", "Toner",
 ].sort();
@@ -207,7 +207,7 @@ const RINSE_OFF_TYPES = new Set(["Face Wash", "Body Wash", "Shampoo", "Makeup Re
 
 const BROWSE_AREA_GROUPS: { label: string; types: string[] }[] = [
   { label: "Face", types: ["Concentrate", "Exfoliant", "Eye Cream", "Eye Primer", "Face Mask", "Face Wash", "Makeup Remover", "Mist", "Moisturizer", "Oil", "Ointment", "Primer", "Serum", "Sleeping Mask", "Spot Patches", "Toner"] },
-  { label: "Hair", types: ["Brow Gel", "Conditioner", "Hair Mask", "Hair Oil", "Hair Serum", "Scalp Serum", "Scalp Treatment", "Shampoo"] },
+  { label: "Hair", types: ["Brow Gel", "Conditioner", "Hair Treatment", "Scalp Treatment", "Shampoo"] },
   { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream", "Hand Cream"] },
   { label: "Lip", types: ["Lip Balm", "Lip Treatment"] },
   { label: "Makeup", types: ["BB Cream", "Blush", "CC Cream", "Concealer", "Eyeliner", "Eyeshadow", "Foundation", "Mascara", "Setting Spray"] },
