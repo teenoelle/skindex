@@ -199,7 +199,7 @@ const PRODUCT_TYPES = [
 const RINSE_OFF_TYPES = new Set(["Face Wash", "Body Wash", "Shampoo", "Makeup Remover"]);
 
 const BROWSE_AREA_GROUPS: { label: string; types: string[] }[] = [
-  { label: "Face", types: ["Ampoule", "Cream", "Emulsion", "Exfoliant", "Extract", "Eye Cream", "Eye Gel", "Eye Primer", "Face Mask", "Face Wash", "Gel", "Mist", "Oil", "Ointment", "Primer", "Serum", "Sleeping Mask", "Spot Patches", "Toner"] },
+  { label: "Face", types: ["Ampoule", "Cream", "Emulsion", "Exfoliant", "Extract", "Eye Cream", "Eye Gel", "Eye Primer", "Face Mask", "Face Wash", "Gel", "Makeup Remover", "Mist", "Oil", "Ointment", "Primer", "Serum", "Sleeping Mask", "Spot Patches", "Toner"] },
   { label: "Hair", types: ["Brow Gel", "Conditioner", "Hair Mask", "Hair Oil", "Hair Serum", "Scalp Serum", "Scalp Treatment", "Shampoo"] },
   { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream", "Hand Cream"] },
   { label: "Lip", types: ["Balm", "Chapstick", "Lip Balm", "Lip Treatment"] },
