@@ -3,13 +3,14 @@ import { auth } from "@clerk/nextjs/server";
 import { extractIngredientsFromUrl } from "@/lib/extract-ingredients";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-const MAX_URLS = 20;
+const MAX_URLS = 50;
 
 export type ImportResult = {
   url: string;
   status: "imported" | "skipped" | "failed";
   name?: string;
   brand?: string;
+  reason?: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -27,11 +28,12 @@ export async function POST(req: NextRequest) {
 
   for (let idx = 0; idx < urls.length; idx++) {
     const url = urls[idx];
-    if (idx > 0) await new Promise((r) => setTimeout(r, 1000));
+    if (idx > 0) await new Promise((r) => setTimeout(r, 2000));
     try {
+      const isIHerb = url.toLowerCase().includes("iherb.com");
       const extracted = await extractIngredientsFromUrl(url);
       if (!extracted) {
-        results.push({ url, status: "failed" });
+        results.push({ url, status: "failed", reason: isIHerb ? "iherb-blocked" : "extraction-failed" });
         continue;
       }
 
@@ -63,7 +65,7 @@ export async function POST(req: NextRequest) {
 
       results.push({ url, status: "imported", name, brand: brand ?? undefined });
     } catch {
-      results.push({ url, status: "failed" });
+      results.push({ url, status: "failed", reason: "error" });
     }
   }
 

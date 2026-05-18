@@ -54,6 +54,7 @@ type ImportResult = {
   status: "imported" | "skipped" | "failed";
   name?: string;
   brand?: string;
+  reason?: string;
 };
 type UserList = { id: string; name: string; is_public: boolean; itemCount: number };
 
@@ -998,7 +999,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       )}
       {tab === "import" && isSignedIn && (() => {
         const count = importUrls.split("\n").map((l) => l.trim()).filter((l) => l.length > 0).length;
-        return count > 0 ? <p className="text-xs text-gray-400 mb-3">{count} URL{count !== 1 ? "s" : ""} detected{count > 20 ? " — first 20 will be imported" : ""}</p> : <div className="mb-3" />;
+        return count > 0 ? <p className="text-xs text-gray-400 mb-3">{count} URL{count !== 1 ? "s" : ""} detected{count > 50 ? " — first 50 will be imported" : ""}</p> : <div className="mb-3" />;
       })()}
 
       {tab === "browse" ? (
@@ -1158,7 +1159,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         ) : (
                           <p className="text-xs text-gray-400 truncate">{r.url}</p>
                         )}
-                        <p className="text-xs text-gray-400">{r.status === "imported" ? "Added to database" : r.status === "skipped" ? "Already in database" : "Could not extract ingredients"}</p>
+                        <p className="text-xs text-gray-400">{r.status === "imported" ? "Added to database" : r.status === "skipped" ? "Already in database" : r.reason === "iherb-blocked" ? "iHerb blocks imports — paste ingredients instead" : "Could not extract ingredients"}</p>
                       </div>
                     </div>
                   ))}
