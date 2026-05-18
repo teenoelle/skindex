@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
   let ingredientText: string | null = ingredient_list?.trim() ?? null;
 
   if (!ingredientText && hasUrl) {
-    ingredientText = await extractIngredientsFromUrl(url.trim());
+    const extracted = await extractIngredientsFromUrl(url.trim());
+    ingredientText = extracted?.ingredients ?? null;
     if (!ingredientText) {
       return NextResponse.json(
         { error: "Could not find an ingredients list on that page. Try pasting the ingredient list directly instead." },

@@ -500,8 +500,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ notFound: true });
     }
 
-    rawIngredients = extracted;
-    product = { name: url, source: "url-extract" };
+    rawIngredients = extracted.ingredients;
+    product = {
+      name: extracted.name ?? url,
+      brand: extracted.brand ?? null,
+      source: "url-extract",
+    };
   } else {
     return NextResponse.json({ error: "Unknown scan type" }, { status: 400 });
   }

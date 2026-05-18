@@ -892,7 +892,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://sephora.com/product/..."
+          placeholder="INCIDecoder or iHerb product URL…"
           disabled={urlTabGated}
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400 mb-3 disabled:bg-gray-50 disabled:text-gray-400"
         />
