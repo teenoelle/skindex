@@ -47,7 +47,14 @@ function CategoryIcon({ type, size = 28 }: { type?: string | null; size?: number
   );
 }
 
-type Tab = "search" | "paste" | "url" | "browse";
+type Tab = "search" | "paste" | "url" | "import" | "browse";
+
+type ImportResult = {
+  url: string;
+  status: "imported" | "skipped" | "failed";
+  name?: string;
+  brand?: string;
+};
 type UserList = { id: string; name: string; is_public: boolean; itemCount: number };
 
 type BrowseType = { name: string; count: number };
@@ -339,6 +346,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [saveListLoading, setSaveListLoading] = useState<string | null>(null);
   const [savedTo, setSavedTo] = useState<string | null>(null);
   const [saveListError, setSaveListError] = useState<string | null>(null);
+  const [importUrls, setImportUrls] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResults, setImportResults] = useState<ImportResult[] | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
@@ -854,7 +864,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     <div>
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-4">
-        {(["search", "paste", "url", "browse"] as Tab[]).map((t) => (
+        {(["search", "paste", "url", "import", "browse"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => resetTab(t)}
@@ -862,7 +872,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600"
             }`}
           >
-            {t === "search" ? "Search" : t === "paste" ? "Paste list" : t === "url" ? "Paste URL" : "Browse"}
+            {t === "search" ? "Search" : t === "paste" ? "Paste list" : t === "url" ? "Paste URL" : t === "import" ? "Import" : "Browse"}
           </button>
         ))}
       </div>
@@ -897,6 +907,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400 mb-3 disabled:bg-gray-50 disabled:text-gray-400"
         />
       )}
+      {tab === "import" && (
+        <textarea
+          value={importUrls}
+          onChange={(e) => setImportUrls(e.target.value)}
+          placeholder={"Paste one URL per line (INCIDecoder or iHerb)\nhttps://incidecoder.com/products/...\nhttps://www.iherb.com/pr/..."}
+          rows={6}
+          disabled={!isSignedIn}
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400 mb-1 resize-none font-mono leading-relaxed disabled:bg-gray-50 disabled:text-gray-400"
+        />
+      )}
+      {tab === "import" && isSignedIn && (() => {
+        const count = importUrls.split("\n").map((l) => l.trim()).filter((l) => l.length > 0).length;
+        return count > 0 ? <p className="text-xs text-gray-400 mb-3">{count} URL{count !== 1 ? "s" : ""} detected{count > 20 ? " — first 20 will be imported" : ""}</p> : <div className="mb-3" />;
+      })()}
 
       {tab === "browse" ? (
         <div>
@@ -1005,6 +1029,69 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
           )}
         </div>
+      ) : tab === "import" ? (
+        !isSignedIn ? (
+          <SignInButton mode="redirect" fallbackRedirectUrl="/">
+            <button className="w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors">
+              Sign in to import products
+            </button>
+          </SignInButton>
+        ) : (
+          <div className="space-y-4">
+            <button
+              onClick={async () => {
+                const urls = importUrls.split("\n").map((l) => l.trim()).filter(Boolean);
+                if (!urls.length) return;
+                setImportLoading(true);
+                setImportResults(null);
+                try {
+                  const res = await fetch("/api/bulk-import", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ urls }),
+                  });
+                  const data = await res.json();
+                  setImportResults(data.results ?? []);
+                } catch {
+                  setImportResults([]);
+                } finally {
+                  setImportLoading(false);
+                }
+              }}
+              disabled={importLoading || importUrls.trim().length === 0}
+              className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {importLoading ? "Importing…" : "Import all"}
+            </button>
+            {importResults && (
+              <div className="border border-gray-100 rounded-xl overflow-hidden">
+                <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest flex-1">Import results</p>
+                  <span className="text-xs text-green-700">{importResults.filter((r) => r.status === "imported").length} imported</span>
+                  {importResults.some((r) => r.status === "skipped") && <span className="text-xs text-gray-400">{importResults.filter((r) => r.status === "skipped").length} skipped</span>}
+                  {importResults.some((r) => r.status === "failed") && <span className="text-xs text-rose-600">{importResults.filter((r) => r.status === "failed").length} failed</span>}
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {importResults.map((r, i) => (
+                    <div key={i} className="px-4 py-2 flex items-start gap-3">
+                      <span className={`text-xs shrink-0 mt-0.5 ${r.status === "imported" ? "text-green-600" : r.status === "skipped" ? "text-gray-400" : "text-rose-500"}`}>
+                        {r.status === "imported" ? "✓" : r.status === "skipped" ? "→" : "✗"}
+                      </span>
+                      <div className="min-w-0">
+                        {r.name ? (
+                          <p className="text-xs text-gray-700 font-medium truncate">{r.brand ? `${r.brand} ` : ""}{r.name}</p>
+                        ) : (
+                          <p className="text-xs text-gray-400 truncate">{r.url}</p>
+                        )}
+                        <p className="text-xs text-gray-400">{r.status === "imported" ? "Added to database" : r.status === "skipped" ? "Already in database" : "Could not extract ingredients"}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )
       ) : urlTabGated ? (
         <SignInButton mode="redirect" fallbackRedirectUrl="/">
           <button className="w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors">
