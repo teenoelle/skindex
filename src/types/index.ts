@@ -63,6 +63,7 @@ export type ScanResult = {
     type?: string | null;
     image_url?: string | null;
     iherb_url?: string | null;
+    source_url?: string | null;
     activity_tags?: string[] | null;
     activity_note?: string | null;
   };

@@ -59,6 +59,9 @@ export async function POST(req: NextRequest) {
         ingredient_list: extracted.ingredients,
         type: extracted.type ?? null,
         source: "url-import",
+        source_url: url,
+        ...(extracted.iherb_url ? { iherb_url: extracted.iherb_url } : {}),
+        ...(extracted.image_url ? { image_url: extracted.image_url } : {}),
       });
 
       if (insertError) throw insertError;

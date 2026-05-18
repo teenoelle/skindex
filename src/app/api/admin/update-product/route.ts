@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
   if (user?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { productId, name, brand, type, ingredient_list, iherb_url, image_url } = await req.json();
+  const { productId, name, brand, type, ingredient_list, iherb_url, image_url, source_url } = await req.json();
   if (!productId) return NextResponse.json({ error: "Missing productId" }, { status: 400 });
 
   const patch: Record<string, string | null> = {};
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
   if (ingredient_list !== undefined) patch.ingredient_list = ingredient_list?.trim() || null;
   if (iherb_url !== undefined) patch.iherb_url = iherb_url?.trim() || null;
   if (image_url !== undefined) patch.image_url = image_url?.trim() || null;
+  if (source_url !== undefined) patch.source_url = source_url?.trim() || null;
 
   if (Object.keys(patch).length === 0) return NextResponse.json({ ok: true });
 

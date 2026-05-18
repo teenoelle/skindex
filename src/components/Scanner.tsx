@@ -369,6 +369,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [editBrand, setEditBrand] = useState("");
   const [editType, setEditType] = useState("");
   const [editIngredients, setEditIngredients] = useState("");
+  const [editSourceUrl, setEditSourceUrl] = useState("");
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editDone, setEditDone] = useState(false);
@@ -722,6 +723,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           brand: editBrand || undefined,
           type: editType || undefined,
           ingredient_list: editIngredients || undefined,
+          source_url: editSourceUrl || undefined,
         }),
       });
       const data = await res.json();
@@ -1574,7 +1576,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     {!editOpen ? (
                       <button
                         type="button"
-                        onClick={() => setEditOpen(true)}
+                        onClick={() => {
+                          setEditSourceUrl(result.product?.source_url ?? "");
+                          setEditOpen(true);
+                        }}
                         className="text-xs text-indigo-500 underline underline-offset-2 hover:text-indigo-700"
                       >
                         Edit product
@@ -1608,6 +1613,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           placeholder="Ingredient list (leave blank to keep current)"
                           rows={3}
                           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 resize-none"
+                        />
+                        <input
+                          type="url"
+                          value={editSourceUrl}
+                          onChange={(e) => setEditSourceUrl(e.target.value)}
+                          placeholder="Source URL (INCIDecoder link)"
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
                         />
                         {editError && <p className="text-xs text-rose-600">{editError}</p>}
                         {editDone && <p className="text-xs text-teal-600">Saved.</p>}

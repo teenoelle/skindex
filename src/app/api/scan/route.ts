@@ -272,6 +272,7 @@ export async function POST(req: NextRequest) {
     type?: string | null;
     image_url?: string | null;
     iherb_url?: string | null;
+    source_url?: string | null;
     activity_tags?: string[] | null;
     activity_note?: string | null;
   } | undefined;
@@ -539,9 +540,10 @@ export async function POST(req: NextRequest) {
       let existingId: string | null = null;
       let existingSource: string | null = null;
       let existingIherbUrl: string | null = null;
+      let existingImageUrl: string | null = null;
       const { data: existingRows } = await supabaseAdmin
         .from("products")
-        .select("id, source, iherb_url")
+        .select("id, source, iherb_url, image_url")
         .ilike("name", productName)
         .not("ingredient_list", "is", null)
         .limit(1);
@@ -549,9 +551,11 @@ export async function POST(req: NextRequest) {
         existingId = existingRows[0].id;
         existingSource = existingRows[0].source;
         existingIherbUrl = existingRows[0].iherb_url ?? null;
+        existingImageUrl = existingRows[0].image_url ?? null;
       }
 
       const extractedIherbUrl = extracted.iherb_url ?? null;
+      const extractedImageUrl = extracted.image_url ?? null;
 
       if (!existingId) {
         const { data: inserted } = await supabaseAdmin
@@ -562,16 +566,22 @@ export async function POST(req: NextRequest) {
             ingredient_list: extracted.ingredients,
             type: extracted.type ?? null,
             source: "url-import",
+            source_url: url,
             ...(extractedIherbUrl ? { iherb_url: extractedIherbUrl } : {}),
+            ...(extractedImageUrl ? { image_url: extractedImageUrl } : {}),
           })
           .select("id")
           .single();
         if (inserted?.id) product.id = inserted.id;
         if (extractedIherbUrl) product.iherb_url = extractedIherbUrl;
+        if (extractedImageUrl) product.image_url = extractedImageUrl;
+        product.source_url = url;
       } else {
         product.id = existingId;
-        // Prefer freshly-extracted iherb_url; fall back to what's stored
+        // Prefer freshly-extracted values; fall back to what's stored
         product.iherb_url = extractedIherbUrl ?? existingIherbUrl;
+        product.image_url = extractedImageUrl ?? existingImageUrl;
+        product.source_url = url;
         if (existingSource === "url-import") {
           await supabaseAdmin
             .from("products")
@@ -580,7 +590,10 @@ export async function POST(req: NextRequest) {
               brand: extracted.brand ?? null,
               ingredient_list: extracted.ingredients,
               type: extracted.type ?? null,
+              source_url: url,
               ...(extractedIherbUrl ? { iherb_url: extractedIherbUrl } : {}),
+              // Only overwrite image_url if the row doesn't already have one
+              ...(extractedImageUrl && !existingImageUrl ? { image_url: extractedImageUrl } : {}),
             })
             .eq("id", existingId);
         }

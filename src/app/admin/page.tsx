@@ -29,6 +29,22 @@ type EditState = {
   image_url: string;
 };
 
+type UrlImportProduct = {
+  id: string;
+  name: string;
+  brand: string | null;
+  type: string | null;
+  source_url: string | null;
+  image_url: string | null;
+  iherb_url: string | null;
+};
+
+type UrlImportEditState = {
+  source_url: string;
+  image_url: string;
+  iherb_url: string;
+};
+
 const PRODUCT_TYPES = [
   "BB Cream", "Blush", "Body Lotion", "Body Wash",
   "Brow Gel", "CC Cream", "Concealer", "Concentrate", "Conditioner",
@@ -66,6 +82,14 @@ export default function AdminPage() {
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [saveError, setSaveError] = useState<Record<string, string>>({});
 
+  const [urlImports, setUrlImports] = useState<UrlImportProduct[]>([]);
+  const [urlImportsLoading, setUrlImportsLoading] = useState(false);
+  const [urlImportEdits, setUrlImportEdits] = useState<Record<string, UrlImportEditState>>({});
+  const [urlImportSaving, setUrlImportSaving] = useState<string | null>(null);
+  const [urlImportSaved, setUrlImportSaved] = useState<Set<string>>(new Set());
+  const [urlImportError, setUrlImportError] = useState<Record<string, string>>({});
+  const [urlImportsExpanded, setUrlImportsExpanded] = useState(false);
+
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) { setLoading(false); return; }
@@ -80,6 +104,7 @@ export default function AdminPage() {
         setRecentCount(d.recentCount ?? 0);
         setLoading(false);
         loadUnrecognized();
+        loadUrlImports();
       })
       .catch(() => setLoading(false));
   }, [isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -133,6 +158,63 @@ export default function AdminPage() {
       setSaveError((prev) => ({ ...prev, [p.id]: (e as Error).message }));
     }
     setSaving(null);
+  }
+
+  async function loadUrlImports() {
+    setUrlImportsLoading(true);
+    try {
+      const res = await fetch("/api/admin/url-imports");
+      const data = await res.json();
+      setUrlImports(data.products ?? []);
+      const initEdits: Record<string, UrlImportEditState> = {};
+      for (const p of data.products ?? []) {
+        initEdits[p.id] = {
+          source_url: p.source_url ?? "",
+          image_url: p.image_url ?? "",
+          iherb_url: p.iherb_url ?? "",
+        };
+      }
+      setUrlImportEdits(initEdits);
+    } catch {
+      // ignore
+    }
+    setUrlImportsLoading(false);
+  }
+
+  function updateUrlImportEdit(id: string, field: keyof UrlImportEditState, value: string) {
+    setUrlImportEdits((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+    setUrlImportSaved((prev) => { const next = new Set(prev); next.delete(id); return next; });
+    setUrlImportError((prev) => { const next = { ...prev }; delete next[id]; return next; });
+  }
+
+  async function saveUrlImport(p: UrlImportProduct) {
+    const edit = urlImportEdits[p.id];
+    if (!edit) return;
+    setUrlImportSaving(p.id);
+    setUrlImportError((prev) => { const next = { ...prev }; delete next[p.id]; return next; });
+    try {
+      const res = await fetch("/api/admin/update-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: p.id,
+          source_url: edit.source_url || undefined,
+          image_url: edit.image_url || undefined,
+          iherb_url: edit.iherb_url || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      setUrlImportSaved((prev) => new Set([...prev, p.id]));
+      setUrlImports((prev) => prev.map((u) =>
+        u.id === p.id
+          ? { ...u, source_url: edit.source_url || u.source_url, image_url: edit.image_url || u.image_url, iherb_url: edit.iherb_url || u.iherb_url }
+          : u
+      ));
+    } catch (e) {
+      setUrlImportError((prev) => ({ ...prev, [p.id]: (e as Error).message }));
+    }
+    setUrlImportSaving(null);
   }
 
   async function handleDelete(id: string, name: string) {
@@ -357,6 +439,153 @@ export default function AdminPage() {
                 );
               })}
             </div>
+          )}
+        </section>
+
+        {/* URL Imports */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">
+              URL Imports
+            </h2>
+            {!urlImportsLoading && urlImports.length > 0 && (
+              <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
+                {urlImports.length}
+              </span>
+            )}
+          </div>
+
+          {urlImportsLoading && (
+            <p className="text-sm text-gray-400">Loading…</p>
+          )}
+
+          {!urlImportsLoading && urlImports.length === 0 && (
+            <p className="text-sm text-gray-400">No URL-imported products yet.</p>
+          )}
+
+          {!urlImportsLoading && urlImports.length > 0 && (
+            <>
+              {!urlImportsExpanded ? (
+                <button
+                  type="button"
+                  onClick={() => setUrlImportsExpanded(true)}
+                  className="text-sm text-indigo-600 underline underline-offset-2 hover:text-indigo-800"
+                >
+                  Show {urlImports.length} products
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setUrlImportsExpanded(false)}
+                    className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-700 mb-4"
+                  >
+                    Collapse
+                  </button>
+                  <div className="divide-y divide-gray-100">
+                    {urlImports.map((p) => {
+                      const edit = urlImportEdits[p.id] ?? { source_url: "", image_url: "", iherb_url: "" };
+                      const isSaving = urlImportSaving === p.id;
+                      const isSaved = urlImportSaved.has(p.id);
+                      const error = urlImportError[p.id];
+                      const hasChanges = edit.source_url !== (p.source_url ?? "") ||
+                        edit.image_url !== (p.image_url ?? "") ||
+                        edit.iherb_url !== (p.iherb_url ?? "");
+                      return (
+                        <div key={p.id} className="py-5 space-y-3">
+                          {/* Identity row */}
+                          <div className="flex items-start gap-3">
+                            {edit.image_url && (
+                              <img
+                                src={`/api/image-proxy?url=${encodeURIComponent(edit.image_url)}`}
+                                alt={p.name}
+                                className="w-10 h-12 object-contain rounded border border-gray-100 bg-gray-50 shrink-0"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
+                              <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                                {p.brand && <span className="text-xs text-gray-400">{p.brand}</span>}
+                                {p.type && (
+                                  <span className="text-xs text-gray-400 border border-gray-200 rounded-full px-2 py-0.5 shrink-0">
+                                    {p.type}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Edit fields */}
+                          <div className="grid grid-cols-1 gap-2">
+                            <input
+                              type="url"
+                              value={edit.source_url}
+                              onChange={(e) => updateUrlImportEdit(p.id, "source_url", e.target.value)}
+                              placeholder="Source URL (INCIDecoder link)"
+                              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
+                            />
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <input
+                                type="url"
+                                value={edit.iherb_url}
+                                onChange={(e) => updateUrlImportEdit(p.id, "iherb_url", e.target.value)}
+                                placeholder="iHerb URL"
+                                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
+                              />
+                              <input
+                                type="url"
+                                value={edit.image_url}
+                                onChange={(e) => updateUrlImportEdit(p.id, "image_url", e.target.value)}
+                                placeholder="Image URL"
+                                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Actions row */}
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => saveUrlImport(p)}
+                              disabled={isSaving || !hasChanges}
+                              className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
+                            >
+                              {isSaving ? "Saving…" : "Save"}
+                            </button>
+                            {isSaved && <span className="text-xs text-teal-600">Saved.</span>}
+                            {error && <span className="text-xs text-rose-600">{error}</span>}
+                            <Link
+                              href={`/?scan=${p.id}`}
+                              className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                            >
+                              Scan
+                            </Link>
+                            {edit.source_url && (
+                              <a
+                                href={edit.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                              >
+                                Source ↗
+                              </a>
+                            )}
+                            <a
+                              href={`https://www.iherb.com/search?kw=${encodeURIComponent([p.brand, p.name].filter(Boolean).join(' '))}&rcode=DYT4743`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                            >
+                              iHerb ↗
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </>
           )}
         </section>
 

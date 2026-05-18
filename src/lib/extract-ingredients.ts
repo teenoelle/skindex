@@ -7,6 +7,7 @@ export type ExtractedProduct = {
   brand?: string;
   type?: string;
   iherb_url?: string;
+  image_url?: string;
 };
 
 // tier 1 = specific use-case (wins over tier 2 when both match, e.g. "Deodorant Serum" → Deodorant)
@@ -397,7 +398,25 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
   // iHerb URL: INCIDecoder shows a "Buy this product" section with retailer links
   const iherb_url = extractIHerbLinkFromHtml(html) ?? undefined;
 
-  return { ingredients, name, brand, type, iherb_url };
+  // Product image: prefer og:image meta tag; fall back to Google Cloud Storage img src
+  const image_url = extractINCIDecoderImage(html) ?? undefined;
+
+  return { ingredients, name, brand, type, iherb_url, image_url };
+}
+
+function extractINCIDecoderImage(html: string): string | null {
+  // og:image meta tag — INCIDecoder hosts product images on Google Cloud Storage
+  const m1 = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+    ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+  if (m1?.[1]) {
+    const u = m1[1].replace(/&amp;/g, "&");
+    // Skip the generic INCIDecoder logo/placeholder
+    if (u.startsWith("http") && !u.includes("/images/logo") && !u.includes("incidecoder.com")) return u;
+  }
+  // Fallback: direct img src from Google Cloud Storage bucket used by INCIDecoder
+  const m2 = html.match(/src="(https:\/\/incidecoder-content\.storage\.googleapis\.com\/[^"]+)"/i);
+  if (m2) return m2[1].replace(/&amp;/g, "&");
+  return null;
 }
 
 function extractIHerbLinkFromHtml(html: string): string | null {
