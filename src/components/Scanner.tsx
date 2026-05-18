@@ -325,7 +325,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [autoSearching, setAutoSearching] = useState(false);
   const [autoSearchResult, setAutoSearchResult] = useState<"found" | "not-found" | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewResult, setReviewResult] = useState<{ reviewed: number } | null>(null);
+  const [reviewResult, setReviewResult] = useState<{ reviewed: number; total: number } | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submitName, setSubmitName] = useState("");
   const [submitBrand, setSubmitBrand] = useState("");
@@ -403,11 +403,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     }
   }, [result?.product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-trigger review when scan finds unreviewed ingredients
+  // Auto-trigger review when scan finds unreviewed ingredients.
+  // Delay gives the scan's fire-and-forget queue push time to complete.
   useEffect(() => {
-    if (result?.unreviewed?.length && !reviewLoading && reviewResult === null) {
-      handleReview();
-    }
+    if (!result?.unreviewed?.length || reviewLoading || reviewResult !== null) return;
+    const t = setTimeout(() => handleReview(), 2000);
+    return () => clearTimeout(t);
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleScan(override?: { tab?: Tab; query?: string }) {
@@ -665,13 +666,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   async function handleReview() {
     setReviewLoading(true);
     setReviewResult(null);
-    let total = 0;
+    let totalInserted = 0;
+    let totalProcessed = 0;
     try {
       for (let i = 0; i < 60; i++) {
         const res = await fetch("/api/review-ingredients", { method: "POST" });
         const data = await res.json();
-        total += data.reviewed ?? 0;
-        setReviewResult({ reviewed: total });
+        totalInserted += data.reviewed ?? 0;
+        totalProcessed += data.total ?? 0;
+        setReviewResult({ reviewed: totalInserted, total: totalProcessed });
         if ((data.remaining ?? data.total) === 0) break;
       }
     } catch { /* stop on error */ }
@@ -2265,8 +2268,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 ) : reviewResult ? (
                   <span className="text-xs text-gray-400">
                     {reviewResult.reviewed > 0
-                      ? `${reviewResult.reviewed} reviewed — rescan to see results`
-                      : "Nothing new to review"}
+                      ? `${reviewResult.reviewed} classified — rescan to see results`
+                      : reviewResult.total > 0
+                      ? "Already in database — rescan to see results"
+                      : "Queued for review — rescan later"}
                   </span>
                 ) : (
                   <button

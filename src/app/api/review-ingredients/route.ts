@@ -16,35 +16,36 @@ async function processQueue(): Promise<NextResponse> {
   if (!queue?.length) return NextResponse.json({ reviewed: 0, total: 0, remaining: 0 });
 
   // Classify and insert all in parallel
-  const insertOps = queue.map(async (item) => {
+  const insertOps = queue.map(async (item): Promise<boolean> => {
     const { data: existing } = await supabaseAdmin
       .from("ingredients")
       .select("id")
       .ilike("name", item.name)
       .maybeSingle();
 
-    if (!existing) {
-      const classification = classifyIngredient(item.name);
-      const explanation = generateExplanation(
-        item.name,
-        classification.status,
-        classification.structural_category,
-        classification.category,
-        classification.flagged_category,
-      );
-      await supabaseAdmin.from("ingredients").insert({
-        name: item.name,
-        status: classification.status,
-        structural_category: classification.structural_category,
-        category: classification.category,
-        flagged_category: classification.flagged_category,
-        explanation,
-      });
-    }
+    if (existing) return false;
+
+    const classification = classifyIngredient(item.name);
+    const explanation = generateExplanation(
+      item.name,
+      classification.status,
+      classification.structural_category,
+      classification.category,
+      classification.flagged_category,
+    );
+    await supabaseAdmin.from("ingredients").insert({
+      name: item.name,
+      status: classification.status,
+      structural_category: classification.structural_category,
+      category: classification.category,
+      flagged_category: classification.flagged_category,
+      explanation,
+    });
+    return true;
   });
 
   const results = await Promise.allSettled(insertOps);
-  const reviewed = results.filter((r) => r.status === "fulfilled").length;
+  const reviewed = results.filter((r) => r.status === "fulfilled" && r.value === true).length;
 
   // Batch-delete all processed items from queue (keeps queue draining regardless of outcome)
   const allIds = queue.map((item) => item.id);

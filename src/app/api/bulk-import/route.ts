@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
         name,
         brand,
         ingredient_list: extracted.ingredients,
+        type: extracted.type ?? null,
         source: "url-import",
       });
 

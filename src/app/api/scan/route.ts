@@ -506,6 +506,7 @@ export async function POST(req: NextRequest) {
       name: extracted.name ?? url,
       brand: extracted.brand ?? null,
       source: "url-extract",
+      type: extracted.type ?? null,
     };
   } else {
     return NextResponse.json({ error: "Unknown scan type" }, { status: 400 });

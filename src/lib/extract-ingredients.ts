@@ -5,7 +5,55 @@ export type ExtractedProduct = {
   ingredients: string;
   name?: string;
   brand?: string;
+  type?: string;
 };
+
+const PRODUCT_TYPE_PATTERNS: [RegExp, string][] = [
+  [/sleeping mask/i, "Sleeping Mask"],
+  [/sunscreen|sun\s*screen|sun\s*care|\bspf\b/i, "Sun Screen"],
+  [/spot patch|pimple patch|acne patch/i, "Spot Patches"],
+  [/eye\s*(cream|gel|serum|treatment)/i, "Eye Cream"],
+  [/eye\s*primer/i, "Eye Primer"],
+  [/\bbb\s*cream\b/i, "BB Cream"],
+  [/\bcc\s*cream\b/i, "CC Cream"],
+  [/face\s*mask|sheet\s*mask|clay\s*mask|mud\s*mask/i, "Face Mask"],
+  [/face\s*wash|facial\s*wash|foaming\s*cleanser|cleansing\s*foam|cleansing\s*gel|facial\s*cleanser/i, "Face Wash"],
+  [/makeup\s*remover|cleansing\s*balm|micellar/i, "Makeup Remover"],
+  [/exfoliant|exfoliator|peeling\s*(gel|solution)/i, "Exfoliant"],
+  [/\bprimer\b/i, "Primer"],
+  [/\bconcealer\b/i, "Concealer"],
+  [/\bfoundation\b/i, "Foundation"],
+  [/\bmascara\b/i, "Mascara"],
+  [/\beyeliner\b/i, "Eyeliner"],
+  [/\beyeshadow\b/i, "Eyeshadow"],
+  [/\bblush\b/i, "Blush"],
+  [/setting\s*spray/i, "Setting Spray"],
+  [/\btoner\b|\bessence\b/i, "Toner"],
+  [/\bserum\b|\bampoule\b|\bconcentrate\b/i, "Serum"],
+  [/\bmist\b|facial\s*mist/i, "Mist"],
+  [/body\s*lotion|body\s*cream|body\s*milk/i, "Body Lotion"],
+  [/body\s*wash|shower\s*gel/i, "Body Wash"],
+  [/hand\s*cream|hand\s*lotion/i, "Hand Cream"],
+  [/foot\s*cream/i, "Foot Cream"],
+  [/\bdeodorant\b/i, "Deodorant"],
+  [/\bshampoo\b/i, "Shampoo"],
+  [/\bconditioner\b/i, "Conditioner"],
+  [/hair\s*(treatment|mask|serum|oil|therapy)/i, "Hair Treatment"],
+  [/\bscalp\b/i, "Scalp Treatment"],
+  [/lip\s*balm/i, "Lip Balm"],
+  [/lip\s*(treatment|serum|mask|oil)/i, "Lip Treatment"],
+  [/moisturiz|day\s*cream|night\s*cream/i, "Moisturizer"],
+  [/\bcream\b/i, "Moisturizer"],
+  [/\boil\b/i, "Oil"],
+  [/\bointment\b|\bbalm\b/i, "Ointment"],
+];
+
+export function guessProductType(name: string): string | null {
+  for (const [pattern, type] of PRODUCT_TYPE_PATTERNS) {
+    if (pattern.test(name)) return type;
+  }
+  return null;
+}
 
 async function fetchHtml(url: string): Promise<string | null> {
   try {
@@ -125,27 +173,23 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
   const productSlug = urlMatch?.[2] ?? null;
   const brandFromUrl = brandSlug ? slugToTitle(brandSlug) : undefined;
 
+  // JSON-LD has the real brand name (not a slug); prefer it over URL-derived brand
+  const jsonLd = extractJsonLd(html);
+  let brand: string | undefined = jsonLd?.brand ?? brandFromUrl;
+
   // Name from title: "Product Name | INCIDecoder"
   const rawTitle = extractRawTitle(html);
-  let name: string | undefined;
-  let brand: string | undefined = brandFromUrl;
+  let name: string | undefined = jsonLd?.name;
 
-  if (rawTitle) {
+  if (!name && rawTitle) {
     const stripped = rawTitle.replace(/\s*[|–\-]\s*inci\s*decoder.*/i, "").trim();
     if (stripped && stripped !== rawTitle) {
-      if (brand && stripped.toLowerCase().startsWith(brand.toLowerCase())) {
-        name = stripped.slice(brand.length).trim().replace(/^[^a-z0-9]+/i, "") || stripped;
-      } else {
-        name = stripped;
-      }
+      // Keep the full title (brand + product) for better searchability;
+      // brand is stored separately so display can de-duplicate if needed.
+      name = stripped;
     }
   }
   if (!name && productSlug) name = slugToTitle(productSlug);
-
-  // Enrich with JSON-LD if available
-  const jsonLd = extractJsonLd(html);
-  if (jsonLd?.name && !name) name = jsonLd.name;
-  if (jsonLd?.brand && !brand) brand = jsonLd.brand;
 
   // Strategy 1: INCIDecoder renders ingredients in a div with "ingred" in the class
   let ingredients: string | null = null;
@@ -163,7 +207,8 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
   }
 
   if (!ingredients) return null;
-  return { ingredients, name, brand };
+  const type = guessProductType(name ?? "") ?? undefined;
+  return { ingredients, name, brand, type };
 }
 
 // iHerb embeds product data as JSON in script tags (Vue SSR / app state)
@@ -221,7 +266,8 @@ function parseIHerb(html: string): ExtractedProduct | null {
   }
 
   if (!ingredients) return null;
-  return { ingredients, name, brand };
+  const type = guessProductType(name ?? "") ?? undefined;
+  return { ingredients, name, brand, type };
 }
 
 function parseGeneric(html: string): ExtractedProduct | null {
@@ -232,7 +278,8 @@ function parseGeneric(html: string): ExtractedProduct | null {
   const text = htmlToText(html);
   const ingredients = extractIngredientBlock(text);
   if (!ingredients) return null;
-  return { ingredients, name, brand };
+  const type = guessProductType(name ?? "") ?? undefined;
+  return { ingredients, name, brand, type };
 }
 
 export async function extractIngredientsFromUrl(rawUrl: string): Promise<ExtractedProduct | null> {
