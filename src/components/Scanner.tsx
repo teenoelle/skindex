@@ -1795,7 +1795,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       const key = `cp-${v.label}`;
                       const isOpen = expanded.has(key);
                       return (
-                        <div key={v.label} className="px-4 py-2.5">
+                        <div key={v.label} className="px-4 py-1.5">
                           <div className="flex items-start gap-3">
                             <button
                               type="button"
