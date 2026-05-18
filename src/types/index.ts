@@ -13,6 +13,7 @@ export type IngredientMatch = {
   displayName: string;
   ingredient: DbIngredient;
   benefit_note?: string;
+  comedogenicRating?: string;
 };
 
 export type CommunityVariant = {

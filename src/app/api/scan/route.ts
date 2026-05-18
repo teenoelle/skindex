@@ -542,6 +542,7 @@ export async function POST(req: NextRequest) {
             flagged_category: "pore-clogger",
             structural_category: null,
           },
+          comedogenicRating: rule.rating,
         });
       }
       break;

@@ -1,37 +1,45 @@
-export const COMEDOGENIC_PATTERNS: { pattern: RegExp; note: string; maxPosition?: number }[] = [
+export const COMEDOGENIC_PATTERNS: { pattern: RegExp; note: string; rating: string; maxPosition?: number }[] = [
   {
     pattern: /\bsqualene\b/i,
+    rating: "oxid.",
     note: "Squalene is the unstabilized, unsaturated precursor to squalane. Unlike squalane, it oxidizes readily on skin, and oxidized squalene is a documented contributor to comedone formation and pore congestion. Squalane (with an 'a') is the stable, non-comedogenic form.",
   },
   {
     pattern: /polysorbate[ -]?\d+/i,
+    rating: "3–4/5",
     note: "Polysorbates are emulsifiers commonly linked to closed comedones (hard, flesh-colored bumps), particularly on the forehead and chin.",
   },
   {
     pattern: /cyclopentasiloxane|cyclohexasiloxane|cyclomethicone|trimethylsiloxysilicate|dimethicone\/vinyl dimethicone crosspolymer/i,
+    rating: "2–3/5",
     note: "Heavy or cyclic silicones form an occlusive film on the skin's surface that can trap sebum and dead skin cells, contributing to closed comedones on acne-prone or reactive skin.",
   },
   {
     pattern: /palmitoyl\s+\w*peptide/i,
+    rating: "2–3/5",
     note: "Palmitoyl peptide carriers use fatty acid chains to deliver active peptides into skin. These chains can be occlusive and may trigger closed comedones in pore-prone skin.",
   },
   {
     pattern: /\b(algae|laminaria|fucus|ascophyllum|sargassum|chlorella|spirulina|ecklonia|macrocystis|undaria|porphyra|ulva|chondrus|carrageenan)\b/i,
+    rating: "3–5/5",
     note: "Algae-derived ingredients provide a smooth, slippery skin feel but are associated with closed comedones on acne-prone and reactive skin due to their polysaccharide content, which can trap sebum in the pore.",
   },
   {
     // High-comedogenic esters (rated 4–5/5 on standard comedogenicity scales)
     pattern: /isopropyl myristate|isopropyl palmitate|isopropyl isostearate|isopropyl linoleate|myristyl myristate/i,
+    rating: "4–5/5",
     note: "Isopropyl esters are among the most comedogenic cosmetic ingredients — they penetrate follicle walls and directly contribute to closed comedones. Even small amounts can cause breakouts on congestion-prone skin.",
   },
   {
     // Moderate-comedogenic esters and ethers
     pattern: /ethylhexyl palmitate|octyldodecyl myristate|octyl palmitate|cetyl myristate/i,
+    rating: "3–4/5",
     note: "This ester has a moderate comedogenic rating and can contribute to closed comedones with repeated use on congestion-prone or reactive skin.",
   },
   {
     // Only flag glycols when they appear high in the formula (first 5 ingredients)
     pattern: /^(butylene glycol|dipropylene glycol)$/i,
+    rating: "2–3/5",
     note: "At high concentrations — indicated by appearing in the first five ingredients — Butylene Glycol and Dipropylene Glycol can disrupt the skin barrier and contribute to closed comedones.",
     maxPosition: 5,
   },

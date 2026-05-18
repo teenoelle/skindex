@@ -216,7 +216,7 @@ const CONGESTION_VECTOR_DEFS: { label: string; bumps: string; description: strin
   {
     label: "Pore-clogging",
     bumps: "Blackheads & closed comedones",
-    description: "These ingredients can penetrate follicle walls and cause hyperkeratosis — the cell buildup that forms blackheads (open comedones) and closed comedones, which are flesh-colored, hard bumps beneath the skin surface. Rated on the 0–5 comedogenicity scale.",
+    description: "These ingredients can penetrate follicle walls and cause hyperkeratosis — the cell buildup that forms blackheads (open comedones) and closed comedones, which are flesh-colored, hard bumps beneath the skin surface. Each ingredient's comedogenicity rating (0–5 scale) is shown in its row below.",
   },
   {
     label: "Milia risk",
@@ -1791,9 +1791,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {/* Flagged ingredients */}
           {result.flagged.length > 0 && (
             <section id="section-flagged">
-              <p className="text-xs font-semibold text-rose-700 uppercase tracking-widest mb-2">
-                Flagged — {result.flagged.length}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <p className="text-xs font-semibold text-rose-700 uppercase tracking-widest">
+                  Flagged — {result.flagged.length}
+                </p>
+                {result.flagged.some((f) => f.ingredient.flagged_category === "pore-clogger") && (
+                  <span className="text-xs text-rose-600 bg-rose-50 rounded-full px-2 py-0.5">pore-clogging</span>
+                )}
+                {result.flagged.some((f) => ["sensitizer","fragrance-allergen","preservative-allergen"].includes(f.ingredient.flagged_category ?? "")) && (
+                  <span className="text-xs text-rose-600 bg-rose-50 rounded-full px-2 py-0.5">inflammatory</span>
+                )}
+              </div>
               <div className="divide-y divide-gray-100">
                 {result.flagged.map((item) => {
                   const { id, explanation: dbExplanation, flagged_category, category: ingCat, structural_category } = item.ingredient;
@@ -1825,6 +1833,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               <span className="text-xs text-rose-700 shrink-0">{catLabel}</span>
                             </>
                           )}
+                          {item.comedogenicRating && (
+                            <>
+                              <span className="text-gray-200 text-xs shrink-0">·</span>
+                              <span className="text-xs text-gray-400 shrink-0">{item.comedogenicRating}</span>
+                            </>
+                          )}
                         </span>
                         <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                       </button>
@@ -1832,6 +1846,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
                           {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
                             <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
+                          )}
+                          {item.comedogenicRating && (
+                            <p className="text-xs text-gray-500">Comedogenicity: <span className="font-medium">{item.comedogenicRating}</span>{item.comedogenicRating !== "oxid." ? " on the 0–5 scale" : " (oxidation-dependent, not a fixed scale rating)"}</p>
                           )}
                           {isLoading ? (
                             <span className="italic text-gray-400">Generating explanation…</span>
@@ -1853,9 +1870,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {/* Sensory trigger ingredients */}
           {(result.sensoryTrigger ?? []).length > 0 && (
             <section id="section-sensory">
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest mb-2">
-                Sensory trigger — {result.sensoryTrigger.length}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">
+                  Sensory trigger — {result.sensoryTrigger.length}
+                </p>
+                {(result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Film-forming") && (
+                  <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">milia risk</span>
+                )}
+                {(result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Occlusive") && (
+                  <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">traps congestion</span>
+                )}
+              </div>
               {isRinseOff && (
                 <p className="text-xs text-gray-400 mb-2">Occlusive and pore-clogging effects are lower when this product is rinsed off thoroughly.</p>
               )}
