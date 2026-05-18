@@ -138,18 +138,12 @@ function extractHtmlByClass(html: string, classPattern: string): string | null {
 
 function extractIngredientBlock(text: string): string | null {
   const labelPattern =
-    /(?:(?:full|complete|all|other)\s+)?(?:ingredients?(?:\s+(?:list|overview))?|inci(?:\s+list)?|what'?s\s+inside|formula)[\s]*[:：\-]?\s*/gi;
+    /(?:(?:full|complete|all|other)\s+)?(?:ingredients?(?:\s+list)?|inci(?:\s+list)?|what'?s\s+inside|formula)[\s]*[:：\-]?\s*/i;
+  const labelMatch = labelPattern.exec(text);
+  if (!labelMatch) return null;
 
-  let bestCandidate: string | null = null;
-
-  for (const labelMatch of text.matchAll(labelPattern)) {
-    const startPos = labelMatch.index + labelMatch[0].length;
-    // Skip matches where nothing ingredient-like follows immediately (e.g. nav "Ingredients Decode INCI")
-    const preview = text.slice(startPos, startPos + 150);
-    const earlyCommas = (preview.match(/,/g) ?? []).length;
-    if (earlyCommas === 0 && !/\b(?:water|aqua|glycerin|butylene glycol|niacinamide|dimethicone)\b/i.test(preview)) continue;
-
-    let candidate = text.slice(startPos, startPos + 6000).trim();
+  const startPos = labelMatch.index + labelMatch[0].length;
+  let candidate = text.slice(startPos, startPos + 6000).trim();
 
   const sectionBreak =
     /\n\s*(?:[*•·▸►\-]\s*)?(?:directions?|how to use|how to apply|usage|warnings?|cautions?|shelf.?life|storage|disclaimer|about this|certif|reviews?|questions?|customer|contact|return|faq|similar|you may also|related|product details|overview|description)\b/i;
@@ -170,13 +164,9 @@ function extractIngredientBlock(text: string): string | null {
   candidate = candidate.replace(/\s*(?:read more|show more|see (?:full|all|more)|expand|view all)[^,]*$/i, "").trim();
 
   const commaCount = (candidate.match(/,/g) ?? []).length;
-  if (commaCount < 3 || candidate.length < 50) continue;
+  if (commaCount < 3 || candidate.length < 50) return null;
 
-    bestCandidate = candidate;
-    break; // first valid match wins
-  }
-
-  return bestCandidate;
+  return candidate;
 }
 
 function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
