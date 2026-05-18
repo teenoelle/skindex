@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { extractIngredientsFromUrl } from "@/lib/extract-ingredients";
+import { extractIngredientsFromUrlWithStatus } from "@/lib/extract-ingredients";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const MAX_URLS = 50;
@@ -11,6 +11,7 @@ export type ImportResult = {
   name?: string;
   brand?: string;
   reason?: string;
+  httpStatus?: number;
 };
 
 export async function POST(req: NextRequest) {
@@ -31,9 +32,15 @@ export async function POST(req: NextRequest) {
     if (idx > 0) await new Promise((r) => setTimeout(r, 2000));
     try {
       const isIHerb = url.toLowerCase().includes("iherb.com");
-      const extracted = await extractIngredientsFromUrl(url);
+      const { product: extracted, httpStatus } = await extractIngredientsFromUrlWithStatus(url);
       if (!extracted) {
-        results.push({ url, status: "failed", reason: isIHerb ? "iherb-blocked" : "extraction-failed" });
+        let reason = "extraction-failed";
+        if (isIHerb) reason = "iherb-blocked";
+        else if (httpStatus === 429) reason = "rate-limited";
+        else if (httpStatus === 403) reason = "blocked";
+        else if (httpStatus && httpStatus >= 400) reason = `http-${httpStatus}`;
+        else if (httpStatus === 200) reason = "parse-failed";
+        results.push({ url, status: "failed", reason, httpStatus: httpStatus ?? undefined });
         continue;
       }
 

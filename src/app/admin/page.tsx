@@ -74,6 +74,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState<string | null>(null);
 
   const [unrecognized, setUnrecognized] = useState<UnrecognizedProduct[]>([]);
   const [unrecognizedLoading, setUnrecognizedLoading] = useState(false);
@@ -217,6 +218,17 @@ export default function AdminPage() {
     setUrlImportSaving(null);
   }
 
+  async function handleArchive(id: string) {
+    setArchiving(id);
+    const res = await fetch("/api/admin/mark-reviewed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId: id }),
+    });
+    if (res.ok) setSubmissions((prev) => prev.filter((s) => s.id !== id));
+    setArchiving(null);
+  }
+
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     setDeleting(id);
@@ -316,6 +328,14 @@ export default function AdminPage() {
                     >
                       Scan
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleArchive(s.id)}
+                      disabled={archiving === s.id}
+                      className="text-xs text-gray-400 hover:text-gray-700 disabled:opacity-40"
+                    >
+                      {archiving === s.id ? "Archiving…" : "Archive"}
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(s.id, s.name)}

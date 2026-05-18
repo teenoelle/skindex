@@ -19,6 +19,7 @@ export async function GET() {
     .from("products")
     .select("id, name, brand, type, submitted_at, ingredient_list")
     .not("submitted_at", "is", null)
+    .is("reviewed_at", null)
     .order("submitted_at", { ascending: false })
     .limit(100);
 

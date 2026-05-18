@@ -61,7 +61,7 @@ export function guessProductType(name: string): string | null {
   return best;
 }
 
-async function fetchHtml(url: string): Promise<string | null> {
+async function fetchHtml(url: string, onStatus?: (status: number) => void): Promise<string | null> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -78,6 +78,7 @@ async function fetchHtml(url: string): Promise<string | null> {
       },
       signal: AbortSignal.timeout(15000),
     });
+    onStatus?.(res.status);
     if (!res.ok) return null;
     return res.text();
   } catch {
@@ -520,19 +521,28 @@ function parseGeneric(html: string): ExtractedProduct | null {
 }
 
 export async function extractIngredientsFromUrl(rawUrl: string): Promise<ExtractedProduct | null> {
-  // Normalize regional iHerb subdomains (il.iherb.com, de.iherb.com, etc.) to www.iherb.com
+  const { product } = await extractIngredientsFromUrlWithStatus(rawUrl);
+  return product;
+}
+
+export async function extractIngredientsFromUrlWithStatus(
+  rawUrl: string
+): Promise<{ product: ExtractedProduct | null; httpStatus: number | null }> {
   const url = rawUrl.replace(/https?:\/\/(?!www\.)[a-z]{2,3}\.iherb\.com/i, "https://www.iherb.com");
 
-  const html = await fetchHtml(url);
-  if (!html) return null;
+  let httpStatus: number | null = null;
+  const html = await fetchHtml(url, (s) => { httpStatus = s; });
+  if (!html) return { product: null, httpStatus };
 
   try {
     const lower = url.toLowerCase();
-    if (lower.includes("incidecoder.com")) return parseINCIDecoder(html, url);
-    if (lower.includes("iherb.com")) return parseIHerb(html);
-    return parseGeneric(html);
+    let product: ExtractedProduct | null = null;
+    if (lower.includes("incidecoder.com")) product = parseINCIDecoder(html, url);
+    else if (lower.includes("iherb.com")) product = parseIHerb(html);
+    else product = parseGeneric(html);
+    return { product, httpStatus };
   } catch {
-    return null;
+    return { product: null, httpStatus };
   }
 }
 
