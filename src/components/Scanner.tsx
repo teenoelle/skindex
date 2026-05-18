@@ -302,6 +302,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [iHerbBlocked, setIHerbBlocked] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showUnreviewed, setShowUnreviewed] = useState(false);
@@ -411,7 +412,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   async function handleScan(override?: { tab?: Tab; query?: string }) {
     setLoading(true);
-    setNotFound(false);
+    setNotFound(false); setIHerbBlocked(false);
     setResult(null);
     setLimitReached(false);
     setShowUnreviewed(false);
@@ -467,7 +468,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setLoading(false);
 
     if (data.limitReached) { setLimitReached(true); return; }
-    if (data.notFound || data.needsAuth) { setNotFound(true); return; }
+    if (data.notFound || data.needsAuth) {
+      if (data.iHerbBlocked) setIHerbBlocked(true);
+      else setNotFound(true);
+      return;
+    }
     setResult(data);
   }
 
@@ -564,7 +569,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   async function scanVariant(opts: { productId?: string; pasteIngredients?: string; productName?: string; productBrand?: string | null }) {
     setLoading(true);
-    setNotFound(false);
+    setNotFound(false); setIHerbBlocked(false);
     setResult(null);
     setShowUnreviewed(false);
     setShowObfVariants(false);
@@ -824,14 +829,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setTab("paste");
     if (prefill) setIngredients(prefill);
     setResult(null);
-    setNotFound(false);
+    setNotFound(false); setIHerbBlocked(false);
     setLimitReached(false);
   }
 
   function resetTab(t: Tab) {
     setTab(t);
     setResult(null);
-    setNotFound(false);
+    setNotFound(false); setIHerbBlocked(false);
     setLimitReached(false);
     if (t === "browse" && browseTypes.length === 0) {
       setBrowseLoading(true);
@@ -1110,6 +1115,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             paste the ingredients
           </button>{" "}
           instead.
+        </div>
+      )}
+
+      {/* iHerb blocked */}
+      {iHerbBlocked && (
+        <div className="mt-6 p-4 bg-gray-50 rounded-xl text-sm text-gray-500 text-center">
+          iHerb blocks automated requests.{" "}
+          Copy the ingredient list from the product page and{" "}
+          <button className="underline text-gray-700" onClick={() => switchToPaste()}>
+            paste it here
+          </button>{" "}
+          instead. You can also find most iHerb products on{" "}
+          <a href="https://incidecoder.com" target="_blank" rel="noopener noreferrer" className="underline text-gray-700">INCIDecoder</a>{" "}
+          and paste that URL.
         </div>
       )}
 

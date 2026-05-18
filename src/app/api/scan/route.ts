@@ -497,7 +497,8 @@ export async function POST(req: NextRequest) {
 
     const extracted = await extractIngredientsFromUrl(url);
     if (!extracted) {
-      return NextResponse.json({ notFound: true });
+      const isIHerb = url.toLowerCase().includes("iherb.com");
+      return NextResponse.json({ notFound: true, iHerbBlocked: isIHerb });
     }
 
     rawIngredients = extracted.ingredients;
