@@ -502,12 +502,32 @@ export async function POST(req: NextRequest) {
     }
 
     rawIngredients = extracted.ingredients;
+    const productName = extracted.name ?? url;
     product = {
-      name: extracted.name ?? url,
+      name: productName,
       brand: extracted.brand ?? null,
       source: "url-extract",
       type: extracted.type ?? null,
     };
+
+    // Auto-save to DB (fire-and-forget) so the product is searchable later
+    import("@/lib/supabase-admin").then(async ({ supabaseAdmin }) => {
+      const { data: existing } = await supabaseAdmin
+        .from("products")
+        .select("id")
+        .ilike("name", productName)
+        .not("ingredient_list", "is", null)
+        .maybeSingle();
+      if (!existing) {
+        await supabaseAdmin.from("products").insert({
+          name: productName,
+          brand: extracted.brand ?? null,
+          ingredient_list: extracted.ingredients,
+          type: extracted.type ?? null,
+          source: "url-import",
+        });
+      }
+    }).catch(() => {});
   } else {
     return NextResponse.json({ error: "Unknown scan type" }, { status: 400 });
   }

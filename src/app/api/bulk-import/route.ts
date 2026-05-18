@@ -49,13 +49,15 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      await supabaseAdmin.from("products").insert({
+      const { error: insertError } = await supabaseAdmin.from("products").insert({
         name,
         brand,
         ingredient_list: extracted.ingredients,
         type: extracted.type ?? null,
         source: "url-import",
       });
+
+      if (insertError) throw insertError;
 
       results.push({ url, status: "imported", name, brand: brand ?? undefined });
     } catch {

@@ -126,21 +126,30 @@ function extractJsonLd(html: string): { name?: string; brand?: string } | null {
   return null;
 }
 
-// Extract the innerHTML of the first element whose class matches a pattern
+// Extract content after the first element whose class matches a pattern.
+// Takes a generous chunk so nested tags don't truncate the result.
 function extractHtmlByClass(html: string, classPattern: string): string | null {
-  const re = new RegExp(`<[a-z][^>]*class="[^"]*${classPattern}[^"]*"[^>]*>([\\s\\S]*?)<\\/`, "i");
+  const re = new RegExp(`<[a-z][^>]*class="[^"]*${classPattern}[^"]*"[^>]*>`, "i");
   const m = html.match(re);
-  return m ? m[1] : null;
+  if (!m || m.index === undefined) return null;
+  const start = m.index + m[0].length;
+  return html.slice(start, start + 8000);
 }
 
 function extractIngredientBlock(text: string): string | null {
   const labelPattern =
-    /(?:(?:full|complete|all|other)\s+)?(?:ingredients?(?:\s+list)?|inci(?:\s+list)?|what'?s\s+inside|formula)[\s]*[:：\-]?\s*/i;
-  const labelMatch = labelPattern.exec(text);
-  if (!labelMatch) return null;
+    /(?:(?:full|complete|all|other)\s+)?(?:ingredients?(?:\s+(?:list|overview))?|inci(?:\s+list)?|what'?s\s+inside|formula)[\s]*[:：\-]?\s*/gi;
 
-  const startPos = labelMatch.index + labelMatch[0].length;
-  let candidate = text.slice(startPos, startPos + 6000).trim();
+  let bestCandidate: string | null = null;
+
+  for (const labelMatch of text.matchAll(labelPattern)) {
+    const startPos = labelMatch.index + labelMatch[0].length;
+    // Skip matches where nothing ingredient-like follows immediately (e.g. nav "Ingredients Decode INCI")
+    const preview = text.slice(startPos, startPos + 150);
+    const earlyCommas = (preview.match(/,/g) ?? []).length;
+    if (earlyCommas === 0 && !/\b(?:water|aqua|glycerin|butylene glycol|niacinamide|dimethicone)\b/i.test(preview)) continue;
+
+    let candidate = text.slice(startPos, startPos + 6000).trim();
 
   const sectionBreak =
     /\n\s*(?:[*•·▸►\-]\s*)?(?:directions?|how to use|how to apply|usage|warnings?|cautions?|shelf.?life|storage|disclaimer|about this|certif|reviews?|questions?|customer|contact|return|faq|similar|you may also|related|product details|overview|description)\b/i;
@@ -157,13 +166,17 @@ function extractIngredientBlock(text: string): string | null {
     if (commasInOriginal < 3 && avgLineLen < 70) candidate = lines.join(", ");
   }
 
-  candidate = candidate.replace(/\s+/g, " ").trim();
+  candidate = candidate.replace(/\[(?:more|less)\]/gi, " ").replace(/\s+/g, " ").trim();
   candidate = candidate.replace(/\s*(?:read more|show more|see (?:full|all|more)|expand|view all)[^,]*$/i, "").trim();
 
   const commaCount = (candidate.match(/,/g) ?? []).length;
-  if (commaCount < 3 || candidate.length < 50) return null;
+  if (commaCount < 3 || candidate.length < 50) continue;
 
-  return candidate;
+    bestCandidate = candidate;
+    break; // first valid match wins
+  }
+
+  return bestCandidate;
 }
 
 function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
