@@ -174,6 +174,11 @@ const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category: strin
     sensory_category: "Pilling",
     note: "A film-forming polymer that can roll and ball up when layered with incompatible formulas or applied over skin that isn't fully dry. The lumpy residue it creates prompts rubbing and picking that disrupts the skin barrier.",
   },
+  {
+    pattern: /acryloyldimethyltaurate|\/vp copolymer|vp\/va copolymer|carbomer|carbopol|polyacrylate/i,
+    sensory_category: "Film-forming",
+    note: "A synthetic film-forming polymer used to create gel or serum textures. It lays a continuous surface film that can trap dead skin cells underneath, preventing normal shedding and contributing to milia — small, hard, keratin-filled bumps just under the skin surface that are distinct from comedones.",
+  },
 ];
 
 const BENEFIT_PATTERNS: { pattern: RegExp; note: string }[] = [
