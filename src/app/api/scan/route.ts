@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { anthropic } from "@/lib/anthropic";
 import type { CommunityVariant, ObfVariant, PhotosensitiveItem, SensoryTriggerItem } from "@/types";
 import { COMEDOGENIC_PATTERNS } from "@/lib/comedogenic";
-import { extractIngredientsFromUrl } from "@/lib/extract-ingredients";
+import { extractIngredientsFromUrl, mapCategoryToType, guessProductType } from "@/lib/extract-ingredients";
 
 function obfFullImage(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -271,6 +271,7 @@ export async function POST(req: NextRequest) {
     source: string;
     type?: string | null;
     image_url?: string | null;
+    iherb_url?: string | null;
     activity_tags?: string[] | null;
     activity_note?: string | null;
   } | undefined;
@@ -317,7 +318,7 @@ export async function POST(req: NextRequest) {
     if (!dbProduct) {
       const tokens = query.trim().split(/\s+/).filter((w: string) => w.length >= 3);
       if (tokens.length > 1) {
-        const orFilter = tokens.map((t: string) => `name.ilike.%${t}%`).join(",");
+        const orFilter = tokens.map((t: string) => `name.ilike.%${t}%,brand.ilike.%${t}%`).join(",");
         const { data: candidates } = await supabase
           .from("products")
           .select("*")
@@ -374,6 +375,7 @@ export async function POST(req: NextRequest) {
         source: "community",
         type: dbProduct.type ?? null,
         image_url: dbProduct.image_url ?? null,
+        iherb_url: dbProduct.iherb_url ?? null,
         activity_tags: dbProduct.activity_tags ?? null,
         activity_note: dbProduct.activity_note ?? null,
       };
@@ -429,11 +431,30 @@ export async function POST(req: NextRequest) {
 
       if (p?.ingredients_text) {
         rawIngredients = p.ingredients_text;
+
+        // Derive type from OBF categories (tags like "en:deodorants") or product name fallback
+        let obfProductType: string | null = null;
+        if (Array.isArray(p.categories_tags)) {
+          for (let i = p.categories_tags.length - 1; i >= 0; i--) {
+            const tag = (p.categories_tags[i] as string).replace(/^[a-z]{2}:/, "").replace(/-/g, " ");
+            obfProductType = mapCategoryToType(tag);
+            if (obfProductType) break;
+          }
+        }
+        if (!obfProductType && typeof p.categories === "string") {
+          const cats = (p.categories as string).split(",").map((c: string) => c.trim()).filter(Boolean);
+          for (let i = cats.length - 1; i >= 0; i--) {
+            obfProductType = mapCategoryToType(cats[i]);
+            if (obfProductType) break;
+          }
+        }
+        if (!obfProductType) obfProductType = guessProductType(p.product_name || query);
+
         product = {
           name: p.product_name || query,
           brand: p.brands || null,
           source: "openbeautyfacts",
-          type: null,
+          type: obfProductType,
           image_url: obfFullImage(p.image_front_url || p.image_url || null),
         };
 
@@ -510,24 +531,61 @@ export async function POST(req: NextRequest) {
       type: extracted.type ?? null,
     };
 
-    // Auto-save to DB (fire-and-forget) so the product is searchable later
-    import("@/lib/supabase-admin").then(async ({ supabaseAdmin }) => {
-      const { data: existing } = await supabaseAdmin
+    // Save to DB before responding so the product is searchable immediately.
+    // Also update existing url-import records to fix stale data from older extractions.
+    try {
+      const { supabaseAdmin } = await import("@/lib/supabase-admin");
+      // Look up by name+brand to avoid duplicates; use limit(1) to survive multiple matches
+      let existingId: string | null = null;
+      let existingSource: string | null = null;
+      let existingIherbUrl: string | null = null;
+      const { data: existingRows } = await supabaseAdmin
         .from("products")
-        .select("id")
+        .select("id, source, iherb_url")
         .ilike("name", productName)
         .not("ingredient_list", "is", null)
-        .maybeSingle();
-      if (!existing) {
-        await supabaseAdmin.from("products").insert({
-          name: productName,
-          brand: extracted.brand ?? null,
-          ingredient_list: extracted.ingredients,
-          type: extracted.type ?? null,
-          source: "url-import",
-        });
+        .limit(1);
+      if (existingRows?.length) {
+        existingId = existingRows[0].id;
+        existingSource = existingRows[0].source;
+        existingIherbUrl = existingRows[0].iherb_url ?? null;
       }
-    }).catch(() => {});
+
+      const extractedIherbUrl = extracted.iherb_url ?? null;
+
+      if (!existingId) {
+        const { data: inserted } = await supabaseAdmin
+          .from("products")
+          .insert({
+            name: productName,
+            brand: extracted.brand ?? null,
+            ingredient_list: extracted.ingredients,
+            type: extracted.type ?? null,
+            source: "url-import",
+            ...(extractedIherbUrl ? { iherb_url: extractedIherbUrl } : {}),
+          })
+          .select("id")
+          .single();
+        if (inserted?.id) product.id = inserted.id;
+        if (extractedIherbUrl) product.iherb_url = extractedIherbUrl;
+      } else {
+        product.id = existingId;
+        // Prefer freshly-extracted iherb_url; fall back to what's stored
+        product.iherb_url = extractedIherbUrl ?? existingIherbUrl;
+        if (existingSource === "url-import") {
+          await supabaseAdmin
+            .from("products")
+            .update({
+              name: productName,
+              brand: extracted.brand ?? null,
+              ingredient_list: extracted.ingredients,
+              type: extracted.type ?? null,
+              ...(extractedIherbUrl ? { iherb_url: extractedIherbUrl } : {}),
+            })
+            .eq("id", existingId);
+        }
+      }
+    } catch { /* don't fail the scan if DB save fails */ }
   } else {
     return NextResponse.json({ error: "Unknown scan type" }, { status: 400 });
   }

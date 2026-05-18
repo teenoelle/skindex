@@ -359,6 +359,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editDone, setEditDone] = useState(false);
+  const [altImageOpen, setAltImageOpen] = useState<string | null>(null);
+  const [altImageUrl, setAltImageUrl] = useState("");
+  const [altImageSaving, setAltImageSaving] = useState(false);
 
   const initialProductIdRef = useRef(initialProductId);
   useEffect(() => {
@@ -722,6 +725,29 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setEditLoading(false);
   }
 
+  async function handleAltImageSave(altId: string) {
+    if (!altImageUrl.trim()) return;
+    setAltImageSaving(true);
+    try {
+      const res = await fetch("/api/set-product-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: altId, url: altImageUrl.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAlternatives((prev) =>
+          prev.map((a) => a.id === altId ? { ...a, image_url: data.imageUrl } : a)
+        );
+        setAltImageOpen(null);
+        setAltImageUrl("");
+      }
+    } catch {
+      // ignore
+    }
+    setAltImageSaving(false);
+  }
+
   async function handleSubmitProduct() {
     setSubmitLoading(true);
     setSubmitError(null);
@@ -1071,7 +1097,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <div className="border border-gray-100 rounded-xl overflow-hidden">
                 <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-3">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest flex-1">Import results</p>
-                  <span className="text-xs text-green-700">{importResults.filter((r) => r.status === "imported").length} imported</span>
+                  {(() => { const n = importResults.filter((r) => r.status === "imported").length; return <span className={`text-xs ${n > 0 ? "text-green-700" : "text-gray-400"}`}>{n} imported</span>; })()}
                   {importResults.some((r) => r.status === "skipped") && <span className="text-xs text-gray-400">{importResults.filter((r) => r.status === "skipped").length} skipped</span>}
                   {importResults.some((r) => r.status === "failed") && <span className="text-xs text-rose-600">{importResults.filter((r) => r.status === "failed").length} failed</span>}
                 </div>
@@ -1269,15 +1295,30 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     ? (() => { try { return new URL(result.product.name).hostname.replace("www.", ""); } catch { return result.product.name; } })()
                     : result.product.name}
                 </h2>
-                {result.product.brand && (
-                  <p className="text-sm text-gray-400">
-                    <button
-                      type="button"
-                      onClick={() => { setTab("search"); setQuery(result.product!.brand!); handleScan({ tab: "search", query: result.product!.brand! }); }}
-                      className="hover:underline underline-offset-2"
-                    >
-                      {result.product.brand}
-                    </button>
+                {(result.product.brand || result.product.iherb_url) && (
+                  <p className="text-sm text-gray-400 flex items-center gap-2 flex-wrap">
+                    {result.product.brand && (
+                      <button
+                        type="button"
+                        onClick={() => { setTab("search"); setQuery(result.product!.brand!); handleScan({ tab: "search", query: result.product!.brand! }); }}
+                        className="hover:underline underline-offset-2"
+                      >
+                        {result.product.brand}
+                      </button>
+                    )}
+                    {result.product.iherb_url && (
+                      <>
+                        {result.product.brand && <span className="text-gray-300">·</span>}
+                        <a
+                          href={`${result.product.iherb_url}${result.product.iherb_url.includes("?") ? "&" : "?"}rcode=DYT4743`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs hover:underline underline-offset-2"
+                        >
+                          iHerb ↗
+                        </a>
+                      </>
+                    )}
                   </p>
                 )}
 
@@ -1709,40 +1750,82 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     <span className="text-gray-300">{alternativesOpen ? "▲" : "▼"}</span>
                   </button>
                   {alternativesOpen && <div className="divide-y divide-gray-100">
-                    {alternatives.map((alt, i) => {
+                    {alternatives.map((alt) => {
+                      const isAltImageOpen = altImageOpen === alt.id;
                       return (
                         <Fragment key={alt.id}>
-                          <div className="flex items-center gap-3 py-2">
-                            {alt.image_url ? (
-                              <Image
-                                src={proxyImage(alt.image_url)!}
-                                width={48}
-                                height={56}
-                                alt=""
-                                className="object-contain rounded-lg border border-gray-100 bg-gray-50 shrink-0"
-                                unoptimized
-                              />
-                            ) : (
-                              <div className="w-12 h-14 rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center shrink-0">
-                                <CategoryIcon type={alt.type} size={18} />
+                          <div className="py-2 space-y-1.5">
+                            <div className="flex items-center gap-3">
+                              {alt.image_url ? (
+                                <Image
+                                  src={proxyImage(alt.image_url)!}
+                                  width={48}
+                                  height={56}
+                                  alt=""
+                                  className="object-contain rounded-lg border border-gray-100 bg-gray-50 shrink-0"
+                                  unoptimized
+                                />
+                              ) : (
+                                <div className="w-12 h-14 rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center shrink-0">
+                                  <CategoryIcon type={alt.type} size={18} />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-800 truncate">{alt.name}</p>
+                                {alt.brand && <p className="text-xs text-gray-400">{alt.brand}</p>}
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (isAltImageOpen) { setAltImageOpen(null); setAltImageUrl(""); }
+                                      else { setAltImageOpen(alt.id); setAltImageUrl(""); }
+                                    }}
+                                    className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600"
+                                  >
+                                    {alt.image_url ? "Change image" : "Add image"}
+                                  </button>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`text-xs px-1.5 py-0.5 rounded-md ${alt.flaggedCount === 0 ? "bg-green-50 text-green-700" : "bg-rose-50 text-rose-700"}`}>
+                                  {alt.flaggedCount === 0 ? "0 flagged" : `${alt.flaggedCount} flagged`}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                                  onClick={() => scanVariant({ productId: alt.id })}
+                                >
+                                  Scan
+                                </button>
+                              </div>
+                            </div>
+                            {isAltImageOpen && (
+                              <div className="flex gap-1.5 pl-[60px]">
+                                <input
+                                  type="url"
+                                  value={altImageUrl}
+                                  onChange={(e) => setAltImageUrl(e.target.value)}
+                                  onKeyDown={(e) => e.key === "Enter" && !altImageSaving && handleAltImageSave(alt.id)}
+                                  placeholder="Image URL"
+                                  className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 min-w-0"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleAltImageSave(alt.id)}
+                                  disabled={altImageSaving || !altImageUrl.trim()}
+                                  className="text-xs px-2.5 py-1.5 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0"
+                                >
+                                  {altImageSaving ? "Saving…" : "Save"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setAltImageOpen(null); setAltImageUrl(""); }}
+                                  className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+                                >
+                                  Cancel
+                                </button>
                               </div>
                             )}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-800 truncate">{alt.name}</p>
-                              {alt.brand && <p className="text-xs text-gray-400">{alt.brand}</p>}
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className={`text-xs px-1.5 py-0.5 rounded-md ${alt.flaggedCount === 0 ? "bg-green-50 text-green-700" : "bg-rose-50 text-rose-700"}`}>
-                                {alt.flaggedCount === 0 ? "0 flagged" : `${alt.flaggedCount} flagged`}
-                              </span>
-                              <button
-                                type="button"
-                                className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
-                                onClick={() => scanVariant({ productId: alt.id })}
-                              >
-                                Scan
-                              </button>
-                            </div>
                           </div>
                         </Fragment>
                       );
@@ -1948,7 +2031,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <section id="section-flagged">
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <p className="text-xs font-semibold text-rose-700 uppercase tracking-widest">
-                  Flagged — {result.flagged.length}
+                  Flagged Ingredients — {result.flagged.length}
                 </p>
                 {!isRinseOff && result.flagged.some((f) => f.ingredient.flagged_category === "pore-clogger") && (
                   <span className="text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">pore-clogging</span>
@@ -2034,7 +2117,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <section id="section-sensory">
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">
-                  Sensory trigger — {visibleSensory.length}
+                  Sensory Trigger Ingredients — {visibleSensory.length}
                 </p>
                 {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Film-forming") && (
                   <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">milia risk</span>
@@ -2130,7 +2213,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             return (
             <section id="section-photosensitive">
               <p className="text-xs font-semibold text-yellow-700 uppercase tracking-widest mb-2">
-                Photosensitive — {visiblePhoto.length}
+                Photosensitive Ingredients — {visiblePhoto.length}
               </p>
               {isRinseOff && suppressed > 0 && (
                 <p className="text-xs text-gray-400 mb-2">{suppressed} ingredient{suppressed !== 1 ? "s" : ""} (retinoids, BHA, brightening) suppressed — negligible risk when rinsed off. AHAs and botanicals remain flagged as they cause reactions even with brief contact.</p>
@@ -2196,7 +2279,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {result.safe.length > 0 && (
             <section id="section-safe">
               <p className="text-xs font-semibold text-teal-700 uppercase tracking-widest mb-2">
-                Safe — {result.safe.length}
+                Safe Ingredients — {result.safe.length}
               </p>
               <div className="divide-y divide-gray-100">
                 {result.safe.map((item) => {

@@ -25,7 +25,9 @@ export async function POST(req: NextRequest) {
 
   const results: ImportResult[] = [];
 
-  for (const url of urls) {
+  for (let idx = 0; idx < urls.length; idx++) {
+    const url = urls[idx];
+    if (idx > 0) await new Promise((r) => setTimeout(r, 1000));
     try {
       const extracted = await extractIngredientsFromUrl(url);
       if (!extracted) {
