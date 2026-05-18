@@ -248,6 +248,18 @@ function smartCase(str: string): string {
   return toTitleCase(str);
 }
 
+function withRcode(url: string, code = "DYT4743"): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("rcode");
+    u.searchParams.set("rcode", code);
+    return u.toString();
+  } catch {
+    const clean = url.replace(/[?&]rcode=[^&]*/gi, "").replace(/\?$/, "").replace(/&&/g, "&");
+    return clean + (clean.includes("?") ? "&" : "?") + "rcode=" + code;
+  }
+}
+
 function proxyImage(url: string | null | undefined): string | null {
   if (!url) return null;
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
@@ -362,6 +374,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [altImageOpen, setAltImageOpen] = useState<string | null>(null);
   const [altImageUrl, setAltImageUrl] = useState("");
   const [altImageSaving, setAltImageSaving] = useState(false);
+  const [suggestLinkOpen, setSuggestLinkOpen] = useState(false);
+  const [suggestLinkUrl, setSuggestLinkUrl] = useState("");
+  const [suggestLinkLoading, setSuggestLinkLoading] = useState(false);
+  const [suggestLinkError, setSuggestLinkError] = useState<string | null>(null);
 
   const initialProductIdRef = useRef(initialProductId);
   useEffect(() => {
@@ -453,6 +469,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setNewListName("");
     setSaveListLoading(null);
     setSavedTo(null);
+    setSuggestLinkOpen(false);
+    setSuggestLinkUrl("");
+    setSuggestLinkError(null);
 
     const activeTab = override?.tab ?? tab;
     const activeQuery = override?.query ?? query;
@@ -599,6 +618,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setNewListName("");
     setSaveListLoading(null);
     setSavedTo(null);
+    setSuggestLinkOpen(false);
+    setSuggestLinkUrl("");
+    setSuggestLinkError(null);
 
     const body = opts.productId
       ? { type: "search", query, productId: opts.productId }
@@ -746,6 +768,29 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       // ignore
     }
     setAltImageSaving(false);
+  }
+
+  async function handleSuggestLink() {
+    if (!result?.product?.id || !suggestLinkUrl.trim()) return;
+    setSuggestLinkLoading(true);
+    setSuggestLinkError(null);
+    try {
+      const res = await fetch("/api/suggest-purchase-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: result.product.id, url: suggestLinkUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setSuggestLinkError(data.error ?? "Failed to save"); }
+      else {
+        setResult((prev) =>
+          prev ? { ...prev, product: prev.product ? { ...prev.product, iherb_url: data.iherb_url } : prev.product } : prev
+        );
+        setSuggestLinkOpen(false);
+        setSuggestLinkUrl("");
+      }
+    } catch { setSuggestLinkError("Failed to save"); }
+    setSuggestLinkLoading(false);
   }
 
   async function handleSubmitProduct() {
@@ -1295,31 +1340,72 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     ? (() => { try { return new URL(result.product.name).hostname.replace("www.", ""); } catch { return result.product.name; } })()
                     : result.product.name}
                 </h2>
-                {(result.product.brand || result.product.iherb_url) && (
-                  <p className="text-sm text-gray-400 flex items-center gap-2 flex-wrap">
-                    {result.product.brand && (
-                      <button
-                        type="button"
-                        onClick={() => { setTab("search"); setQuery(result.product!.brand!); handleScan({ tab: "search", query: result.product!.brand! }); }}
-                        className="hover:underline underline-offset-2"
-                      >
-                        {result.product.brand}
-                      </button>
-                    )}
-                    {result.product.iherb_url && (
-                      <>
-                        {result.product.brand && <span className="text-gray-300">·</span>}
-                        <a
-                          href={`${result.product.iherb_url}${result.product.iherb_url.includes("?") ? "&" : "?"}rcode=DYT4743`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs hover:underline underline-offset-2"
+                {(result.product.brand || result.product.iherb_url || (isSignedIn && result.product.id)) && (
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-sm text-gray-400 flex items-center gap-2 flex-wrap">
+                      {result.product.brand && (
+                        <button
+                          type="button"
+                          onClick={() => { setTab("search"); setQuery(result.product!.brand!); handleScan({ tab: "search", query: result.product!.brand! }); }}
+                          className="hover:underline underline-offset-2"
                         >
-                          iHerb ↗
-                        </a>
-                      </>
+                          {result.product.brand}
+                        </button>
+                      )}
+                      {result.product.iherb_url ? (
+                        <>
+                          {result.product.brand && <span className="text-gray-300">·</span>}
+                          <a
+                            href={withRcode(result.product.iherb_url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs hover:underline underline-offset-2"
+                          >
+                            iHerb ↗
+                          </a>
+                        </>
+                      ) : (isSignedIn && result.product.id && !suggestLinkOpen) ? (
+                        <>
+                          {result.product.brand && <span className="text-gray-300">·</span>}
+                          <button
+                            type="button"
+                            onClick={() => setSuggestLinkOpen(true)}
+                            className="text-xs text-gray-300 hover:text-gray-500 underline underline-offset-2"
+                          >
+                            + iHerb link
+                          </button>
+                        </>
+                      ) : null}
+                    </p>
+                    {suggestLinkOpen && result.product.id && (
+                      <div className="flex gap-1.5 items-center flex-wrap">
+                        <input
+                          type="url"
+                          value={suggestLinkUrl}
+                          onChange={(e) => { setSuggestLinkUrl(e.target.value); setSuggestLinkError(null); }}
+                          onKeyDown={(e) => e.key === "Enter" && !suggestLinkLoading && handleSuggestLink()}
+                          placeholder="iHerb product URL"
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400 w-52"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSuggestLink}
+                          disabled={suggestLinkLoading || !suggestLinkUrl.trim()}
+                          className="text-xs px-2.5 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40"
+                        >
+                          {suggestLinkLoading ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setSuggestLinkOpen(false); setSuggestLinkUrl(""); setSuggestLinkError(null); }}
+                          className="text-xs text-gray-400 hover:text-gray-600"
+                        >
+                          Cancel
+                        </button>
+                        {suggestLinkError && <span className="text-xs text-rose-600">{suggestLinkError}</span>}
+                      </div>
                     )}
-                  </p>
+                  </div>
                 )}
 
                 {/* Leave-on / Rinse-off toggle */}

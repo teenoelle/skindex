@@ -402,18 +402,17 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
 
 function extractIHerbLinkFromHtml(html: string): string | null {
   // Match any href that points to an iherb.com product page (/pr/ path)
-  const patterns = [
-    /href="(https?:\/\/(?:www\.)?iherb\.com\/pr\/[^"?#]+(?:\?[^"]*)?)"/gi,
-    /href="(https?:\/\/(?:[a-z]{2,3}\.)?iherb\.com\/pr\/[^"?#]+(?:\?[^"]*)?)"/gi,
-  ];
-  for (const pattern of patterns) {
-    const match = pattern.exec(html);
-    if (match) {
-      // Normalise regional subdomain to www
-      return match[1].replace(/https?:\/\/(?!www\.)[a-z]{2,3}\.iherb\.com/i, "https://www.iherb.com");
-    }
+  const pattern = /href="(https?:\/\/(?:[a-z]{2,3}\.)?iherb\.com\/pr\/[^"?#]+(?:\?[^"]*)?)"/gi;
+  const match = pattern.exec(html);
+  if (!match) return null;
+  try {
+    const u = new URL(match[1]);
+    u.hostname = "www.iherb.com";   // normalise regional subdomain
+    u.searchParams.delete("rcode"); // strip any existing rcode — ours is appended at display time
+    return u.toString();
+  } catch {
+    return match[1].replace(/https?:\/\/(?!www\.)[a-z]{2,3}\.iherb\.com/i, "https://www.iherb.com");
   }
-  return null;
 }
 
 // iHerb embeds product data as JSON in script tags (Vue SSR / app state)
