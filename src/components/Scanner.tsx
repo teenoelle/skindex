@@ -212,6 +212,29 @@ function toTitleCase(str: string): string {
 }
 
 // Preserve original casing unless the string is all-caps, then apply title case
+const CONGESTION_VECTOR_DEFS: { label: string; bumps: string; description: string }[] = [
+  {
+    label: "Pore-clogging",
+    bumps: "Blackheads & closed comedones",
+    description: "These ingredients can penetrate follicle walls and cause hyperkeratosis — the cell buildup that forms blackheads (open comedones) and closed comedones, which are flesh-colored, hard bumps beneath the skin surface. Rated on the 0–5 comedogenicity scale.",
+  },
+  {
+    label: "Milia risk",
+    bumps: "Hard white bumps just under the skin",
+    description: "Film-forming ingredients can trap dead skin cells beneath the surface, preventing them from shedding normally. The cells pack together and harden into milia — small, firm, white bumps just under the skin that are not inside pores and don't respond to pore-clearing treatments.",
+  },
+  {
+    label: "Traps congestion",
+    bumps: "Worsens existing buildup",
+    description: "Heavy occlusive ingredients seal the skin surface tightly. When congestion is already forming — excess sebum, dead cells, bacteria — this seal locks it in underneath, accelerating the development of bumps.",
+  },
+  {
+    label: "Inflammatory",
+    bumps: "Red papules (not comedones)",
+    description: "Sensitizing or allergenic ingredients can trigger an immune response in the skin, producing red, inflamed papules — bumps that look like acne but are caused by irritation or allergy, not by pore-clogging.",
+  },
+];
+
 function smartCase(str: string): string {
   const alpha = str.replace(/[^a-zA-Z]/g, "");
   if (!alpha || alpha !== alpha.toUpperCase()) return str;
@@ -1489,6 +1512,55 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
           )}
 
+          {/* Congestion profile */}
+          {(() => {
+            const poreClogging = result.flagged.filter((f) => f.ingredient.flagged_category === "pore-clogger");
+            const miliaRisk = (result.sensoryTrigger ?? []).filter((s) => s.sensory_category === "Film-forming");
+            const trapsCongest = (result.sensoryTrigger ?? []).filter((s) => s.sensory_category === "Occlusive");
+            const inflammatory = result.flagged.filter((f) =>
+              ["sensitizer", "fragrance-allergen", "preservative-allergen"].includes(f.ingredient.flagged_category ?? "")
+            );
+            const vectors = [
+              { label: "Pore-clogging", names: poreClogging.map((f) => smartCase(f.displayName)) },
+              { label: "Milia risk", names: miliaRisk.map((s) => smartCase(s.rawName)) },
+              { label: "Traps congestion", names: trapsCongest.map((s) => smartCase(s.rawName)) },
+              { label: "Inflammatory", names: inflammatory.map((f) => smartCase(f.displayName)) },
+            ].filter((v) => v.names.length > 0);
+            if (vectors.length === 0) return null;
+            return (
+              <div className="border border-gray-100 rounded-xl overflow-hidden">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-4 py-3 border-b border-gray-100">Congestion profile</p>
+                <div className="divide-y divide-gray-50">
+                  {vectors.map((v) => {
+                    const def = CONGESTION_VECTOR_DEFS.find((d) => d.label === v.label);
+                    const key = `cp-${v.label}`;
+                    const isOpen = expanded.has(key);
+                    return (
+                      <div key={v.label} className="px-4 py-2.5">
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setExpanded((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
+                            className="text-xs font-medium text-gray-700 hover:text-gray-900 shrink-0 text-left w-36"
+                          >
+                            {v.label} <span className="text-gray-300 text-[10px]">{isOpen ? "▲" : "▼"}</span>
+                          </button>
+                          <p className="text-xs text-gray-400 flex-1 leading-relaxed">{v.names.join(", ")}</p>
+                        </div>
+                        {isOpen && def && (
+                          <div className="mt-2 space-y-0.5">
+                            <p className="text-xs text-gray-500 leading-relaxed">{def.description}</p>
+                            <p className="text-xs text-gray-400">Bump type: {def.bumps}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Summary line + safe alternatives group */}
           <div className="space-y-2">
           {(result.flagged.length + result.safe.length + result.unreviewed.length) > 0 && (
@@ -1822,6 +1894,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               <span className="text-xs text-amber-700 shrink-0">{item.sensory_category}</span>
                             </>
                           )}
+                          {item.sensory_category === "Film-forming" && (
+                            <>
+                              <span className="text-gray-200 text-xs shrink-0">·</span>
+                              <span className="text-xs text-gray-400 shrink-0">milia risk</span>
+                            </>
+                          )}
+                          {item.sensory_category === "Occlusive" && (
+                            <>
+                              <span className="text-gray-200 text-xs shrink-0">·</span>
+                              <span className="text-xs text-gray-400 shrink-0">traps congestion</span>
+                            </>
+                          )}
                         </span>
                         <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                       </button>
@@ -1832,6 +1916,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           )}
                           {!flaggedMatch && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
                           {item.sensory_note && <p>{item.sensory_note}</p>}
+                          {item.sensory_category === "Film-forming" && (
+                            <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
+                          )}
+                          {item.sensory_category === "Occlusive" && (
+                            <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: worsens existing congestion by sealing the skin surface and locking in sebum and dead cells underneath.</p>
+                          )}
                         </div>
                       )}
                     </div>
