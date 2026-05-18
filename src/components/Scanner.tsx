@@ -56,6 +56,7 @@ type ImportResult = {
   brand?: string;
   reason?: string;
   httpStatus?: number;
+  fetchError?: string;
 };
 type UserList = { id: string; name: string; is_public: boolean; itemCount: number };
 
@@ -1162,7 +1163,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         ) : (
                           <p className="text-xs text-gray-400 truncate">{r.url}</p>
                         )}
-                        <p className="text-xs text-gray-400">{r.status === "imported" ? "Added to database" : r.status === "skipped" ? "Already in database" : r.reason === "iherb-blocked" ? "iHerb blocks imports — paste ingredients instead" : r.reason === "rate-limited" ? `Rate limited by server (429)${r.httpStatus ? "" : ""}` : r.reason === "blocked" ? "Blocked by server (403)" : r.reason === "parse-failed" ? "Page loaded but ingredients not found" : r.httpStatus ? `Failed (HTTP ${r.httpStatus})` : "Could not extract ingredients"}</p>
+                        <p className="text-xs text-gray-400">{
+                          r.status === "imported" ? "Added to database" :
+                          r.status === "skipped" ? "Already in database" :
+                          r.reason === "iherb-blocked" ? "iHerb blocks imports — paste ingredients instead" :
+                          r.reason === "rate-limited" ? "Rate limited (429)" :
+                          r.reason === "blocked" ? "Blocked (403)" :
+                          r.reason === "parse-failed" ? "Loaded but ingredients not found (200)" :
+                          r.fetchError ? r.fetchError :
+                          r.httpStatus ? `Failed (HTTP ${r.httpStatus})` :
+                          "Could not extract ingredients"
+                        }</p>
                       </div>
                     </div>
                   ))}

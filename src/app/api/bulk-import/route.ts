@@ -12,6 +12,7 @@ export type ImportResult = {
   brand?: string;
   reason?: string;
   httpStatus?: number;
+  fetchError?: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     if (idx > 0) await new Promise((r) => setTimeout(r, 2000));
     try {
       const isIHerb = url.toLowerCase().includes("iherb.com");
-      const { product: extracted, httpStatus } = await extractIngredientsFromUrlWithStatus(url);
+      const { product: extracted, httpStatus, fetchError } = await extractIngredientsFromUrlWithStatus(url);
       if (!extracted) {
         let reason = "extraction-failed";
         if (isIHerb) reason = "iherb-blocked";
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
         else if (httpStatus === 403) reason = "blocked";
         else if (httpStatus && httpStatus >= 400) reason = `http-${httpStatus}`;
         else if (httpStatus === 200) reason = "parse-failed";
-        results.push({ url, status: "failed", reason, httpStatus: httpStatus ?? undefined });
+        results.push({ url, status: "failed", reason, httpStatus: httpStatus ?? undefined, fetchError });
         continue;
       }
 

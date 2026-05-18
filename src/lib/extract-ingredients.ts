@@ -61,7 +61,11 @@ export function guessProductType(name: string): string | null {
   return best;
 }
 
-async function fetchHtml(url: string, onStatus?: (status: number) => void): Promise<string | null> {
+async function fetchHtml(
+  url: string,
+  onStatus?: (status: number) => void,
+  onError?: (err: string) => void
+): Promise<string | null> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -81,7 +85,8 @@ async function fetchHtml(url: string, onStatus?: (status: number) => void): Prom
     onStatus?.(res.status);
     if (!res.ok) return null;
     return res.text();
-  } catch {
+  } catch (e) {
+    onError?.(e instanceof Error ? `${e.name}: ${e.message}` : String(e));
     return null;
   }
 }
@@ -527,12 +532,13 @@ export async function extractIngredientsFromUrl(rawUrl: string): Promise<Extract
 
 export async function extractIngredientsFromUrlWithStatus(
   rawUrl: string
-): Promise<{ product: ExtractedProduct | null; httpStatus: number | null }> {
+): Promise<{ product: ExtractedProduct | null; httpStatus: number | null; fetchError?: string }> {
   const url = rawUrl.replace(/https?:\/\/(?!www\.)[a-z]{2,3}\.iherb\.com/i, "https://www.iherb.com");
 
   let httpStatus: number | null = null;
-  const html = await fetchHtml(url, (s) => { httpStatus = s; });
-  if (!html) return { product: null, httpStatus };
+  let fetchError: string | undefined;
+  const html = await fetchHtml(url, (s) => { httpStatus = s; }, (e) => { fetchError = e; });
+  if (!html) return { product: null, httpStatus, fetchError };
 
   try {
     const lower = url.toLowerCase();
@@ -541,8 +547,8 @@ export async function extractIngredientsFromUrlWithStatus(
     else if (lower.includes("iherb.com")) product = parseIHerb(html);
     else product = parseGeneric(html);
     return { product, httpStatus };
-  } catch {
-    return { product: null, httpStatus };
+  } catch (e) {
+    return { product: null, httpStatus, fetchError: e instanceof Error ? e.message : String(e) };
   }
 }
 
