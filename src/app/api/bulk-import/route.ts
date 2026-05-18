@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
     try {
       const isIHerb = url.toLowerCase().includes("iherb.com");
       const { product: extracted, httpStatus, fetchError } = await extractIngredientsFromUrlWithStatus(url);
+      console.log(`[bulk] ${idx + 1}/${urls.length} status=${httpStatus} fetchError=${fetchError} extracted=${!!extracted} url=${url}`);
       if (!extracted) {
         let reason = "extraction-failed";
         if (isIHerb) reason = "iherb-blocked";
@@ -75,8 +76,9 @@ export async function POST(req: NextRequest) {
       if (insertError) throw insertError;
 
       results.push({ url, status: "imported", name, brand: brand ?? undefined });
-    } catch {
-      results.push({ url, status: "failed", reason: "error" });
+    } catch (e) {
+      console.error(`[bulk] outer catch for ${url}:`, e);
+      results.push({ url, status: "failed", reason: "error", fetchError: e instanceof Error ? `${e.name}: ${e.message}` : String(e) });
     }
   }
 
