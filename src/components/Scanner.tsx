@@ -2020,11 +2020,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
 
           {/* Sensory trigger ingredients */}
-          {(result.sensoryTrigger ?? []).length > 0 && (
+          {(result.sensoryTrigger ?? []).length > 0 && (() => {
+            const RINSE_OFF_SUPPRESS_SENSORY = ["Pilling", "Film-forming"];
+            const visibleSensory = isRinseOff
+              ? result.sensoryTrigger.filter((s) => !s.sensory_category || !RINSE_OFF_SUPPRESS_SENSORY.includes(s.sensory_category))
+              : result.sensoryTrigger;
+            const suppressedSensory = result.sensoryTrigger.length - visibleSensory.length;
+            if (visibleSensory.length === 0) return null;
+            return (
             <section id="section-sensory">
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">
-                  Sensory trigger — {result.sensoryTrigger.length}
+                  Sensory trigger — {visibleSensory.length}
                 </p>
                 {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Film-forming") && (
                   <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">milia risk</span>
@@ -2033,8 +2040,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">traps congestion</span>
                 )}
               </div>
+              {isRinseOff && suppressedSensory > 0 && (
+                <p className="text-xs text-gray-400 mb-2">{suppressedSensory} ingredient{suppressedSensory !== 1 ? "s" : ""} (pilling, film-forming) suppressed — these require prolonged skin contact to cause problems and are not a concern in rinse-off products.</p>
+              )}
               <div className="divide-y divide-gray-100">
-                {result.sensoryTrigger.map((item) => {
+                {visibleSensory.map((item) => {
                   const key = `sensory-${item.rawName}`;
                   const isOpen = expanded.has(key);
                   const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
@@ -2103,7 +2113,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 })}
               </div>
             </section>
-          )}
+            );
+          })()}
 
           {/* Photosensitive ingredients */}
           {(result.photosensitive ?? []).length > 0 && (() => {
