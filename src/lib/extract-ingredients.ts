@@ -16,8 +16,13 @@ async function fetchHtml(url: string): Promise<string | null> {
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
         "Cache-Control": "no-cache",
+        "Referer": "https://www.google.com/",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "cross-site",
       },
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) return null;
     return res.text();
@@ -161,6 +166,23 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
   return { ingredients, name, brand };
 }
 
+// iHerb embeds product data as JSON in script tags (Vue SSR / app state)
+function extractIHerbEmbeddedJson(html: string): string | null {
+  // Look for ingredient fields in any inline JSON blob
+  const FIELD_PATTERN = /"(?:ingredients|ingredientList|ingredientsList|otherIngredients|other_ingredients|skinIngredients)"\s*:\s*"((?:[^"\\]|\\.)*)"/gi;
+  let best: string | null = null;
+  let bestCommas = 2;
+  for (const m of html.matchAll(FIELD_PATTERN)) {
+    const raw = m[1].replace(/\\n/g, " ").replace(/\\t/g, " ").replace(/\\"/g, '"').replace(/\\u[\da-f]{4}/gi, " ").trim();
+    const commas = (raw.match(/,/g) ?? []).length;
+    if (commas > bestCommas && raw.length >= 50) {
+      best = raw;
+      bestCommas = commas;
+    }
+  }
+  return best;
+}
+
 function parseIHerb(html: string): ExtractedProduct | null {
   // Try JSON-LD first — iHerb includes Product schema
   const jsonLd = extractJsonLd(html);
@@ -177,16 +199,22 @@ function parseIHerb(html: string): ExtractedProduct | null {
       .trim() || undefined;
   }
 
-  // Strategy 1: look for iHerb's supplement/ingredients section by class
-  let ingredients: string | null = null;
-  const ingredHtml = extractHtmlByClass(html, "supplement-ingredient");
-  if (ingredHtml) {
-    const ingredText = htmlToText(ingredHtml).replace(/\s+/g, " ").trim();
-    const commaCount = (ingredText.match(/,/g) ?? []).length;
-    if (commaCount >= 3 && ingredText.length >= 50) ingredients = ingredText;
+  // Strategy 1: look for ingredient data in embedded JSON (Vue SSR / app state)
+  let ingredients: string | null = extractIHerbEmbeddedJson(html);
+
+  // Strategy 2: iHerb's ingredient section by class (several possible class names)
+  if (!ingredients) {
+    for (const cls of ["supplement-ingredient", "ingredient", "product-ingredient", "cosmetic-ingredient"]) {
+      const ingredHtml = extractHtmlByClass(html, cls);
+      if (ingredHtml) {
+        const ingredText = htmlToText(ingredHtml).replace(/\s+/g, " ").trim();
+        const commaCount = (ingredText.match(/,/g) ?? []).length;
+        if (commaCount >= 3 && ingredText.length >= 50) { ingredients = ingredText; break; }
+      }
+    }
   }
 
-  // Strategy 2: generic label search
+  // Strategy 3: generic label search
   if (!ingredients) {
     const text = htmlToText(html);
     ingredients = extractIngredientBlock(text);
