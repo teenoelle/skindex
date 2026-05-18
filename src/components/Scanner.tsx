@@ -1748,43 +1748,92 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               ["sensitizer", "fragrance-allergen", "preservative-allergen"].includes(f.ingredient.flagged_category ?? "")
             );
             const vectors = [
-              { label: "Pore-clogging", names: poreClogging.map((f) => smartCase(f.displayName)) },
-              { label: "Milia risk", names: miliaRisk.map((s) => smartCase(s.rawName)) },
-              { label: "Traps congestion", names: trapsCongest.map((s) => smartCase(s.rawName)) },
-              { label: "Inflammatory", names: inflammatory.map((f) => smartCase(f.displayName)) },
-            ].filter((v) => v.names.length > 0);
+              {
+                label: "Pore-clogging",
+                items: poreClogging.map((f) => ({
+                  name: smartCase(f.displayName),
+                  expandKey: f.ingredient.id,
+                  elementId: `ingredient-${f.ingredient.id}`,
+                })),
+              },
+              {
+                label: "Milia risk",
+                items: miliaRisk.map((s) => ({
+                  name: smartCase(s.rawName),
+                  expandKey: `sensory-${s.rawName}`,
+                  elementId: `sensory-row-${s.rawName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+                })),
+              },
+              {
+                label: "Traps congestion",
+                items: trapsCongest.map((s) => ({
+                  name: smartCase(s.rawName),
+                  expandKey: `sensory-${s.rawName}`,
+                  elementId: `sensory-row-${s.rawName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+                })),
+              },
+              {
+                label: "Inflammatory",
+                items: inflammatory.map((f) => ({
+                  name: smartCase(f.displayName),
+                  expandKey: f.ingredient.id,
+                  elementId: `ingredient-${f.ingredient.id}`,
+                })),
+              },
+            ].filter((v) => v.items.length > 0);
             if (vectors.length === 0) return null;
             return (
-              <div className="border border-gray-100 rounded-xl overflow-hidden">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-4 py-3 border-b border-gray-100">Product congestion profile</p>
-                <div className="divide-y divide-gray-50">
-                  {vectors.map((v) => {
-                    const def = CONGESTION_VECTOR_DEFS.find((d) => d.label === v.label);
-                    const key = `cp-${v.label}`;
-                    const isOpen = expanded.has(key);
-                    return (
-                      <div key={v.label} className="px-4 py-2.5">
-                        <div className="flex items-start gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setExpanded((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
-                            className="text-xs font-medium text-gray-700 hover:text-gray-900 shrink-0 text-left w-36"
-                          >
-                            {v.label} <span className="text-gray-300 text-[10px]">{isOpen ? "▲" : "▼"}</span>
-                          </button>
-                          <p className="text-xs text-gray-400 flex-1 leading-relaxed">{v.names.join(", ")}</p>
-                        </div>
-                        {isOpen && def && (
-                          <div className="mt-2 space-y-0.5">
-                            <p className="text-xs text-gray-500 leading-relaxed">{def.description}</p>
-                            <p className="text-xs text-gray-400">Bump type: {def.bumps}</p>
+              <section>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Product congestion profile</p>
+                <div className="border border-gray-100 rounded-xl overflow-hidden">
+                  <div className="divide-y divide-gray-50">
+                    {vectors.map((v) => {
+                      const def = CONGESTION_VECTOR_DEFS.find((d) => d.label === v.label);
+                      const key = `cp-${v.label}`;
+                      const isOpen = expanded.has(key);
+                      return (
+                        <div key={v.label} className="px-4 py-2.5">
+                          <div className="flex items-start gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setExpanded((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
+                              className="text-xs font-medium text-gray-700 hover:text-gray-900 shrink-0 text-left w-36"
+                            >
+                              {v.label} <span className="text-gray-300 text-[10px]">{isOpen ? "▲" : "▼"}</span>
+                            </button>
+                            <p className="text-xs text-gray-400 flex-1 leading-relaxed">
+                              {v.items.map((item, i) => (
+                                <Fragment key={item.elementId}>
+                                  {i > 0 && ", "}
+                                  <button
+                                    type="button"
+                                    className="hover:text-gray-700 hover:underline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setExpanded((prev) => { const n = new Set(prev); n.add(item.expandKey); return n; });
+                                      setTimeout(() => {
+                                        document.getElementById(item.elementId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                      }, 50);
+                                    }}
+                                  >
+                                    {item.name}
+                                  </button>
+                                </Fragment>
+                              ))}
+                            </p>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          {isOpen && def && (
+                            <div className="mt-2 space-y-0.5">
+                              <p className="text-xs text-gray-500 leading-relaxed">{def.description}</p>
+                              <p className="text-xs text-gray-400">Bump type: {def.bumps}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              </section>
             );
           })()}
 
@@ -1796,10 +1845,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   Flagged — {result.flagged.length}
                 </p>
                 {result.flagged.some((f) => f.ingredient.flagged_category === "pore-clogger") && (
-                  <span className="text-xs text-rose-600 bg-rose-50 rounded-full px-2 py-0.5">pore-clogging</span>
+                  <span className="text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">pore-clogging</span>
                 )}
                 {result.flagged.some((f) => ["sensitizer","fragrance-allergen","preservative-allergen"].includes(f.ingredient.flagged_category ?? "")) && (
-                  <span className="text-xs text-rose-600 bg-rose-50 rounded-full px-2 py-0.5">inflammatory</span>
+                  <span className="text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">inflammatory</span>
                 )}
               </div>
               <div className="divide-y divide-gray-100">
@@ -1848,7 +1897,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
                           )}
                           {item.comedogenicRating && (
-                            <p className="text-xs text-gray-500">Comedogenicity: <span className="font-medium">{item.comedogenicRating}</span>{item.comedogenicRating !== "oxid." ? " on the 0–5 scale" : " (oxidation-dependent, not a fixed scale rating)"}</p>
+                            <p className="text-xs text-gray-500"><span className="font-medium">{item.comedogenicRating}</span>{item.comedogenicRating !== "oxid." ? " on the 0–5 scale" : " (oxidation-dependent, not a fixed scale rating)"}</p>
                           )}
                           {isLoading ? (
                             <span className="italic text-gray-400">Generating explanation…</span>
@@ -1894,7 +1943,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   const match = flaggedMatch ?? safeMatch;
                   const structCat = match?.ingredient.structural_category ?? null;
                   return (
-                    <div key={item.rawName} className="border-l-4 border-l-gray-200 overflow-hidden">
+                    <div key={item.rawName} id={`sensory-row-${item.rawName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`} className="border-l-4 border-l-gray-200 overflow-hidden">
                       <button
                         className="w-full flex items-center justify-between px-3 py-1 text-left"
                         onClick={() => setExpanded((prev) => {
