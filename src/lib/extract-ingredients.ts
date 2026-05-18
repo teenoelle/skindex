@@ -11,11 +11,13 @@ async function fetchHtml(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Cache-Control": "no-cache",
       },
-      signal: AbortSignal.timeout(9000),
+      signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return null;
     return res.text();
@@ -50,22 +52,50 @@ function slugToTitle(slug: string): string {
   return slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
+// Parse JSON-LD structured data for product name and brand
+function extractJsonLd(html: string): { name?: string; brand?: string } | null {
+  const matches = [...html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)];
+  for (const match of matches) {
+    try {
+      const data = JSON.parse(match[1]);
+      const candidates = Array.isArray(data) ? data : data["@graph"] ? data["@graph"] : [data];
+      for (const item of candidates) {
+        if (item["@type"] === "Product") {
+          return {
+            name: typeof item.name === "string" ? item.name.trim() : undefined,
+            brand: typeof item.brand?.name === "string" ? item.brand.name.trim()
+              : typeof item.brand === "string" ? item.brand.trim() : undefined,
+          };
+        }
+      }
+    } catch { continue; }
+  }
+  return null;
+}
+
+// Extract the innerHTML of the first element whose class matches a pattern
+function extractHtmlByClass(html: string, classPattern: string): string | null {
+  const re = new RegExp(`<[a-z][^>]*class="[^"]*${classPattern}[^"]*"[^>]*>([\\s\\S]*?)<\\/`, "i");
+  const m = html.match(re);
+  return m ? m[1] : null;
+}
+
 function extractIngredientBlock(text: string): string | null {
   const labelPattern =
-    /(?:(?:full|complete|all|other)\s+)?(?:ingredients?(?:\s+list)?|inci(?:\s+list)?|what'?s\s+inside|formula)[\s]*[:：\-]\s*/i;
+    /(?:(?:full|complete|all|other)\s+)?(?:ingredients?(?:\s+list)?|inci(?:\s+list)?|what'?s\s+inside|formula)[\s]*[:：\-]?\s*/i;
   const labelMatch = labelPattern.exec(text);
   if (!labelMatch) return null;
 
   const startPos = labelMatch.index + labelMatch[0].length;
-  let candidate = text.slice(startPos, startPos + 4000).trim();
+  let candidate = text.slice(startPos, startPos + 6000).trim();
 
   const sectionBreak =
-    /\n\s*(?:[*•·▸►\-]\s*)?(?:directions?|how to use|how to apply|usage|warnings?|cautions?|shelf.?life|storage|disclaimer|about this|certif|reviews?|questions?|customer|contact|return|faq|similar|you may also|related)\b/i;
+    /\n\s*(?:[*•·▸►\-]\s*)?(?:directions?|how to use|how to apply|usage|warnings?|cautions?|shelf.?life|storage|disclaimer|about this|certif|reviews?|questions?|customer|contact|return|faq|similar|you may also|related|product details|overview|description)\b/i;
   const breakMatch = sectionBreak.exec(candidate);
   if (breakMatch && breakMatch.index > 30) candidate = candidate.slice(0, breakMatch.index);
 
   const dblBreak = /\n\n/.exec(candidate);
-  if (dblBreak && dblBreak.index > 50) candidate = candidate.slice(0, dblBreak.index);
+  if (dblBreak && dblBreak.index > 100) candidate = candidate.slice(0, dblBreak.index);
 
   const lines = candidate.split("\n").map((l) => l.trim()).filter((l) => l.length > 1);
   if (lines.length >= 5) {
@@ -90,7 +120,7 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
   const productSlug = urlMatch?.[2] ?? null;
   const brandFromUrl = brandSlug ? slugToTitle(brandSlug) : undefined;
 
-  // Title format: "Product Name | INCIDecoder" or "Brand Product Name - INCIDecoder"
+  // Name from title: "Product Name | INCIDecoder"
   const rawTitle = extractRawTitle(html);
   let name: string | undefined;
   let brand: string | undefined = brandFromUrl;
@@ -98,7 +128,6 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
   if (rawTitle) {
     const stripped = rawTitle.replace(/\s*[|–\-]\s*inci\s*decoder.*/i, "").trim();
     if (stripped && stripped !== rawTitle) {
-      // If title starts with brand, split it off
       if (brand && stripped.toLowerCase().startsWith(brand.toLowerCase())) {
         name = stripped.slice(brand.length).trim().replace(/^[^a-z0-9]+/i, "") || stripped;
       } else {
@@ -108,40 +137,74 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
   }
   if (!name && productSlug) name = slugToTitle(productSlug);
 
-  const text = htmlToText(html);
-  const ingredients = extractIngredientBlock(text);
-  if (!ingredients) return null;
+  // Enrich with JSON-LD if available
+  const jsonLd = extractJsonLd(html);
+  if (jsonLd?.name && !name) name = jsonLd.name;
+  if (jsonLd?.brand && !brand) brand = jsonLd.brand;
 
+  // Strategy 1: INCIDecoder renders ingredients in a div with "ingred" in the class
+  let ingredients: string | null = null;
+  const ingredHtml = extractHtmlByClass(html, "ingred");
+  if (ingredHtml) {
+    const ingredText = htmlToText(ingredHtml).replace(/\s+/g, " ").trim();
+    const commaCount = (ingredText.match(/,/g) ?? []).length;
+    if (commaCount >= 3 && ingredText.length >= 50) ingredients = ingredText;
+  }
+
+  // Strategy 2: generic label search in full page text
+  if (!ingredients) {
+    const text = htmlToText(html);
+    ingredients = extractIngredientBlock(text);
+  }
+
+  if (!ingredients) return null;
   return { ingredients, name, brand };
 }
 
 function parseIHerb(html: string): ExtractedProduct | null {
-  // Title format: "Brand Product Name, Size - iHerb" or "Brand Product Name | iHerb"
-  const rawTitle = extractRawTitle(html);
-  let name: string | undefined;
+  // Try JSON-LD first — iHerb includes Product schema
+  const jsonLd = extractJsonLd(html);
 
-  if (rawTitle) {
-    const stripped = rawTitle
+  // Title: "Brand Product Name, Size - iHerb"
+  const rawTitle = extractRawTitle(html);
+  let name: string | undefined = jsonLd?.name;
+  const brand: string | undefined = jsonLd?.brand;
+
+  if (!name && rawTitle) {
+    name = rawTitle
       .replace(/\s*[-–|]\s*iherb.*/i, "")
       .replace(/,\s*\d+\s*(?:fl\.?\s*oz|oz|ml|g|lb|ct|count|pack|pcs|piece).*$/i, "")
-      .trim();
-    if (stripped) name = stripped;
+      .trim() || undefined;
   }
 
-  const text = htmlToText(html);
-  const ingredients = extractIngredientBlock(text);
-  if (!ingredients) return null;
+  // Strategy 1: look for iHerb's supplement/ingredients section by class
+  let ingredients: string | null = null;
+  const ingredHtml = extractHtmlByClass(html, "supplement-ingredient");
+  if (ingredHtml) {
+    const ingredText = htmlToText(ingredHtml).replace(/\s+/g, " ").trim();
+    const commaCount = (ingredText.match(/,/g) ?? []).length;
+    if (commaCount >= 3 && ingredText.length >= 50) ingredients = ingredText;
+  }
 
-  return { ingredients, name };
+  // Strategy 2: generic label search
+  if (!ingredients) {
+    const text = htmlToText(html);
+    ingredients = extractIngredientBlock(text);
+  }
+
+  if (!ingredients) return null;
+  return { ingredients, name, brand };
 }
 
 function parseGeneric(html: string): ExtractedProduct | null {
+  const jsonLd = extractJsonLd(html);
   const rawTitle = extractRawTitle(html);
-  const name = rawTitle ? rawTitle.split(/[|–\-]/)[0].trim() || undefined : undefined;
+  const name = jsonLd?.name ?? (rawTitle ? rawTitle.split(/[|–\-]/)[0].trim() || undefined : undefined);
+  const brand = jsonLd?.brand;
   const text = htmlToText(html);
   const ingredients = extractIngredientBlock(text);
   if (!ingredients) return null;
-  return { ingredients, name };
+  return { ingredients, name, brand };
 }
 
 export async function extractIngredientsFromUrl(url: string): Promise<ExtractedProduct | null> {
