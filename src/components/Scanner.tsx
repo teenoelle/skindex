@@ -1006,7 +1006,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
         </div>
       ) : urlTabGated ? (
-        <SignInButton mode="modal">
+        <SignInButton mode="redirect" fallbackRedirectUrl="/">
           <button className="w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors">
             Sign in to use URL scanning
           </button>
