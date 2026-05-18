@@ -1750,7 +1750,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             const vectors = [
               {
                 label: "Pore-clogging",
-                items: poreClogging.map((f) => ({
+                items: isRinseOff ? [] : poreClogging.map((f) => ({
                   name: smartCase(f.displayName),
                   expandKey: f.ingredient.id,
                   elementId: `ingredient-${f.ingredient.id}`,
@@ -1758,7 +1758,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               },
               {
                 label: "Milia risk",
-                items: miliaRisk.map((s) => ({
+                items: isRinseOff ? [] : miliaRisk.map((s) => ({
                   name: smartCase(s.rawName),
                   expandKey: `sensory-${s.rawName}`,
                   elementId: `sensory-row-${s.rawName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
@@ -1766,7 +1766,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               },
               {
                 label: "Traps congestion",
-                items: trapsCongest.map((s) => ({
+                items: isRinseOff ? [] : trapsCongest.map((s) => ({
                   name: smartCase(s.rawName),
                   expandKey: `sensory-${s.rawName}`,
                   elementId: `sensory-row-${s.rawName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
@@ -1844,7 +1844,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 <p className="text-xs font-semibold text-rose-700 uppercase tracking-widest">
                   Flagged — {result.flagged.length}
                 </p>
-                {result.flagged.some((f) => f.ingredient.flagged_category === "pore-clogger") && (
+                {!isRinseOff && result.flagged.some((f) => f.ingredient.flagged_category === "pore-clogger") && (
                   <span className="text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">pore-clogging</span>
                 )}
                 {result.flagged.some((f) => ["sensitizer","fragrance-allergen","preservative-allergen"].includes(f.ingredient.flagged_category ?? "")) && (
@@ -1923,16 +1923,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">
                   Sensory trigger — {result.sensoryTrigger.length}
                 </p>
-                {(result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Film-forming") && (
+                {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Film-forming") && (
                   <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">milia risk</span>
                 )}
-                {(result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Occlusive") && (
+                {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Occlusive") && (
                   <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">traps congestion</span>
                 )}
               </div>
-              {isRinseOff && (
-                <p className="text-xs text-gray-400 mb-2">Occlusive and pore-clogging effects are lower when this product is rinsed off thoroughly.</p>
-              )}
               <div className="divide-y divide-gray-100">
                 {result.sensoryTrigger.map((item) => {
                   const key = `sensory-${item.rawName}`;
