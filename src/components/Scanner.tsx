@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { useUser, SignInButton } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import Image from "next/image";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -1031,11 +1031,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         </div>
       ) : tab === "import" ? (
         !isSignedIn ? (
-          <SignInButton mode="redirect" fallbackRedirectUrl="/">
-            <button className="w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors">
-              Sign in to import products
-            </button>
-          </SignInButton>
+          <a href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
+            Sign in to import products
+          </a>
         ) : (
           <div className="space-y-4">
             <button
@@ -1093,11 +1091,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           </div>
         )
       ) : urlTabGated ? (
-        <SignInButton mode="redirect" fallbackRedirectUrl="/">
-          <button className="w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors">
-            Sign in to use URL scanning
-          </button>
-        </SignInButton>
+        <a href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
+          Sign in to use URL scanning
+        </a>
       ) : (
         <button
           onClick={() => handleScan()}

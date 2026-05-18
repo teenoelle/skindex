@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
+import { useUser, UserButton } from "@clerk/nextjs";
 
 export default function NavAuth() {
   const { isSignedIn, isLoaded } = useUser();
@@ -16,7 +16,6 @@ export default function NavAuth() {
       .then((d) => {
         if (!d.isAdmin) return;
         setIsAdmin(true);
-        // Fetch pending count for badge
         fetch("/api/admin/submissions")
           .then((r) => r.json())
           .then((s) => setRecentCount(s.recentCount ?? 0))
@@ -25,13 +24,7 @@ export default function NavAuth() {
       .catch(() => {});
   }, [isSignedIn]);
 
-  if (!isLoaded) return (
-    <SignInButton mode="redirect" fallbackRedirectUrl="/">
-      <button className="text-sm text-gray-400 hover:text-gray-900 transition-colors">Sign in</button>
-    </SignInButton>
-  );
-
-  if (isSignedIn) return (
+  if (isLoaded && isSignedIn) return (
     <div className="flex items-center gap-4">
       {isAdmin && (
         <Link href="/admin" className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-900 transition-colors">
@@ -51,10 +44,8 @@ export default function NavAuth() {
   );
 
   return (
-    <SignInButton mode="redirect" fallbackRedirectUrl="/">
-      <button className="text-sm text-gray-400 hover:text-gray-900 transition-colors">
-        Sign in
-      </button>
-    </SignInButton>
+    <Link href="/sign-in" className="text-sm text-gray-400 hover:text-gray-900 transition-colors">
+      Sign in
+    </Link>
   );
 }
