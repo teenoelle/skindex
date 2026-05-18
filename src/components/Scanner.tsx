@@ -1785,6 +1785,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             return (
               <section>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Product congestion profile</p>
+                {isRinseOff && (
+                  <p className="text-xs text-gray-400 mb-2">Pore-clogging, milia, and occlusion risks are negligible when a product is rinsed off. Sensitizers and allergens are flagged regardless — they can trigger an immune response on contact, even briefly.</p>
+                )}
                 <div className="border border-gray-100 rounded-xl overflow-hidden">
                   <div className="divide-y divide-gray-50">
                     {vectors.map((v) => {
