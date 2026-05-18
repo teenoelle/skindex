@@ -940,15 +940,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   sections.push(
                     <div key={group.label}>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">{group.label}</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div className="flex flex-wrap gap-2">
                         {groupTypes.map((t) => (
                           <button
                             key={t.name}
                             onClick={() => selectBrowseType(t.name)}
-                            className="text-left border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                            className="text-sm text-gray-700 border border-gray-200 rounded-full px-3 py-1 hover:border-gray-400 hover:text-gray-900 transition-colors"
                           >
-                            <p className="text-sm font-medium text-gray-800">{t.name}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{t.count} product{t.count !== 1 ? "s" : ""}</p>
+                            {t.name} <span className="text-gray-400 text-xs">{t.count}</span>
                           </button>
                         ))}
                       </div>
@@ -960,15 +959,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   sections.push(
                     <div key="other">
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Other</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div className="flex flex-wrap gap-2">
                         {misc.map((t) => (
                           <button
                             key={t.name}
                             onClick={() => selectBrowseType(t.name)}
-                            className="text-left border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                            className="text-sm text-gray-700 border border-gray-200 rounded-full px-3 py-1 hover:border-gray-400 hover:text-gray-900 transition-colors"
                           >
-                            <p className="text-sm font-medium text-gray-800">{t.name}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{t.count} product{t.count !== 1 ? "s" : ""}</p>
+                            {t.name} <span className="text-gray-400 text-xs">{t.count}</span>
                           </button>
                         ))}
                       </div>
@@ -2089,13 +2087,23 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
 
           {/* Photosensitive ingredients */}
-          {(result.photosensitive ?? []).length > 0 && (
+          {(result.photosensitive ?? []).length > 0 && (() => {
+            const RINSE_OFF_SUPPRESS: string[] = ["photo-retinoid", "photo-BHA", "photo-brightening"];
+            const visiblePhoto = isRinseOff
+              ? result.photosensitive.filter((p) => !p.photoCategory || !RINSE_OFF_SUPPRESS.includes(p.photoCategory))
+              : result.photosensitive;
+            const suppressed = result.photosensitive.length - visiblePhoto.length;
+            if (visiblePhoto.length === 0) return null;
+            return (
             <section id="section-photosensitive">
               <p className="text-xs font-semibold text-yellow-700 uppercase tracking-widest mb-2">
-                Photosensitive — {result.photosensitive.length}
+                Photosensitive — {visiblePhoto.length}
               </p>
+              {isRinseOff && suppressed > 0 && (
+                <p className="text-xs text-gray-400 mb-2">{suppressed} ingredient{suppressed !== 1 ? "s" : ""} (retinoids, BHA, brightening) suppressed — negligible risk when rinsed off. AHAs and botanicals remain flagged as they cause reactions even with brief contact.</p>
+              )}
               <div className="divide-y divide-gray-100">
-                {result.photosensitive.map((item) => {
+                {visiblePhoto.map((item) => {
                   const key = `photo-${item.rawName}`;
                   const isOpen = expanded.has(key);
                   const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
@@ -2148,7 +2156,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 })}
               </div>
             </section>
-          )}
+            );
+          })()}
 
           {/* Safe ingredients */}
           {result.safe.length > 0 && (

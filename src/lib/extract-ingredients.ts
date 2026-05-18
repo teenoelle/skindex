@@ -207,7 +207,10 @@ function parseGeneric(html: string): ExtractedProduct | null {
   return { ingredients, name, brand };
 }
 
-export async function extractIngredientsFromUrl(url: string): Promise<ExtractedProduct | null> {
+export async function extractIngredientsFromUrl(rawUrl: string): Promise<ExtractedProduct | null> {
+  // Normalize regional iHerb subdomains (il.iherb.com, de.iherb.com, etc.) to www.iherb.com
+  const url = rawUrl.replace(/https?:\/\/(?!www\.)[a-z]{2,3}\.iherb\.com/i, "https://www.iherb.com");
+
   const html = await fetchHtml(url);
   if (!html) return null;
 
