@@ -1512,55 +1512,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
           )}
 
-          {/* Congestion profile */}
-          {(() => {
-            const poreClogging = result.flagged.filter((f) => f.ingredient.flagged_category === "pore-clogger");
-            const miliaRisk = (result.sensoryTrigger ?? []).filter((s) => s.sensory_category === "Film-forming");
-            const trapsCongest = (result.sensoryTrigger ?? []).filter((s) => s.sensory_category === "Occlusive");
-            const inflammatory = result.flagged.filter((f) =>
-              ["sensitizer", "fragrance-allergen", "preservative-allergen"].includes(f.ingredient.flagged_category ?? "")
-            );
-            const vectors = [
-              { label: "Pore-clogging", names: poreClogging.map((f) => smartCase(f.displayName)) },
-              { label: "Milia risk", names: miliaRisk.map((s) => smartCase(s.rawName)) },
-              { label: "Traps congestion", names: trapsCongest.map((s) => smartCase(s.rawName)) },
-              { label: "Inflammatory", names: inflammatory.map((f) => smartCase(f.displayName)) },
-            ].filter((v) => v.names.length > 0);
-            if (vectors.length === 0) return null;
-            return (
-              <div className="border border-gray-100 rounded-xl overflow-hidden">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-4 py-3 border-b border-gray-100">Congestion profile</p>
-                <div className="divide-y divide-gray-50">
-                  {vectors.map((v) => {
-                    const def = CONGESTION_VECTOR_DEFS.find((d) => d.label === v.label);
-                    const key = `cp-${v.label}`;
-                    const isOpen = expanded.has(key);
-                    return (
-                      <div key={v.label} className="px-4 py-2.5">
-                        <div className="flex items-start gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setExpanded((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
-                            className="text-xs font-medium text-gray-700 hover:text-gray-900 shrink-0 text-left w-36"
-                          >
-                            {v.label} <span className="text-gray-300 text-[10px]">{isOpen ? "▲" : "▼"}</span>
-                          </button>
-                          <p className="text-xs text-gray-400 flex-1 leading-relaxed">{v.names.join(", ")}</p>
-                        </div>
-                        {isOpen && def && (
-                          <div className="mt-2 space-y-0.5">
-                            <p className="text-xs text-gray-500 leading-relaxed">{def.description}</p>
-                            <p className="text-xs text-gray-400">Bump type: {def.bumps}</p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-
           {/* Summary line + safe alternatives group */}
           <div className="space-y-2">
           {(result.flagged.length + result.safe.length + result.unreviewed.length) > 0 && (
@@ -1787,6 +1738,55 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               </button>
             </p>
           )}
+
+          {/* Product congestion profile */}
+          {(() => {
+            const poreClogging = result.flagged.filter((f) => f.ingredient.flagged_category === "pore-clogger");
+            const miliaRisk = (result.sensoryTrigger ?? []).filter((s) => s.sensory_category === "Film-forming");
+            const trapsCongest = (result.sensoryTrigger ?? []).filter((s) => s.sensory_category === "Occlusive");
+            const inflammatory = result.flagged.filter((f) =>
+              ["sensitizer", "fragrance-allergen", "preservative-allergen"].includes(f.ingredient.flagged_category ?? "")
+            );
+            const vectors = [
+              { label: "Pore-clogging", names: poreClogging.map((f) => smartCase(f.displayName)) },
+              { label: "Milia risk", names: miliaRisk.map((s) => smartCase(s.rawName)) },
+              { label: "Traps congestion", names: trapsCongest.map((s) => smartCase(s.rawName)) },
+              { label: "Inflammatory", names: inflammatory.map((f) => smartCase(f.displayName)) },
+            ].filter((v) => v.names.length > 0);
+            if (vectors.length === 0) return null;
+            return (
+              <div className="border border-gray-100 rounded-xl overflow-hidden">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-4 py-3 border-b border-gray-100">Product congestion profile</p>
+                <div className="divide-y divide-gray-50">
+                  {vectors.map((v) => {
+                    const def = CONGESTION_VECTOR_DEFS.find((d) => d.label === v.label);
+                    const key = `cp-${v.label}`;
+                    const isOpen = expanded.has(key);
+                    return (
+                      <div key={v.label} className="px-4 py-2.5">
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setExpanded((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
+                            className="text-xs font-medium text-gray-700 hover:text-gray-900 shrink-0 text-left w-36"
+                          >
+                            {v.label} <span className="text-gray-300 text-[10px]">{isOpen ? "▲" : "▼"}</span>
+                          </button>
+                          <p className="text-xs text-gray-400 flex-1 leading-relaxed">{v.names.join(", ")}</p>
+                        </div>
+                        {isOpen && def && (
+                          <div className="mt-2 space-y-0.5">
+                            <p className="text-xs text-gray-500 leading-relaxed">{def.description}</p>
+                            <p className="text-xs text-gray-400">Bump type: {def.bumps}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Flagged ingredients */}
           {result.flagged.length > 0 && (
