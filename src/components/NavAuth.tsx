@@ -25,7 +25,11 @@ export default function NavAuth() {
       .catch(() => {});
   }, [isSignedIn]);
 
-  if (!isLoaded) return null;
+  if (!isLoaded) return (
+    <SignInButton mode="redirect" fallbackRedirectUrl="/">
+      <button className="text-sm text-gray-400 hover:text-gray-900 transition-colors">Sign in</button>
+    </SignInButton>
+  );
 
   if (isSignedIn) return (
     <div className="flex items-center gap-4">
@@ -47,7 +51,7 @@ export default function NavAuth() {
   );
 
   return (
-    <SignInButton mode="modal">
+    <SignInButton mode="redirect" fallbackRedirectUrl="/">
       <button className="text-sm text-gray-400 hover:text-gray-900 transition-colors">
         Sign in
       </button>
