@@ -1912,10 +1912,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </button>
                   {alternativesOpen && <div className="divide-y divide-gray-100">
                     {alternatives.map((alt) => {
-                      const isAltImageOpen = altImageOpen === alt.id;
                       return (
                         <Fragment key={alt.id}>
-                          <div className="py-2 space-y-1.5">
+                          <div className="py-2">
                             <div className="flex items-center gap-3">
                               {alt.image_url ? (
                                 <Image
@@ -1934,18 +1933,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-800 truncate">{alt.name}</p>
                                 {alt.brand && <p className="text-xs text-gray-400">{alt.brand}</p>}
-                                {isAdmin && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (isAltImageOpen) { setAltImageOpen(null); setAltImageUrl(""); }
-                                      else { setAltImageOpen(alt.id); setAltImageUrl(""); }
-                                    }}
-                                    className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600"
-                                  >
-                                    {alt.image_url ? "Change image" : "Add image"}
-                                  </button>
-                                )}
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 {alt.flaggedCount === 0 && alt.sensoryCount === 0 && alt.photoCount === 0 ? (
@@ -1966,33 +1953,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                 </button>
                               </div>
                             </div>
-                            {isAltImageOpen && (
-                              <div className="flex gap-1.5 pl-[60px]">
-                                <input
-                                  type="url"
-                                  value={altImageUrl}
-                                  onChange={(e) => setAltImageUrl(e.target.value)}
-                                  onKeyDown={(e) => e.key === "Enter" && !altImageSaving && handleAltImageSave(alt.id)}
-                                  placeholder="Image URL"
-                                  className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 min-w-0"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleAltImageSave(alt.id)}
-                                  disabled={altImageSaving || !altImageUrl.trim()}
-                                  className="text-xs px-2.5 py-1.5 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0"
-                                >
-                                  {altImageSaving ? "Saving…" : "Save"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => { setAltImageOpen(null); setAltImageUrl(""); }}
-                                  className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            )}
                           </div>
                         </Fragment>
                       );

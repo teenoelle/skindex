@@ -168,13 +168,13 @@ export async function POST(req: NextRequest) {
         .select("*")
         .ilike("name", `%${query}%`)
         .not("ingredient_list", "is", null)
-        .limit(5);
+        .limit(10);
       if (data?.length) {
         // Check for close scores — if top match is exact, take it; otherwise collect ambiguous ones
         dbProduct = data[0];
         if (data.length > 1) {
           // All are substring matches, offer alternatives
-          communityVariants = data.slice(1, 4).map((p) => ({
+          communityVariants = data.slice(1).map((p) => ({
             id: p.id,
             name: p.name,
             brand: p.brand ?? null,
@@ -215,7 +215,7 @@ export async function POST(req: NextRequest) {
             // Collect alternatives within 0.15 of top score
             const alts = scored.slice(1).filter((s) => s.score >= 0.5 && scored[0].score - s.score <= 0.15);
             if (alts.length) {
-              communityVariants = alts.slice(0, 3).map((s) => ({
+              communityVariants = alts.map((s) => ({
                 id: s.p.id,
                 name: s.p.name,
                 brand: s.p.brand ?? null,
@@ -373,7 +373,7 @@ export async function POST(req: NextRequest) {
         .ilike("name", `%${query}%`)
         .not("ingredient_list", "is", null)
         .neq("id", dbProduct.id)
-        .limit(3);
+        .limit(10);
       if (alts?.length) {
         communityVariants = alts.map((p) => ({ id: p.id, name: p.name, brand: p.brand ?? null, image_url: null, flaggedCount: 0, sensoryCount: 0, photoCount: 0 }));
       }

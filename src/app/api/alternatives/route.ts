@@ -55,33 +55,32 @@ export async function POST(req: NextRequest) {
     flaggedCounts.set(link.product_id, (flaggedCounts.get(link.product_id) ?? 0) + 1);
   }
 
-  // 5. Build and sort results: same type first, then by flagged count ascending
+  // 5. Build, filter to same type, and sort by concern counts ascending
   const normalizedType = productType?.toLowerCase().trim() ?? null;
 
-  const results = candidates.map((p) => {
-    const dbCount = flaggedCounts.get(p.id) ?? 0;
-    const patternCount = p.ingredient_list ? countComedogenicPatternMatches(p.ingredient_list) : 0;
-    return {
-      id: p.id,
-      name: p.name,
-      brand: p.brand ?? null,
-      type: p.type ?? null,
-      image_url: p.image_url ?? null,
-      flaggedCount: dbCount + patternCount,
-      sensoryCount: p.ingredient_list ? countSensoryPatternMatches(p.ingredient_list) : 0,
-      photoCount: p.ingredient_list ? countPhotoPatternMatches(p.ingredient_list) : 0,
-      sameType: normalizedType ? p.type?.toLowerCase().trim() === normalizedType : false,
-    };
-  });
+  const results = candidates
+    .filter((p) => !normalizedType || p.type?.toLowerCase().trim() === normalizedType)
+    .map((p) => {
+      const dbCount = flaggedCounts.get(p.id) ?? 0;
+      const patternCount = p.ingredient_list ? countComedogenicPatternMatches(p.ingredient_list) : 0;
+      return {
+        id: p.id,
+        name: p.name,
+        brand: p.brand ?? null,
+        type: p.type ?? null,
+        image_url: p.image_url ?? null,
+        flaggedCount: dbCount + patternCount,
+        sensoryCount: p.ingredient_list ? countSensoryPatternMatches(p.ingredient_list) : 0,
+        photoCount: p.ingredient_list ? countPhotoPatternMatches(p.ingredient_list) : 0,
+        sameType: true,
+      };
+    });
 
   results.sort((a, b) => {
-    if (a.sameType !== b.sameType) return a.sameType ? -1 : 1;
     if (a.flaggedCount !== b.flaggedCount) return a.flaggedCount - b.flaggedCount;
     if (a.sensoryCount !== b.sensoryCount) return a.sensoryCount - b.sensoryCount;
     return a.photoCount - b.photoCount;
   });
 
-  const sameTypeFallback = normalizedType !== null && results.filter((r) => r.sameType).length < 3;
-
-  return NextResponse.json({ results: results.slice(0, 8), sameTypeFallback });
+  return NextResponse.json({ results: results.slice(0, 20), sameTypeFallback: false });
 }
