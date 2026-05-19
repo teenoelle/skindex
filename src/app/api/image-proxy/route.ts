@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 const ALLOWED_HOSTS = new Set([
   "cloudinary.images-iherb.com",
+  "incidecoder-content.storage.googleapis.com",
   "images.openfoodfacts.org",
   "static.openfoodfacts.org",
   "world.openfoodfacts.org",
+  "images.openbeautyfacts.org",
+  "static.openbeautyfacts.org",
   "fqpqlllixjnzsdpqrovv.supabase.co",
 ]);
 
