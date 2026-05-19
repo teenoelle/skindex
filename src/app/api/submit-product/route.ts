@@ -24,10 +24,12 @@ export async function POST(req: NextRequest) {
   }
 
   let ingredientText: string | null = ingredient_list?.trim() ?? null;
+  let extractedImageUrl: string | null = null;
 
   if (!ingredientText && hasUrl) {
     const extracted = await extractIngredientsFromUrl(url.trim());
     ingredientText = extracted?.ingredients ?? null;
+    extractedImageUrl = extracted?.image_url ?? null;
     if (!ingredientText) {
       return NextResponse.json(
         { error: "Could not find an ingredients list on that page. Try pasting the ingredient list directly instead." },
@@ -60,6 +62,8 @@ export async function POST(req: NextRequest) {
       submitted_by: userId,
       submitted_at: new Date().toISOString(),
       source: "community",
+      ...(extractedImageUrl ? { image_url: extractedImageUrl } : {}),
+      ...(hasUrl ? { source_url: url.trim() } : {}),
     })
     .select("id")
     .single();

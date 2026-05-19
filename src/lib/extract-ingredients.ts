@@ -410,6 +410,15 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
   return { ingredients, name, brand, type, iherb_url, image_url };
 }
 
+function extractOgImage(html: string): string | null {
+  const m = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+    ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i)
+    ?? html.match(/<meta[^>]+name="twitter:image(?::src)?"[^>]+content="([^"]+)"/i)
+    ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+name="twitter:image(?::src)?"/i);
+  const u = m?.[1]?.replace(/&amp;/g, "&");
+  return u?.startsWith("http") ? u : null;
+}
+
 function extractINCIDecoderImage(html: string): string | null {
   // og:image meta tag — INCIDecoder hosts product images on Google Cloud Storage
   const m1 = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
@@ -502,7 +511,9 @@ function parseIHerb(html: string): ExtractedProduct | null {
     guessProductType(name ?? "")
   ) ?? undefined;
 
-  return { ingredients, name, brand, type };
+  const image_url = extractOgImage(html) ?? undefined;
+
+  return { ingredients, name, brand, type, image_url };
 }
 
 function parseGeneric(html: string): ExtractedProduct | null {
@@ -522,7 +533,9 @@ function parseGeneric(html: string): ExtractedProduct | null {
     guessProductType(name ?? "")
   ) ?? undefined;
 
-  return { ingredients, name, brand, type };
+  const image_url = extractOgImage(html) ?? undefined;
+
+  return { ingredients, name, brand, type, image_url };
 }
 
 export async function extractIngredientsFromUrl(rawUrl: string): Promise<ExtractedProduct | null> {
