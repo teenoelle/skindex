@@ -51,6 +51,7 @@ export type AlternativeProduct = {
   type: string | null;
   image_url: string | null;
   flaggedCount: number;
+  sensoryCount: number;
   sameType: boolean;
 };
 
