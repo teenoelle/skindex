@@ -419,18 +419,19 @@ function extractOgImage(html: string): string | null {
   return u?.startsWith("http") ? u : null;
 }
 
+function inciDecoderGcsToOriginal(url: string): string {
+  // Convert a sized thumbnail (e.g. _300x300@1x.webp) to the full-res JPEG original
+  return url.replace(/_([\d]+x[\d]+@[\dx]+|[\d]+x[\d]+)\.[a-z]+$/i, "_original.jpeg");
+}
+
 function extractINCIDecoderImage(html: string): string | null {
-  // og:image meta tag — INCIDecoder hosts product images on Google Cloud Storage
-  const m1 = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
-    ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
-  if (m1?.[1]) {
-    const u = m1[1].replace(/&amp;/g, "&");
-    // Skip the generic INCIDecoder logo/placeholder
-    if (u.startsWith("http") && !u.includes("/images/logo") && !u.includes("incidecoder.com")) return u;
-  }
-  // Fallback: direct img src from Google Cloud Storage bucket used by INCIDecoder
+  // INCIDecoder renders images in a <picture><source srcset="..."> element on the GCS bucket.
+  // og:image is absent in server-rendered HTML; the srcset URL is the reliable source.
+  const m1 = html.match(/srcset="(https:\/\/incidecoder-content\.storage\.googleapis\.com\/[^"]+)"/i);
+  if (m1?.[1]) return inciDecoderGcsToOriginal(m1[1].replace(/&amp;/g, "&").split(" ")[0]);
+  // Fallback: plain src attribute (older page format)
   const m2 = html.match(/src="(https:\/\/incidecoder-content\.storage\.googleapis\.com\/[^"]+)"/i);
-  if (m2) return m2[1].replace(/&amp;/g, "&");
+  if (m2) return inciDecoderGcsToOriginal(m2[1].replace(/&amp;/g, "&"));
   return null;
 }
 
