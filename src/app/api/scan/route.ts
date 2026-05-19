@@ -703,11 +703,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Fire-and-forget: populate product_ingredients for newly auto-imported products
-  if (autoImportedProductId) {
-    const pid = autoImportedProductId;
+  // Fire-and-forget: keep product_ingredients in sync for any DB-backed product.
+  // This is how alternatives and browse get accurate flagged counts — they read the
+  // junction table rather than re-running text matching on every request.
+  const linkProductId = autoImportedProductId ?? product?.id ?? null;
+  if (linkProductId) {
+    const pid = linkProductId;
+    const seenIds = new Set<string>();
     const rows = [...safeFiltered, ...flagged]
       .filter((m) => !m.ingredient.id.startsWith("comedo-"))
+      .filter((m) => { if (seenIds.has(m.ingredient.id)) return false; seenIds.add(m.ingredient.id); return true; })
       .map((m, idx) => ({ product_id: pid, ingredient_id: m.ingredient.id, position: idx + 1 }));
     if (rows.length > 0) {
       import("@/lib/supabase-admin").then(({ supabaseAdmin }) => {
