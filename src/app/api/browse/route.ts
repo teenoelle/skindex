@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { countComedogenicPatternMatches } from "@/lib/comedogenic";
 import { countSensoryPatternMatches } from "@/lib/sensory";
+import { countPhotoPatternMatches } from "@/lib/photo";
 
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
@@ -61,7 +62,12 @@ export async function GET(req: NextRequest) {
     image_url: p.image_url ?? null,
     flaggedCount: (dbCounts.get(p.id) ?? 0) + (p.ingredient_list ? countComedogenicPatternMatches(p.ingredient_list) : 0),
     sensoryCount: p.ingredient_list ? countSensoryPatternMatches(p.ingredient_list) : 0,
-  })).sort((a, b) => a.flaggedCount - b.flaggedCount);
+    photoCount: p.ingredient_list ? countPhotoPatternMatches(p.ingredient_list) : 0,
+  })).sort((a, b) => {
+    if (a.flaggedCount !== b.flaggedCount) return a.flaggedCount - b.flaggedCount;
+    if (a.sensoryCount !== b.sensoryCount) return a.sensoryCount - b.sensoryCount;
+    return a.photoCount - b.photoCount;
+  });
 
   return NextResponse.json({ products: results });
 }

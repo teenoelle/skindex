@@ -52,6 +52,7 @@ export type AlternativeProduct = {
   image_url: string | null;
   flaggedCount: number;
   sensoryCount: number;
+  photoCount: number;
   sameType: boolean;
 };
 

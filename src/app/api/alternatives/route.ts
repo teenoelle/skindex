@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { countComedogenicPatternMatches } from "@/lib/comedogenic";
 import { countSensoryPatternMatches } from "@/lib/sensory";
+import { countPhotoPatternMatches } from "@/lib/photo";
 
 export async function POST(req: NextRequest) {
   const { flaggedIds, productType } = await req.json();
@@ -68,13 +69,16 @@ export async function POST(req: NextRequest) {
       image_url: p.image_url ?? null,
       flaggedCount: dbCount + patternCount,
       sensoryCount: p.ingredient_list ? countSensoryPatternMatches(p.ingredient_list) : 0,
+      photoCount: p.ingredient_list ? countPhotoPatternMatches(p.ingredient_list) : 0,
       sameType: normalizedType ? p.type?.toLowerCase().trim() === normalizedType : false,
     };
   });
 
   results.sort((a, b) => {
     if (a.sameType !== b.sameType) return a.sameType ? -1 : 1;
-    return a.flaggedCount - b.flaggedCount;
+    if (a.flaggedCount !== b.flaggedCount) return a.flaggedCount - b.flaggedCount;
+    if (a.sensoryCount !== b.sensoryCount) return a.sensoryCount - b.sensoryCount;
+    return a.photoCount - b.photoCount;
   });
 
   const sameTypeFallback = normalizedType !== null && results.filter((r) => r.sameType).length < 3;

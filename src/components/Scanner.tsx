@@ -61,7 +61,7 @@ type ImportResult = {
 type UserList = { id: string; name: string; is_public: boolean; itemCount: number };
 
 type BrowseType = { name: string; count: number };
-type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; flaggedCount: number; sensoryCount: number };
+type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; flaggedCount: number; sensoryCount: number; photoCount: number };
 
 const CATEGORY_LABELS: Record<string, string> = {
   // kebab-case (newer workflow)
@@ -1111,19 +1111,19 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
                       {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      {p.flaggedCount > 0 && (
-                        <span className="text-xs text-rose-600">{p.flaggedCount} flagged</span>
-                      )}
-                      {p.flaggedCount === 0 && (
-                        <span className="text-xs text-teal-600">Clean</span>
-                      )}
-                      {p.sensoryCount > 0 && (
-                        <span className="text-xs text-amber-600">{p.sensoryCount} sensory</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {p.flaggedCount === 0 && p.sensoryCount === 0 && p.photoCount === 0 ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Clean</span>
+                      ) : (
+                        <>
+                          {p.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{p.flaggedCount} flagged</span>}
+                          {p.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{p.sensoryCount} sensory triggers</span>}
+                          {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photosensitive</span>}
+                        </>
                       )}
                       <button
                         onClick={() => { resetTab("search"); setQuery(p.name); handleScan({ tab: "search", query: p.name }); }}
-                        className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 shrink-0"
+                        className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 shrink-0 ml-1.5"
                       >
                         Scan
                       </button>
@@ -1920,16 +1920,19 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                   </button>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className={`text-xs px-1.5 py-0.5 rounded-md ${alt.flaggedCount === 0 ? "bg-green-50 text-green-700" : "bg-rose-50 text-rose-700"}`}>
-                                  {alt.flaggedCount === 0 ? "0 flagged" : `${alt.flaggedCount} flagged`}
-                                </span>
-                                {alt.sensoryCount > 0 && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{alt.sensoryCount} sensory</span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {alt.flaggedCount === 0 && alt.sensoryCount === 0 && alt.photoCount === 0 ? (
+                                  <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Clean</span>
+                                ) : (
+                                  <>
+                                    {alt.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{alt.flaggedCount} flagged</span>}
+                                    {alt.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{alt.sensoryCount} sensory triggers</span>}
+                                    {alt.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{alt.photoCount} photosensitive</span>}
+                                  </>
                                 )}
                                 <button
                                   type="button"
-                                  className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                                  className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 ml-1.5"
                                   onClick={() => scanVariant({ productId: alt.id })}
                                 >
                                   Scan
