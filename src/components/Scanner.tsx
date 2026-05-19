@@ -486,12 +486,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         ? { type: "paste", ingredients }
         : { type: "url", url };
 
-    const res = await fetch("/api/scan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let data: any = {};
+    try {
+      const res = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      data = await res.json();
+    } catch {
+      setLoading(false);
+      setNotFound(true);
+      return;
+    }
     setLoading(false);
 
     if (data.limitReached) { setLimitReached(true); return; }
@@ -500,6 +508,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       else setNotFound(true);
       return;
     }
+    if (!Array.isArray(data.flagged)) { setNotFound(true); return; }
     setResult(data);
   }
 
@@ -807,25 +816,36 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     if (submitMode === "paste") body.ingredient_list = submitIngredients.trim();
     else body.url = submitUrl.trim();
 
-    const res = await fetch("/api/submit-product", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    setSubmitLoading(false);
-
-    if (res.status === 409 && data.productId) {
-      setSubmitOpen(false);
-      scanVariant({ productId: data.productId });
+    let submitRes: Response | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let submitData: any = {};
+    try {
+      submitRes = await fetch("/api/submit-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      submitData = await submitRes.json();
+    } catch {
+      setSubmitLoading(false);
+      setSubmitError("Could not reach the server. Please try again.");
       return;
     }
-    if (!res.ok) {
-      setSubmitError(data.error ?? "Submission failed");
+    setSubmitLoading(false);
+
+    if (submitRes.status === 409 && submitData.productId) {
+      setSubmitOpen(false);
+      scanVariant({ productId: submitData.productId });
+      return;
+    }
+    if (!submitRes.ok) {
+      const err = submitData.error;
+      const msg = typeof err === "string" ? err : err?.message ?? submitData.message ?? "Submission failed";
+      setSubmitError(msg);
       return;
     }
     setSubmitOpen(false);
-    scanVariant({ productId: data.productId });
+    scanVariant({ productId: submitData.productId });
   }
 
   async function handleReport() {

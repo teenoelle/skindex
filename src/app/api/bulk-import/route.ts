@@ -73,12 +73,20 @@ export async function POST(req: NextRequest) {
         ...(extracted.image_url ? { image_url: extracted.image_url } : {}),
       });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        const msg = insertError.message ?? "Database insert failed";
+        results.push({ url, status: "failed", reason: "db-error", fetchError: msg });
+        continue;
+      }
 
       results.push({ url, status: "imported", name, brand: brand ?? undefined });
     } catch (e) {
       console.error(`[bulk] outer catch for ${url}:`, e);
-      results.push({ url, status: "failed", reason: "error", fetchError: e instanceof Error ? `${e.name}: ${e.message}` : String(e) });
+      const errMsg = e instanceof Error
+        ? `${e.name}: ${e.message}`
+        : (typeof (e as Record<string, unknown>)?.message === "string" ? String((e as Record<string, unknown>).message) : null)
+          ?? (typeof e === "string" ? e : "Unknown error");
+      results.push({ url, status: "failed", reason: "error", fetchError: errMsg });
     }
   }
 
