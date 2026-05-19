@@ -178,6 +178,7 @@ export async function POST(req: NextRequest) {
             id: p.id,
             name: p.name,
             brand: p.brand ?? null,
+            image_url: null,
             flaggedCount: 0,
             sensoryCount: 0,
             photoCount: 0,
@@ -218,6 +219,7 @@ export async function POST(req: NextRequest) {
                 id: s.p.id,
                 name: s.p.name,
                 brand: s.p.brand ?? null,
+                image_url: null,
                 flaggedCount: 0,
                 sensoryCount: 0,
                 photoCount: 0,
@@ -373,23 +375,34 @@ export async function POST(req: NextRequest) {
         .neq("id", dbProduct.id)
         .limit(3);
       if (alts?.length) {
-        communityVariants = alts.map((p) => ({ id: p.id, name: p.name, brand: p.brand ?? null, flaggedCount: 0, sensoryCount: 0, photoCount: 0 }));
+        communityVariants = alts.map((p) => ({ id: p.id, name: p.name, brand: p.brand ?? null, image_url: null, flaggedCount: 0, sensoryCount: 0, photoCount: 0 }));
       }
     }
 
-    // Enrich communityVariants with concern counts
+    // Enrich communityVariants with images and concern counts
     if (communityVariants?.length) {
       const variantIds = communityVariants.map((v) => v.id);
-      const { data: variantData } = await supabase
-        .from("products")
-        .select("id, ingredient_list")
-        .in("id", variantIds);
-      const listMap = new Map((variantData ?? []).map((p) => [p.id, p.ingredient_list as string | null]));
+      const [{ data: variantData }, { data: allFlagged }, { data: flaggedLinks }] = await Promise.all([
+        supabase.from("products").select("id, image_url, ingredient_list").in("id", variantIds),
+        supabase.from("ingredients").select("id").eq("status", "flagged"),
+        supabase.from("product_ingredients").select("product_id, ingredient_id").in("product_id", variantIds),
+      ]);
+      const allFlaggedIds = new Set((allFlagged ?? []).map((i) => i.id));
+      const dbFlaggedCounts = new Map<string, number>();
+      for (const link of flaggedLinks ?? []) {
+        if (allFlaggedIds.has(link.ingredient_id ?? "")) {
+          dbFlaggedCounts.set(link.product_id, (dbFlaggedCounts.get(link.product_id) ?? 0) + 1);
+        }
+      }
+      const listMap = new Map((variantData ?? []).map((p) => [p.id, { list: p.ingredient_list as string | null, image_url: p.image_url as string | null }]));
       communityVariants = communityVariants.map((v) => {
-        const list = listMap.get(v.id) ?? null;
+        const entry = listMap.get(v.id);
+        const list = entry?.list ?? null;
+        const dbCount = dbFlaggedCounts.get(v.id) ?? 0;
         return {
           ...v,
-          flaggedCount: list ? countComedogenicPatternMatches(list) : 0,
+          image_url: entry?.image_url ?? null,
+          flaggedCount: dbCount + (list ? countComedogenicPatternMatches(list) : 0),
           sensoryCount: list ? countSensoryPatternMatches(list) : 0,
           photoCount: list ? countPhotoPatternMatches(list) : 0,
         };

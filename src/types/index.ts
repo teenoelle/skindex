@@ -20,6 +20,7 @@ export type CommunityVariant = {
   id: string;
   name: string;
   brand: string | null;
+  image_url: string | null;
   flaggedCount: number;
   sensoryCount: number;
   photoCount: number;
