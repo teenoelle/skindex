@@ -14339,6 +14339,95 @@ done, it worked - the products are searchable in the db - but the oproduct image
 
 
 
+● Pushed. The root cause was the image proxy allowlist —
+  it blocked any host not explicitly listed, and both
+  INCIDecoder's CDN and OpenBeautyFacts images were
+  missing from it.
+
+  Once Vercel deploys (1-2 min), all the product images
+  should load. The product type icon was also absent
+  because the broken image was filling the entire image
+  slot, hiding the fallback icon — that should resolve
+  itself too once images load correctly.
+
+
+
+
+
+              
+● Glad it's working. The images are now loading across
+  the board — INCIDecoder imports, community submissions
+  via URL, and OBF beauty products.
+
+
+
+
+
+● All pushed. Everything is committed — the backfill
+  script's hardcoded credentials were replaced with env
+  var reads before committing, and .claude/,
+  iherb-report.html, and supabase/.temp/ are now properly   gitignored.
+
+
+
+
+
+
+
+on this product page https://skindex-beauty.vercel.app/product/dove-deodorant-24e05d60-e450-4cc0-a917-cb532f9298f8 here is what was extracted to the full ingredient list: "Develops. Allow To Dry Before Dressing. Ingredients: Aqua, Aluminum Chlorohydrate, Helianthus Annuus Seed Oil, Glycerin, Steareth-2, Parfum, Steareth-20, Disodium EDTA, Pentaerythrityl Tetra-Dibutyl Hydroxyhydrocinnamate, Alpha-Isomethyl Ionone, Benzyl Benzoate, Benzyl Salicylate, Benzyl Alcohol, Citronellol, Eugenol, Geraniol, Hexyl Cinnamal, Hydroxycitronellal, Isoeugenol, Limonene, Linalool Read more on how to read an ingredient list >>" 
+- but what should have been extracted was "Aqua, Aluminum Chlorohydrate, Helianthus Annuus Seed Oil, Glycerin, Steareth-2, Parfum, Steareth-20, Disodium EDTA, Pentaerythrityl Tetra-Dibutyl Hydroxyhydrocinnamate, Alpha-Isomethyl Ionone, Benzyl Benzoate, Benzyl Salicylate, Benzyl Alcohol, Citronellol, Eugenol, Geraniol, Hexyl Cinnamal, Hydroxycitronellal, Isoeugenol, Limonene, Linalool" - now there is an ingredient in the db that says "Develops. Allow To Dry Before Dressing. Ingredients: Aqua" and another ingredient in the db that says "Linalool Read more on how to read an ingredient list >>" - what should change in the scan and extraction code for mistakes like this not to happen? what ideas do you have to fix this in case it happened to other products?
+
+
+
+
+● Clear picture now. The INCIDecoder
+  ingredlist-short-like-section div contains three
+  things:
+
+  1. "Ingredients overview" (heading — already stripped
+  by current code)
+  2. Usage directions → "Ingredients :" (preamble — NOT
+  being stripped)
+  3. "Read more on how to read an ingredient list >>"
+  (trailing UI link — not stripped in the Strategy 1
+  path)
+
+  Two separate bugs. Let me check how many other products
+   in the DB are affected, then fix both the code and the
+   data:
+
+
+
+
+
+● Done. Here's the full picture:
+
+  What went wrong: INCIDecoder's ingredient div
+  (ingredlist-short-like-section) contains three things —   a usage directions block → an "Ingredients :" label →
+  the actual list → a "Read more on how to read..." UI
+  link. The code was stripping "Ingredients overview" but
+   not the directions-before-label, and the "Read more"
+  link wasn't in the cut-point list.
+
+  What was fixed:
+  - Code now strips any preamble before an inner
+  "Ingredients:" label in the INCIDecoder div
+  - "Read more on how to read" added as a cut-point in
+  both INCIDecoder's Strategy 1 and the generic
+  extractIngredientBlock
+  - 24 products in the DB had their ingredient lists
+  cleaned (both the trailing link and directions prefix
+  removed)
+
+  Future imports from INCIDecoder won't have this
+  problem, and the existing products are now correct.
+
+
+
+
+
+
+why does dove deodorant show 0 flagged in safer alternatives but it shows 12 flags when scanned? find out what other products this happen to so that we can fix it across the site and for future scanned or pasted or imported products.
 
 
 
@@ -14350,5 +14439,15 @@ done, it worked - the products are searchable in the db - but the oproduct image
 
 
 
+
+
+
+
+
+
+
+
+
+scan all ingredients in the db and find where explanations don't use the ingredient's name at the beginning of the explanation, whether for safe, photosensitive, sensory triggers, or flagged lists - once you find these, generate updates to the explanations so that the explanation begins with the ingredient's name, or somehow makes it clear close to the beginning of the explanation that it is referring to specifically that listed ingredient. are there any ingredient explanations that could be more specific or curated?
 
 
