@@ -1352,6 +1352,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       {result && (
         <div className="mt-8 space-y-8">
 
+          <div className="space-y-4">
           {/* Product header */}
           {result.product && (
             <div className="flex flex-col sm:flex-row rounded-xl border border-gray-100 overflow-hidden">
@@ -1816,6 +1817,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               </div>
             </div>
           )}
+          </div>
 
           {/* Summary line + safe alternatives group */}
           <div className="space-y-2">
