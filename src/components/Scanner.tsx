@@ -1110,7 +1110,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                      <p className="text-sm font-medium text-gray-800 truncate" title={p.name}>{p.name}</p>
                       {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -1790,7 +1790,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       <div className="w-10 h-10 rounded-lg bg-gray-50 shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{v.name}</p>
+                      <p className="text-sm font-medium text-gray-800 truncate" title={v.name}>{v.name}</p>
                       {v.brand && <p className="text-xs text-gray-400">{v.brand}</p>}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -1931,7 +1931,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-800 truncate">{alt.name}</p>
+                                <p className="text-sm font-medium text-gray-800 truncate" title={alt.name}>{alt.name}</p>
                                 {alt.brand && <p className="text-xs text-gray-400">{alt.brand}</p>}
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
