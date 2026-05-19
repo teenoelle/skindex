@@ -298,7 +298,10 @@ function extractIngredientBlock(text: string): string | null {
   }
 
   candidate = candidate.replace(/\[(?:more|less)\]/gi, " ").replace(/\s+/g, " ").trim();
-  candidate = candidate.replace(/\s*(?:read more|show more|see (?:full|all|more)|expand|view all)[^,]*$/i, "").trim();
+  candidate = candidate
+    .replace(/\s*Read more on how to read an ingredient list\s*>>.*/gi, "")
+    .replace(/\s*(?:read more|show more|see (?:full|all|more)|expand|view all)[^,]*$/i, "")
+    .trim();
 
   const commaCount = (candidate.match(/,/g) ?? []).length;
   if (commaCount < 3 || candidate.length < 50) return null;
@@ -376,11 +379,17 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
     candidate = candidate.replace(/\[more\]/gi, "").replace(/\[less\]/gi, "");
     // Cut at the first non-ingredient section keyword
     const sectionIdx = candidate.search(
-      /\b(?:Warning[s]?|Save\s+to\s+list|Compare\b|Report\s+Error|Embed\b|Highlights?[:\s#]|Key\s+Ingredients?[:\s#])\b/i
+      /\b(?:Warning[s]?|Save\s+to\s+list|Compare\b|Report\s+Error|Embed\b|Highlights?[:\s#]|Key\s+Ingredients?[:\s#]|Read\s+more\s+on\s+how)\b/i
     );
     if (sectionIdx > 50) candidate = candidate.slice(0, sectionIdx);
     // Strip any heading ("Ingredients overview") that precedes the actual list
     candidate = candidate.replace(/^[\s\S]*?Ingredients\s+overview\s*/i, "");
+    // Strip any usage directions preamble before the "Ingredients :" label
+    // e.g. "Develops. Allow To Dry Before Dressing. Ingredients : Aqua, ..."
+    const innerLabelIdx = candidate.search(/\bIngredients?\s*[:\-]\s*/i);
+    if (innerLabelIdx > 0) {
+      candidate = candidate.slice(innerLabelIdx).replace(/^\bIngredients?\s*[:\-]\s*/i, "");
+    }
     candidate = candidate.replace(/\s+/g, " ").trim();
     const commaCount = (candidate.match(/,/g) ?? []).length;
     if (commaCount >= 3 && candidate.length >= 50) ingredients = candidate;
