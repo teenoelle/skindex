@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import Image from "next/image";
+import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct } from "@/types";
@@ -415,6 +416,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   // Reset edit form and rinse-off state when a new product is scanned
   useEffect(() => {
     if (result?.product?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditOpen(false);
       setEditDone(false);
       setEditError(null);
@@ -1136,9 +1138,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         </div>
       ) : tab === "import" ? (
         !isSignedIn ? (
-          <a href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
+          <Link href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
             Sign in to import products
-          </a>
+          </Link>
         ) : (
           <div className="space-y-4">
             <button
@@ -1206,9 +1208,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           </div>
         )
       ) : urlTabGated ? (
-        <a href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
+        <Link href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
           Sign in to use URL scanning
-        </a>
+        </Link>
       ) : (
         <button
           onClick={() => handleScan()}
