@@ -20,6 +20,9 @@ export type CommunityVariant = {
   id: string;
   name: string;
   brand: string | null;
+  flaggedCount: number;
+  sensoryCount: number;
+  photoCount: number;
 };
 
 export type ObfVariant = {

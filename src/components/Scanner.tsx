@@ -1775,16 +1775,32 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {result.communityVariants && result.communityVariants.length > 0 && (
             <div>
               <p className="text-xs text-gray-400 mb-1.5">Did you mean</p>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col divide-y divide-gray-100">
                 {result.communityVariants.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => scanVariant({ productId: v.id })}
-                    className="text-sm text-left text-gray-700 hover:text-gray-900"
-                  >
-                    › {v.name}{v.brand ? ` (${v.brand})` : ""}
-                  </button>
+                  <div key={v.id} className="flex items-center gap-3 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{v.name}</p>
+                      {v.brand && <p className="text-xs text-gray-400">{v.brand}</p>}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {v.flaggedCount === 0 && v.sensoryCount === 0 && v.photoCount === 0 ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Clean</span>
+                      ) : (
+                        <>
+                          {v.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{v.flaggedCount} flagged</span>}
+                          {v.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{v.sensoryCount} sensory triggers</span>}
+                          {v.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{v.photoCount} photosensitive</span>}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => scanVariant({ productId: v.id })}
+                        className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 ml-1.5"
+                      >
+                        Scan
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
