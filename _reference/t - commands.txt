@@ -5,6 +5,18 @@ OPEN FOLDER
 cd "D:\tee\work\code\skindex"
 claude --dangerously-skip-permissions
 
+PRODUCTION
+https://skindex-beauty.vercel.app/
+
+START SERVER
+  Starting the dev server
+
+  In the terminal: npm run dev
+
+  That starts the local development server, usually at
+  http://localhost:3000. You can type ! npm run dev in
+  the Claude Code prompt to run it in this session.
+
 GENERATE REASONS
  node --env-file=.env.local
   scripts/generate-explanations.mjs
@@ -36,3 +48,15 @@ CLASSIFY QUEUE
   terminal: node scripts/classify-queue.mjs, or
    type ! node scripts/classify-queue.mjs in
   the Claude Code prompt.
+
+SITE
+                                                   - http://localhost:3001
+http://127.0.0.1:3001                                    - http://192.168.0.63:3001
+Make sure you're not navigating to https:// (with the S) — it's plain http://.
+  Also note: the dev server needs to stay running in a
+  terminal. If you close the terminal/session that started
+  it, it stops. 
+
+
+
+
