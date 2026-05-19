@@ -13,36 +13,21 @@ type Submission = {
   ingredient_count: number;
 };
 
-type UnrecognizedProduct = {
+type AllProduct = {
   id: string;
   name: string;
   brand: string | null;
   type: string | null;
   image_url: string | null;
   iherb_url: string | null;
+  source_url: string | null;
   source: string | null;
 };
 
-type EditState = {
+type AllEditState = {
   type: string;
   iherb_url: string;
   image_url: string;
-};
-
-type UrlImportProduct = {
-  id: string;
-  name: string;
-  brand: string | null;
-  type: string | null;
-  source_url: string | null;
-  image_url: string | null;
-  iherb_url: string | null;
-};
-
-type UrlImportEditState = {
-  source_url: string;
-  image_url: string;
-  iherb_url: string;
 };
 
 const PRODUCT_TYPES = [
@@ -56,6 +41,8 @@ const PRODUCT_TYPES = [
   "Spot Patches", "Sun Screen", "Toner",
 ].sort();
 
+const PRODUCT_TYPES_SET = new Set(PRODUCT_TYPES);
+
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
@@ -67,8 +54,17 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function initEdit(p: AllProduct): AllEditState {
+  return {
+    type: PRODUCT_TYPES_SET.has(p.type ?? "") ? (p.type ?? "") : "",
+    iherb_url: p.iherb_url ?? "",
+    image_url: p.image_url ?? "",
+  };
+}
+
 export default function AdminPage() {
   const { isSignedIn, isLoaded } = useUser();
+
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [recentCount, setRecentCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -76,20 +72,16 @@ export default function AdminPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<string | null>(null);
 
-  const [unrecognized, setUnrecognized] = useState<UnrecognizedProduct[]>([]);
-  const [unrecognizedLoading, setUnrecognizedLoading] = useState(false);
-  const [edits, setEdits] = useState<Record<string, EditState>>({});
-  const [saving, setSaving] = useState<string | null>(null);
-  const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [saveError, setSaveError] = useState<Record<string, string>>({});
-
-  const [urlImports, setUrlImports] = useState<UrlImportProduct[]>([]);
-  const [urlImportsLoading, setUrlImportsLoading] = useState(false);
-  const [urlImportEdits, setUrlImportEdits] = useState<Record<string, UrlImportEditState>>({});
-  const [urlImportSaving, setUrlImportSaving] = useState<string | null>(null);
-  const [urlImportSaved, setUrlImportSaved] = useState<Set<string>>(new Set());
-  const [urlImportError, setUrlImportError] = useState<Record<string, string>>({});
-  const [urlImportsExpanded, setUrlImportsExpanded] = useState(false);
+  const [allProducts, setAllProducts] = useState<AllProduct[]>([]);
+  const [allProductsLoading, setAllProductsLoading] = useState(false);
+  const [allSearch, setAllSearch] = useState("");
+  const [filterMissingIherb, setFilterMissingIherb] = useState(false);
+  const [filterMissingImage, setFilterMissingImage] = useState(false);
+  const [filterMissingType, setFilterMissingType] = useState(false);
+  const [allEdits, setAllEdits] = useState<Record<string, AllEditState>>({});
+  const [allSaving, setAllSaving] = useState<string | null>(null);
+  const [allSaved, setAllSaved] = useState<Set<string>>(new Set());
+  const [allSaveError, setAllSaveError] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -104,40 +96,45 @@ export default function AdminPage() {
         setSubmissions(d.submissions ?? []);
         setRecentCount(d.recentCount ?? 0);
         setLoading(false);
-        loadUnrecognized();
-        loadUrlImports();
+        loadAllProducts();
       })
       .catch(() => setLoading(false));
-  }, [isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn]);
 
-  async function loadUnrecognized() {
-    setUnrecognizedLoading(true);
+  async function loadAllProducts() {
+    setAllProductsLoading(true);
     try {
-      const res = await fetch("/api/admin/unrecognized-types");
+      const res = await fetch("/api/admin/all-products");
       const data = await res.json();
-      setUnrecognized(data.products ?? []);
-      const initEdits: Record<string, EditState> = {};
-      for (const p of data.products ?? []) {
-        initEdits[p.id] = { type: "", iherb_url: p.iherb_url ?? "", image_url: p.image_url ?? "" };
-      }
-      setEdits(initEdits);
+      const products: AllProduct[] = data.products ?? [];
+      setAllProducts(products);
+      const initEdits: Record<string, AllEditState> = {};
+      for (const p of products) initEdits[p.id] = initEdit(p);
+      setAllEdits(initEdits);
     } catch {
       // ignore
     }
-    setUnrecognizedLoading(false);
+    setAllProductsLoading(false);
   }
 
-  function updateEdit(id: string, field: keyof EditState, value: string) {
-    setEdits((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
-    setSaved((prev) => { const next = new Set(prev); next.delete(id); return next; });
-    setSaveError((prev) => { const next = { ...prev }; delete next[id]; return next; });
+  function updateAllEdit(id: string, field: keyof AllEditState, value: string) {
+    setAllEdits((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+    setAllSaved((prev) => { const next = new Set(prev); next.delete(id); return next; });
+    setAllSaveError((prev) => { const next = { ...prev }; delete next[id]; return next; });
   }
 
-  async function saveProduct(p: UnrecognizedProduct) {
-    const edit = edits[p.id];
+  function productHasChanges(p: AllProduct): boolean {
+    const edit = allEdits[p.id];
+    if (!edit) return false;
+    const base = initEdit(p);
+    return edit.type !== base.type || edit.iherb_url !== base.iherb_url || edit.image_url !== base.image_url;
+  }
+
+  async function saveAllProduct(p: AllProduct) {
+    const edit = allEdits[p.id];
     if (!edit) return;
-    setSaving(p.id);
-    setSaveError((prev) => { const next = { ...prev }; delete next[p.id]; return next; });
+    setAllSaving(p.id);
+    setAllSaveError((prev) => { const next = { ...prev }; delete next[p.id]; return next; });
     try {
       const res = await fetch("/api/admin/update-product", {
         method: "POST",
@@ -151,71 +148,19 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Save failed");
-      setSaved((prev) => new Set([...prev, p.id]));
-      if (edit.type && PRODUCT_TYPES.includes(edit.type)) {
-        setUnrecognized((prev) => prev.filter((u) => u.id !== p.id));
-      }
+      const updated: AllProduct = {
+        ...p,
+        type: edit.type || p.type,
+        iherb_url: edit.iherb_url || p.iherb_url,
+        image_url: edit.image_url || p.image_url,
+      };
+      setAllProducts((prev) => prev.map((q) => q.id === p.id ? updated : q));
+      setAllEdits((prev) => ({ ...prev, [p.id]: initEdit(updated) }));
+      setAllSaved((prev) => new Set([...prev, p.id]));
     } catch (e) {
-      setSaveError((prev) => ({ ...prev, [p.id]: (e as Error).message }));
+      setAllSaveError((prev) => ({ ...prev, [p.id]: (e as Error).message }));
     }
-    setSaving(null);
-  }
-
-  async function loadUrlImports() {
-    setUrlImportsLoading(true);
-    try {
-      const res = await fetch("/api/admin/url-imports");
-      const data = await res.json();
-      setUrlImports(data.products ?? []);
-      const initEdits: Record<string, UrlImportEditState> = {};
-      for (const p of data.products ?? []) {
-        initEdits[p.id] = {
-          source_url: p.source_url ?? "",
-          image_url: p.image_url ?? "",
-          iherb_url: p.iherb_url ?? "",
-        };
-      }
-      setUrlImportEdits(initEdits);
-    } catch {
-      // ignore
-    }
-    setUrlImportsLoading(false);
-  }
-
-  function updateUrlImportEdit(id: string, field: keyof UrlImportEditState, value: string) {
-    setUrlImportEdits((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
-    setUrlImportSaved((prev) => { const next = new Set(prev); next.delete(id); return next; });
-    setUrlImportError((prev) => { const next = { ...prev }; delete next[id]; return next; });
-  }
-
-  async function saveUrlImport(p: UrlImportProduct) {
-    const edit = urlImportEdits[p.id];
-    if (!edit) return;
-    setUrlImportSaving(p.id);
-    setUrlImportError((prev) => { const next = { ...prev }; delete next[p.id]; return next; });
-    try {
-      const res = await fetch("/api/admin/update-product", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: p.id,
-          source_url: edit.source_url || undefined,
-          image_url: edit.image_url || undefined,
-          iherb_url: edit.iherb_url || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Save failed");
-      setUrlImportSaved((prev) => new Set([...prev, p.id]));
-      setUrlImports((prev) => prev.map((u) =>
-        u.id === p.id
-          ? { ...u, source_url: edit.source_url || u.source_url, image_url: edit.image_url || u.image_url, iherb_url: edit.iherb_url || u.iherb_url }
-          : u
-      ));
-    } catch (e) {
-      setUrlImportError((prev) => ({ ...prev, [p.id]: (e as Error).message }));
-    }
-    setUrlImportSaving(null);
+    setAllSaving(null);
   }
 
   async function handleArchive(id: string) {
@@ -240,6 +185,26 @@ export default function AdminPage() {
     if (res.ok) setSubmissions((prev) => prev.filter((s) => s.id !== id));
     setDeleting(null);
   }
+
+  const allStats = {
+    total: allProducts.length,
+    missingIherb: allProducts.filter((p) => !p.iherb_url).length,
+    missingImage: allProducts.filter((p) => !p.image_url).length,
+    missingType: allProducts.filter((p) => !p.type || !PRODUCT_TYPES_SET.has(p.type)).length,
+  };
+
+  const filteredAllProducts = allProducts
+    .filter((p) =>
+      !allSearch ||
+      p.name.toLowerCase().includes(allSearch.toLowerCase()) ||
+      (p.brand ?? "").toLowerCase().includes(allSearch.toLowerCase())
+    )
+    .filter((p) => !filterMissingIherb || !p.iherb_url)
+    .filter((p) => !filterMissingImage || !p.image_url)
+    .filter((p) => !filterMissingType || !p.type || !PRODUCT_TYPES_SET.has(p.type));
+
+  const displayedAllProducts = filteredAllProducts.slice(0, 100);
+  const isFiltered = !!(allSearch || filterMissingIherb || filterMissingImage || filterMissingType);
 
   const header = (
     <header className="border-b border-gray-100 px-6 py-4">
@@ -285,9 +250,7 @@ export default function AdminPage() {
         {/* Submissions */}
         <section>
           <div className="flex items-center gap-3 mb-8">
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-              Submissions
-            </h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Submissions</h1>
             {recentCount > 0 && (
               <span className="text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full px-2.5 py-0.5">
                 {recentCount} this week
@@ -304,9 +267,7 @@ export default function AdminPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-gray-900 truncate">{s.name}</span>
-                      {s.brand && (
-                        <span className="text-xs text-gray-400 shrink-0">{s.brand}</span>
-                      )}
+                      {s.brand && <span className="text-xs text-gray-400 shrink-0">{s.brand}</span>}
                       {s.type && (
                         <span className="text-xs text-gray-400 border border-gray-200 rounded-full px-2 py-0.5 shrink-0">
                           {s.type}
@@ -351,89 +312,165 @@ export default function AdminPage() {
           )}
         </section>
 
-        {/* Unrecognized product types */}
+        {/* All Products */}
         <section>
-          <div className="flex items-center gap-3 mb-6">
-            <h2 className="text-xl font-semibold tracking-tight text-gray-900">
-              Unrecognized Types
-            </h2>
-            {!unrecognizedLoading && unrecognized.length > 0 && (
-              <span className="text-xs font-medium bg-amber-100 text-amber-700 rounded-full px-2.5 py-0.5">
-                {unrecognized.length}
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">All Products</h2>
+            {!allProductsLoading && (
+              <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
+                {allStats.total}
               </span>
             )}
           </div>
 
-          {unrecognizedLoading && (
-            <p className="text-sm text-gray-400">Loading…</p>
+          {!allProductsLoading && allStats.total > 0 && (
+            <p className="text-xs mb-5 flex flex-wrap gap-x-2 gap-y-1">
+              <span className={allStats.missingIherb > 0 ? "text-amber-600" : "text-gray-400"}>
+                {allStats.missingIherb} missing iHerb
+              </span>
+              <span className="text-gray-300">·</span>
+              <span className={allStats.missingImage > 0 ? "text-amber-600" : "text-gray-400"}>
+                {allStats.missingImage} missing image
+              </span>
+              <span className="text-gray-300">·</span>
+              <span className={allStats.missingType > 0 ? "text-amber-600" : "text-gray-400"}>
+                {allStats.missingType} no type
+              </span>
+            </p>
           )}
 
-          {!unrecognizedLoading && unrecognized.length === 0 && (
-            <p className="text-sm text-gray-400">All product types are recognized.</p>
+          {!allProductsLoading && (
+            <div className="flex flex-wrap gap-2 mb-6">
+              <input
+                type="text"
+                value={allSearch}
+                onChange={(e) => setAllSearch(e.target.value)}
+                placeholder="Search by name or brand…"
+                className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 w-52"
+              />
+              <button
+                type="button"
+                onClick={() => setFilterMissingIherb((v) => !v)}
+                className={`text-xs rounded-lg px-3 py-1.5 border transition-colors ${
+                  filterMissingIherb
+                    ? "bg-amber-100 text-amber-800 border-amber-200"
+                    : "border-gray-200 text-gray-500 hover:border-gray-400"
+                }`}
+              >
+                Missing iHerb
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMissingImage((v) => !v)}
+                className={`text-xs rounded-lg px-3 py-1.5 border transition-colors ${
+                  filterMissingImage
+                    ? "bg-amber-100 text-amber-800 border-amber-200"
+                    : "border-gray-200 text-gray-500 hover:border-gray-400"
+                }`}
+              >
+                Missing image
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMissingType((v) => !v)}
+                className={`text-xs rounded-lg px-3 py-1.5 border transition-colors ${
+                  filterMissingType
+                    ? "bg-amber-100 text-amber-800 border-amber-200"
+                    : "border-gray-200 text-gray-500 hover:border-gray-400"
+                }`}
+              >
+                No type
+              </button>
+            </div>
           )}
 
-          {!unrecognizedLoading && unrecognized.length > 0 && (
+          {allProductsLoading && <p className="text-sm text-gray-400">Loading…</p>}
+
+          {!allProductsLoading && allStats.total === 0 && (
+            <p className="text-sm text-gray-400">No products yet.</p>
+          )}
+
+          {!allProductsLoading && allStats.total > 0 && isFiltered && filteredAllProducts.length === 0 && (
+            <p className="text-sm text-gray-400">No products match.</p>
+          )}
+
+          {!allProductsLoading && allStats.total > 0 && !isFiltered && (
+            <p className="text-xs text-gray-400 mb-4">Use search or filters above to find products.</p>
+          )}
+
+          {!allProductsLoading && isFiltered && displayedAllProducts.length > 0 && (
             <div className="divide-y divide-gray-100">
-              {unrecognized.map((p) => {
-                const edit = edits[p.id] ?? { type: "", iherb_url: "", image_url: "" };
-                const isSaving = saving === p.id;
-                const isSaved = saved.has(p.id);
-                const error = saveError[p.id];
+              {displayedAllProducts.map((p) => {
+                const edit = allEdits[p.id] ?? { type: "", iherb_url: "", image_url: "" };
+                const isSaving = allSaving === p.id;
+                const isSaved = allSaved.has(p.id);
+                const error = allSaveError[p.id];
+                const hasChanges = productHasChanges(p);
+                const typeIsNonCanonical = p.type && !PRODUCT_TYPES_SET.has(p.type);
+                const previewImage = edit.image_url || p.image_url;
                 return (
                   <div key={p.id} className="py-5 space-y-3">
-                    {/* Product identity row */}
                     <div className="flex items-start gap-3">
-                      {p.image_url && (
+                      {previewImage && (
                         <img
-                          src={`/api/image-proxy?url=${encodeURIComponent(p.image_url)}`}
+                          src={`/api/image-proxy?url=${encodeURIComponent(previewImage)}`}
                           alt={p.name}
                           className="w-10 h-12 object-contain rounded border border-gray-100 bg-gray-50 shrink-0"
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate" title={p.name}>{p.name}</p>
                         <div className="flex items-center gap-2 flex-wrap mt-0.5">
                           {p.brand && <span className="text-xs text-gray-400">{p.brand}</span>}
-                          <span className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5 shrink-0">
-                            {p.type}
-                          </span>
+                          {p.type && (
+                            <span className={`text-xs border rounded-full px-2 py-0.5 shrink-0 ${
+                              typeIsNonCanonical
+                                ? "text-amber-700 bg-amber-50 border-amber-100"
+                                : "text-gray-400 border-gray-200"
+                            }`}>
+                              {p.type}
+                            </span>
+                          )}
+                          {!p.type && (
+                            <span className="text-xs text-rose-500 border border-rose-100 bg-rose-50 rounded-full px-2 py-0.5 shrink-0">
+                              no type
+                            </span>
+                          )}
                           {p.source && <span className="text-xs text-gray-300">{p.source}</span>}
                         </div>
                       </div>
                     </div>
 
-                    {/* Edit fields */}
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                       <select
                         value={edit.type}
-                        onChange={(e) => updateEdit(p.id, "type", e.target.value)}
+                        onChange={(e) => updateAllEdit(p.id, "type", e.target.value)}
                         className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-white"
                       >
-                        <option value="">Map to type…</option>
+                        <option value="">Type…</option>
                         {PRODUCT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                       <input
                         type="url"
                         value={edit.iherb_url}
-                        onChange={(e) => updateEdit(p.id, "iherb_url", e.target.value)}
+                        onChange={(e) => updateAllEdit(p.id, "iherb_url", e.target.value)}
                         placeholder="iHerb URL"
                         className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
                       />
                       <input
                         type="url"
                         value={edit.image_url}
-                        onChange={(e) => updateEdit(p.id, "image_url", e.target.value)}
+                        onChange={(e) => updateAllEdit(p.id, "image_url", e.target.value)}
                         placeholder="Image URL"
                         className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
                       />
                     </div>
 
-                    {/* Save row */}
                     <div className="flex items-center gap-3 flex-wrap">
                       <button
                         type="button"
-                        onClick={() => saveProduct(p)}
-                        disabled={isSaving || (!edit.type && !edit.iherb_url && !edit.image_url)}
+                        onClick={() => saveAllProduct(p)}
+                        disabled={isSaving || !hasChanges}
                         className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
                       >
                         {isSaving ? "Saving…" : "Save"}
@@ -446,8 +483,18 @@ export default function AdminPage() {
                       >
                         Scan
                       </Link>
+                      {p.source_url && (
+                        <a
+                          href={p.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                        >
+                          Source ↗
+                        </a>
+                      )}
                       <a
-                        href={`https://www.iherb.com/search?kw=${encodeURIComponent([p.brand, p.name].filter(Boolean).join(' '))}&rcode=DYT4743`}
+                        href={`https://www.iherb.com/search?kw=${encodeURIComponent([p.brand, p.name].filter(Boolean).join(" "))}&rcode=DYT4743`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
@@ -460,152 +507,11 @@ export default function AdminPage() {
               })}
             </div>
           )}
-        </section>
 
-        {/* URL Imports */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <h2 className="text-xl font-semibold tracking-tight text-gray-900">
-              URL Imports
-            </h2>
-            {!urlImportsLoading && urlImports.length > 0 && (
-              <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
-                {urlImports.length}
-              </span>
-            )}
-          </div>
-
-          {urlImportsLoading && (
-            <p className="text-sm text-gray-400">Loading…</p>
-          )}
-
-          {!urlImportsLoading && urlImports.length === 0 && (
-            <p className="text-sm text-gray-400">No URL-imported products yet.</p>
-          )}
-
-          {!urlImportsLoading && urlImports.length > 0 && (
-            <>
-              {!urlImportsExpanded ? (
-                <button
-                  type="button"
-                  onClick={() => setUrlImportsExpanded(true)}
-                  className="text-sm text-indigo-600 underline underline-offset-2 hover:text-indigo-800"
-                >
-                  Show {urlImports.length} products
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setUrlImportsExpanded(false)}
-                    className="text-sm text-gray-400 underline underline-offset-2 hover:text-gray-700 mb-4"
-                  >
-                    Collapse
-                  </button>
-                  <div className="divide-y divide-gray-100">
-                    {urlImports.map((p) => {
-                      const edit = urlImportEdits[p.id] ?? { source_url: "", image_url: "", iherb_url: "" };
-                      const isSaving = urlImportSaving === p.id;
-                      const isSaved = urlImportSaved.has(p.id);
-                      const error = urlImportError[p.id];
-                      const hasChanges = edit.source_url !== (p.source_url ?? "") ||
-                        edit.image_url !== (p.image_url ?? "") ||
-                        edit.iherb_url !== (p.iherb_url ?? "");
-                      return (
-                        <div key={p.id} className="py-5 space-y-3">
-                          {/* Identity row */}
-                          <div className="flex items-start gap-3">
-                            {edit.image_url && (
-                              <img
-                                src={`/api/image-proxy?url=${encodeURIComponent(edit.image_url)}`}
-                                alt={p.name}
-                                className="w-10 h-12 object-contain rounded border border-gray-100 bg-gray-50 shrink-0"
-                              />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
-                              <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                                {p.brand && <span className="text-xs text-gray-400">{p.brand}</span>}
-                                {p.type && (
-                                  <span className="text-xs text-gray-400 border border-gray-200 rounded-full px-2 py-0.5 shrink-0">
-                                    {p.type}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Edit fields */}
-                          <div className="grid grid-cols-1 gap-2">
-                            <input
-                              type="url"
-                              value={edit.source_url}
-                              onChange={(e) => updateUrlImportEdit(p.id, "source_url", e.target.value)}
-                              placeholder="Source URL (INCIDecoder link)"
-                              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
-                            />
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                              <input
-                                type="url"
-                                value={edit.iherb_url}
-                                onChange={(e) => updateUrlImportEdit(p.id, "iherb_url", e.target.value)}
-                                placeholder="iHerb URL"
-                                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
-                              />
-                              <input
-                                type="url"
-                                value={edit.image_url}
-                                onChange={(e) => updateUrlImportEdit(p.id, "image_url", e.target.value)}
-                                placeholder="Image URL"
-                                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Actions row */}
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => saveUrlImport(p)}
-                              disabled={isSaving || !hasChanges}
-                              className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
-                            >
-                              {isSaving ? "Saving…" : "Save"}
-                            </button>
-                            {isSaved && <span className="text-xs text-teal-600">Saved.</span>}
-                            {error && <span className="text-xs text-rose-600">{error}</span>}
-                            <Link
-                              href={`/?scan=${p.id}`}
-                              className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
-                            >
-                              Scan
-                            </Link>
-                            {edit.source_url && (
-                              <a
-                                href={edit.source_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
-                              >
-                                Source ↗
-                              </a>
-                            )}
-                            <a
-                              href={`https://www.iherb.com/search?kw=${encodeURIComponent([p.brand, p.name].filter(Boolean).join(' '))}&rcode=DYT4743`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
-                            >
-                              iHerb ↗
-                            </a>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </>
+          {!allProductsLoading && isFiltered && filteredAllProducts.length > 100 && (
+            <p className="text-xs text-gray-400 mt-4">
+              Showing 100 of {filteredAllProducts.length}. Narrow your search to see more.
+            </p>
           )}
         </section>
 
