@@ -1,3 +1,4 @@
+import Link from "next/link";
 import NavAuth from "@/components/NavAuth";
 import Scanner from "@/components/Scanner";
 
@@ -13,10 +14,10 @@ export default async function ProductPage({ params }: Props) {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-100 px-6 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <a href="/" className="text-xl tracking-tight select-none">
+          <Link href="/" className="text-xl tracking-tight select-none">
             <span className="font-black">SKIN</span>
             <span className="font-light text-gray-500">dex</span>
-          </a>
+          </Link>
           <NavAuth />
         </div>
       </header>

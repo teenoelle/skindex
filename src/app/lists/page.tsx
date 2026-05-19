@@ -21,7 +21,7 @@ export default function ListsPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) { setLoading(false); return; }
+    if (!isLoaded || !isSignedIn) { setLoading(false); return; } // eslint-disable-line react-hooks/set-state-in-effect
     fetch("/api/lists")
       .then((r) => r.json())
       .then((d) => { setLists(d.lists ?? []); setLoading(false); });
