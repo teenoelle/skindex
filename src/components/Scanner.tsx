@@ -196,16 +196,13 @@ const STRUCTURAL_DESCRIPTIONS: Record<string, string> = {
   "Active": "Actives are targeted ingredients included for a specific skin benefit like brightening, barrier repair, or anti-aging.",
 };
 
-const PRODUCT_TYPES = [
-  "BB Cream", "Blush", "Body Lotion", "Body Wash",
-  "Brow Gel", "CC Cream", "Concealer", "Concentrate", "Conditioner",
-  "Deodorant", "Exfoliant", "Eye Cream", "Eye Primer",
-  "Eyeliner", "Eyeshadow", "Face Mask", "Face Wash", "Foot Cream", "Foundation",
-  "Hair Treatment", "Hand Cream", "Lip Balm", "Lip Treatment",
-  "Makeup Remover", "Mascara", "Mist", "Moisturizer", "Oil", "Ointment", "Primer",
-  "Scalp Treatment", "Serum", "Setting Spray", "Shampoo", "Sleeping Mask",
-  "Spot Patches", "Sun Screen", "Toner",
-].sort();
+const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
+  { label: "Face", types: ["Concentrate", "Exfoliant", "Eye Cream", "Eye Primer", "Face Mask", "Face Wash", "Makeup Remover", "Mist", "Moisturizer", "Oil", "Ointment", "Primer", "Serum", "Sleeping Mask", "Spot Patches", "Sun Screen", "Toner"].sort() },
+  { label: "Makeup", types: ["BB Cream", "Blush", "Brow Gel", "CC Cream", "Concealer", "Eyeliner", "Eyeshadow", "Foundation", "Mascara", "Setting Spray"].sort() },
+  { label: "Lips", types: ["Lip Balm", "Lip Treatment"] },
+  { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream", "Hand Cream"].sort() },
+  { label: "Hair", types: ["Conditioner", "Hair Treatment", "Scalp Treatment", "Shampoo"].sort() },
+];
 
 const RINSE_OFF_TYPES = new Set(["Face Wash", "Body Wash", "Shampoo", "Makeup Remover"]);
 
@@ -1291,7 +1288,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400 bg-white"
             >
               <option value="">Type (optional)</option>
-              {PRODUCT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              {PRODUCT_TYPE_GROUPS.map(({ label, types }) => (
+                <optgroup key={label} label={label}>
+                  {types.map((t) => <option key={t} value={t}>{t}</option>)}
+                </optgroup>
+              ))}
             </select>
           </div>
           <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
@@ -1643,7 +1644,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-white"
                         >
                           <option value="">Type (optional)</option>
-                          {PRODUCT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                          {PRODUCT_TYPE_GROUPS.map(({ label, types }) => (
+                            <optgroup key={label} label={label}>
+                              {types.map((t) => <option key={t} value={t}>{t}</option>)}
+                            </optgroup>
+                          ))}
                         </select>
                         <textarea
                           value={editIngredients}

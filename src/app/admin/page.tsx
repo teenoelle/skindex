@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 
@@ -30,18 +30,19 @@ type AllEditState = {
   image_url: string;
 };
 
-const PRODUCT_TYPES = [
-  "BB Cream", "Blush", "Body Lotion", "Body Wash",
-  "Brow Gel", "CC Cream", "Concealer", "Concentrate", "Conditioner",
-  "Deodorant", "Exfoliant", "Eye Cream", "Eye Primer",
-  "Eyeliner", "Eyeshadow", "Face Mask", "Face Wash", "Foot Cream", "Foundation",
-  "Hair Treatment", "Hand Cream", "Lip Balm", "Lip Treatment",
-  "Makeup Remover", "Mascara", "Mist", "Moisturizer", "Oil", "Ointment", "Primer",
-  "Scalp Treatment", "Serum", "Setting Spray", "Shampoo", "Sleeping Mask",
-  "Spot Patches", "Sun Screen", "Toner",
-].sort();
+type ProductType = { id: string; name: string; body_area: string };
 
-const PRODUCT_TYPES_SET = new Set(PRODUCT_TYPES);
+const BODY_AREAS = ["Face", "Makeup", "Lips", "Body", "Hair"];
+
+const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
+  { label: "Face", types: ["Concentrate", "Exfoliant", "Eye Cream", "Eye Primer", "Face Mask", "Face Wash", "Makeup Remover", "Mist", "Moisturizer", "Oil", "Ointment", "Primer", "Serum", "Sleeping Mask", "Spot Patches", "Sun Screen", "Toner"].sort() },
+  { label: "Makeup", types: ["BB Cream", "Blush", "Brow Gel", "CC Cream", "Concealer", "Eyeliner", "Eyeshadow", "Foundation", "Mascara", "Setting Spray"].sort() },
+  { label: "Lips", types: ["Lip Balm", "Lip Treatment"] },
+  { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream", "Hand Cream"].sort() },
+  { label: "Hair", types: ["Conditioner", "Hair Treatment", "Scalp Treatment", "Shampoo"].sort() },
+];
+
+const FALLBACK_TYPES_SET = new Set(PRODUCT_TYPE_GROUPS.flatMap((g) => g.types));
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -54,9 +55,9 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function initEdit(p: AllProduct): AllEditState {
+function initEdit(p: AllProduct, validTypes: Set<string>): AllEditState {
   return {
-    type: PRODUCT_TYPES_SET.has(p.type ?? "") ? (p.type ?? "") : "",
+    type: validTypes.has(p.type ?? "") ? (p.type ?? "") : "",
     iherb_url: p.iherb_url ?? "",
     image_url: p.image_url ?? "",
   };
@@ -83,6 +84,44 @@ export default function AdminPage() {
   const [allSaved, setAllSaved] = useState<Set<string>>(new Set());
   const [allSaveError, setAllSaveError] = useState<Record<string, string>>({});
 
+  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
+  const [typesLoading, setTypesLoading] = useState(false);
+  const [newTypeName, setNewTypeName] = useState("");
+  const [newTypeBodyArea, setNewTypeBodyArea] = useState("Face");
+  const [typeAdding, setTypeAdding] = useState(false);
+  const [typeAddError, setTypeAddError] = useState<string | null>(null);
+  const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
+  const [editTypeName, setEditTypeName] = useState("");
+  const [editTypeBodyArea, setEditTypeBodyArea] = useState("Face");
+  const [typeSaving, setTypeSaving] = useState<string | null>(null);
+  const [typeDeleting, setTypeDeleting] = useState<string | null>(null);
+  const [typeOpError, setTypeOpError] = useState<string | null>(null);
+
+  const activeTypesSet = productTypes.length > 0
+    ? new Set(productTypes.map((t) => t.name))
+    : FALLBACK_TYPES_SET;
+
+  const typeGroups = useMemo(() => {
+    if (productTypes.length === 0) return [];
+    const byArea: Record<string, ProductType[]> = {};
+    for (const t of productTypes) {
+      if (!byArea[t.body_area]) byArea[t.body_area] = [];
+      byArea[t.body_area].push(t);
+    }
+    const areas = [
+      ...BODY_AREAS.filter((a) => byArea[a]),
+      ...Object.keys(byArea).filter((a) => !BODY_AREAS.includes(a)).sort(),
+    ];
+    return areas.map((a) => ({
+      label: a,
+      types: byArea[a].sort((x, y) => x.name.localeCompare(y.name)),
+    }));
+  }, [productTypes]);
+
+  const dropdownGroups = typeGroups.length > 0
+    ? typeGroups.map((g) => ({ label: g.label, types: g.types.map((t) => t.name) }))
+    : PRODUCT_TYPE_GROUPS;
+
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) { setLoading(false); return; }
@@ -97,6 +136,7 @@ export default function AdminPage() {
         setRecentCount(d.recentCount ?? 0);
         setLoading(false);
         loadAllProducts();
+        loadTypes();
       })
       .catch(() => setLoading(false));
   }, [isLoaded, isSignedIn]);
@@ -109,12 +149,26 @@ export default function AdminPage() {
       const products: AllProduct[] = data.products ?? [];
       setAllProducts(products);
       const initEdits: Record<string, AllEditState> = {};
-      for (const p of products) initEdits[p.id] = initEdit(p);
+      for (const p of products) initEdits[p.id] = initEdit(p, FALLBACK_TYPES_SET);
       setAllEdits(initEdits);
     } catch {
       // ignore
     }
     setAllProductsLoading(false);
+  }
+
+  async function loadTypes() {
+    setTypesLoading(true);
+    try {
+      const res = await fetch("/api/admin/product-types");
+      if (res.ok) {
+        const data = await res.json();
+        setProductTypes(data.types ?? []);
+      }
+    } catch {
+      // stay with fallback
+    }
+    setTypesLoading(false);
   }
 
   function updateAllEdit(id: string, field: keyof AllEditState, value: string) {
@@ -126,7 +180,7 @@ export default function AdminPage() {
   function productHasChanges(p: AllProduct): boolean {
     const edit = allEdits[p.id];
     if (!edit) return false;
-    const base = initEdit(p);
+    const base = initEdit(p, FALLBACK_TYPES_SET);
     return edit.type !== base.type || edit.iherb_url !== base.iherb_url || edit.image_url !== base.image_url;
   }
 
@@ -155,7 +209,7 @@ export default function AdminPage() {
         image_url: edit.image_url || p.image_url,
       };
       setAllProducts((prev) => prev.map((q) => q.id === p.id ? updated : q));
-      setAllEdits((prev) => ({ ...prev, [p.id]: initEdit(updated) }));
+      setAllEdits((prev) => ({ ...prev, [p.id]: initEdit(updated, FALLBACK_TYPES_SET) }));
       setAllSaved((prev) => new Set([...prev, p.id]));
     } catch (e) {
       setAllSaveError((prev) => ({ ...prev, [p.id]: (e as Error).message }));
@@ -186,11 +240,72 @@ export default function AdminPage() {
     setDeleting(null);
   }
 
+  async function addType() {
+    if (!newTypeName.trim()) return;
+    setTypeAdding(true);
+    setTypeAddError(null);
+    try {
+      const res = await fetch("/api/admin/product-types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newTypeName.trim(), body_area: newTypeBodyArea }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      setProductTypes((prev) => [...prev, data.type]);
+      setNewTypeName("");
+    } catch (e) {
+      setTypeAddError((e as Error).message);
+    }
+    setTypeAdding(false);
+  }
+
+  function startEditType(t: ProductType) {
+    setEditingTypeId(t.id);
+    setEditTypeName(t.name);
+    setEditTypeBodyArea(t.body_area);
+    setTypeOpError(null);
+  }
+
+  async function saveTypeEdit(t: ProductType) {
+    setTypeSaving(t.id);
+    setTypeOpError(null);
+    try {
+      const res = await fetch(`/api/admin/product-types/${t.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editTypeName.trim() || t.name, body_area: editTypeBodyArea }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      setProductTypes((prev) => prev.map((x) => x.id === t.id ? data.type : x));
+      setEditingTypeId(null);
+    } catch (e) {
+      setTypeOpError((e as Error).message);
+    }
+    setTypeSaving(null);
+  }
+
+  async function deleteType(t: ProductType) {
+    if (!confirm(`Delete type "${t.name}"?`)) return;
+    setTypeDeleting(t.id);
+    setTypeOpError(null);
+    try {
+      const res = await fetch(`/api/admin/product-types/${t.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      setProductTypes((prev) => prev.filter((x) => x.id !== t.id));
+    } catch (e) {
+      setTypeOpError((e as Error).message);
+    }
+    setTypeDeleting(null);
+  }
+
   const allStats = {
     total: allProducts.length,
     missingIherb: allProducts.filter((p) => !p.iherb_url).length,
     missingImage: allProducts.filter((p) => !p.image_url).length,
-    missingType: allProducts.filter((p) => !p.type || !PRODUCT_TYPES_SET.has(p.type)).length,
+    missingType: allProducts.filter((p) => !p.type || !activeTypesSet.has(p.type)).length,
   };
 
   const filteredAllProducts = allProducts
@@ -201,7 +316,7 @@ export default function AdminPage() {
     )
     .filter((p) => !filterMissingIherb || !p.iherb_url)
     .filter((p) => !filterMissingImage || !p.image_url)
-    .filter((p) => !filterMissingType || !p.type || !PRODUCT_TYPES_SET.has(p.type));
+    .filter((p) => !filterMissingType || !p.type || !activeTypesSet.has(p.type));
 
   const displayedAllProducts = filteredAllProducts.slice(0, 100);
   const isFiltered = !!(allSearch || filterMissingIherb || filterMissingImage || filterMissingType);
@@ -406,7 +521,7 @@ export default function AdminPage() {
                 const isSaved = allSaved.has(p.id);
                 const error = allSaveError[p.id];
                 const hasChanges = productHasChanges(p);
-                const typeIsNonCanonical = p.type && !PRODUCT_TYPES_SET.has(p.type);
+                const typeIsNonCanonical = p.type && !activeTypesSet.has(p.type);
                 const previewImage = edit.image_url || p.image_url;
                 return (
                   <div key={p.id} className="py-5 space-y-3">
@@ -448,7 +563,11 @@ export default function AdminPage() {
                         className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-white"
                       >
                         <option value="">Type…</option>
-                        {PRODUCT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                        {dropdownGroups.map(({ label, types }) => (
+                          <optgroup key={label} label={label}>
+                            {types.map((t) => <option key={t} value={t}>{t}</option>)}
+                          </optgroup>
+                        ))}
                       </select>
                       <input
                         type="url"
@@ -512,6 +631,121 @@ export default function AdminPage() {
             <p className="text-xs text-gray-400 mt-4">
               Showing 100 of {filteredAllProducts.length}. Narrow your search to see more.
             </p>
+          )}
+        </section>
+
+        {/* Product Types */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">Product Types</h2>
+            {!typesLoading && productTypes.length > 0 && (
+              <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
+                {productTypes.length}
+              </span>
+            )}
+          </div>
+
+          <div className="flex gap-2 mb-8 flex-wrap items-center">
+            <input
+              type="text"
+              value={newTypeName}
+              onChange={(e) => { setNewTypeName(e.target.value); setTypeAddError(null); }}
+              onKeyDown={(e) => { if (e.key === "Enter") addType(); }}
+              placeholder="New type name…"
+              className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 w-44"
+            />
+            <select
+              value={newTypeBodyArea}
+              onChange={(e) => setNewTypeBodyArea(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-gray-400"
+            >
+              {BODY_AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={addType}
+              disabled={typeAdding || !newTypeName.trim()}
+              className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
+            >
+              {typeAdding ? "Adding…" : "Add type"}
+            </button>
+            {typeAddError && <span className="text-xs text-rose-600">{typeAddError}</span>}
+          </div>
+
+          {typesLoading && <p className="text-sm text-gray-400">Loading…</p>}
+
+          {!typesLoading && typeGroups.length > 0 && (
+            <div className="space-y-6">
+              {typeGroups.map(({ label, types: groupTypes }) => (
+                <div key={label}>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
+                  <div className="divide-y divide-gray-50">
+                    {groupTypes.map((t) => {
+                      const isEditing = editingTypeId === t.id;
+                      const isSaving = typeSaving === t.id;
+                      const isDeleting = typeDeleting === t.id;
+                      return (
+                        <div key={t.id} className="py-2 flex items-center gap-3">
+                          {isEditing ? (
+                            <>
+                              <input
+                                value={editTypeName}
+                                onChange={(e) => setEditTypeName(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter") saveTypeEdit(t); if (e.key === "Escape") setEditingTypeId(null); }}
+                                className="text-xs border border-indigo-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 w-40"
+                                autoFocus
+                              />
+                              <select
+                                value={editTypeBodyArea}
+                                onChange={(e) => setEditTypeBodyArea(e.target.value)}
+                                className="text-xs border border-indigo-200 rounded px-2 py-1 bg-white focus:outline-none"
+                              >
+                                {BODY_AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => saveTypeEdit(t)}
+                                disabled={isSaving}
+                                className="text-xs text-indigo-600 hover:text-indigo-800 disabled:opacity-40"
+                              >
+                                {isSaving ? "Saving…" : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingTypeId(null)}
+                                className="text-xs text-gray-400 hover:text-gray-600"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-sm text-gray-800 flex-1">{t.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => startEditType(t)}
+                                className="text-xs text-gray-400 hover:text-gray-700"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteType(t)}
+                                disabled={isDeleting}
+                                className="text-xs text-rose-400 hover:text-rose-600 disabled:opacity-40"
+                              >
+                                {isDeleting ? "Deleting…" : "Delete"}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {typeOpError && <p className="text-xs text-rose-600 mt-2">{typeOpError}</p>}
+            </div>
           )}
         </section>
 
