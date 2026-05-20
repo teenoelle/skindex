@@ -1,4 +1,4 @@
-export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category: string }[] = [
+export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category: string; maxPosition?: number }[] = [
   {
     pattern: /(?!.*\bleaf water\b)(\baloe\b|aloe barbadensis|aloe vera)/i,
     sensory_category: "Film-forming",
@@ -75,6 +75,12 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
     note: "AHA exfoliants that cause a tingling or stinging sensation on reactive skin. Gentler than glycolic acid but still capable of causing discomfort on a compromised barrier, especially in acidic formulas.",
   },
   {
+    pattern: /citric acid/i,
+    sensory_category: "Stinging",
+    note: "At high concentrations (indicated by appearing in the first 10 ingredients), citric acid acts as an AHA exfoliant and can cause a tingling or stinging sensation on reactive or barrier-compromised skin.",
+    maxPosition: 10,
+  },
+  {
     pattern: /benzoyl peroxide/i,
     sensory_category: "Stinging",
     note: "Causes a pronounced burning and stinging sensation on contact, especially on reactive or broken skin. The drying effect compounds over time, creating a raw, sensitized surface that is difficult not to touch or pick at.",
@@ -83,6 +89,12 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
     pattern: /propylene glycol/i,
     sensory_category: "Stinging",
     note: "Can cause a stinging or burning sensation on sensitized skin and around areas where the barrier is broken or compromised.",
+  },
+  {
+    pattern: /^(butylene glycol|dipropylene glycol)$/i,
+    sensory_category: "Stinging",
+    note: "At high concentrations (indicated by appearing in the first 5 ingredients), butylene glycol can cause a stinging or burning sensation on sensitized skin and around areas where the barrier is broken or compromised.",
+    maxPosition: 5,
   },
   {
     pattern: /kojic acid/i,
@@ -139,9 +151,10 @@ export function countSensoryPatternMatches(ingredientList: string): number {
 
   let count = 0;
   const seen = new Set<string>();
-  for (const token of tokens) {
-    const cleaned = token.replace(/\([^)]*\)/g, "").trim();
+  for (let i = 0; i < tokens.length; i++) {
+    const cleaned = tokens[i].replace(/\([^)]*\)/g, "").trim();
     for (const rule of SENSORY_PATTERNS) {
+      if (rule.maxPosition !== undefined && i >= rule.maxPosition) continue;
       if (rule.pattern.test(cleaned)) {
         const key = cleaned.toLowerCase();
         if (!seen.has(key)) { seen.add(key); count++; }

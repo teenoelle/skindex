@@ -16,7 +16,7 @@ function obfFullImage(url: string | null | undefined): string | null {
 
 import type { PhotoCategory } from "@/types";
 
-const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; photoCategory: PhotoCategory; note: string }[] = [
+const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; photoCategory: PhotoCategory; note: string; maxPosition?: number }[] = [
   {
     pattern: /retinol|retinyl palmitate|retinyl acetate|retinaldehyde|tretinoin/i,
     level: "avoid",
@@ -24,10 +24,17 @@ const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; 
     note: "Retinoids accelerate skin cell turnover, which progressively thins the stratum corneum — the skin's protective outer layer. This barrier thinning leaves newly formed cells more vulnerable to UV radiation. Use SPF daily and avoid prolonged sun exposure.",
   },
   {
-    pattern: /glycolic acid|lactic acid|mandelic acid|tartaric acid/i,
+    pattern: /glycolic acid|lactic acid|mandelic acid|malic acid|tartaric acid/i,
     level: "avoid",
     photoCategory: "photo-AHA",
     note: "AHA exfoliant that removes the outer protective skin layer, increasing UV vulnerability. Apply SPF daily when using.",
+  },
+  {
+    pattern: /citric acid/i,
+    level: "avoid",
+    photoCategory: "photo-AHA",
+    note: "At high concentrations (indicated by appearing in the first 10 ingredients), citric acid acts as an AHA exfoliant that removes the outer protective skin layer, increasing UV vulnerability. Apply SPF daily when using products where it appears high in the ingredient list.",
+    maxPosition: 10,
   },
   {
     pattern: /\barbutin\b|alpha.arbutin/i,
@@ -569,9 +576,11 @@ export async function POST(req: NextRequest) {
   // Build photosensitive list from originalItems using pattern matching
   const photosensitive: PhotosensitiveItem[] = [];
   const seenPhotoKeys = new Set<string>();
-  for (const item of originalItems) {
+  for (let i = 0; i < originalItems.length; i++) {
+    const item = originalItems[i];
     const cleaned = item.replace(/\([^)]*\)/g, "").trim();
     for (const rule of PHOTO_PATTERNS) {
+      if (rule.maxPosition !== undefined && i >= rule.maxPosition) continue;
       if (rule.pattern.test(cleaned)) {
         const key = cleaned.toLowerCase();
         if (!seenPhotoKeys.has(key)) {
@@ -586,9 +595,11 @@ export async function POST(req: NextRequest) {
   // Build sensory trigger list from originalItems using pattern matching
   const sensoryTrigger: SensoryTriggerItem[] = [];
   const seenSensoryKeys = new Set<string>();
-  for (const item of originalItems) {
+  for (let i = 0; i < originalItems.length; i++) {
+    const item = originalItems[i];
     const cleaned = item.replace(/\([^)]*\)/g, "").trim();
     for (const rule of SENSORY_PATTERNS) {
+      if (rule.maxPosition !== undefined && i >= rule.maxPosition) continue;
       if (rule.pattern.test(cleaned)) {
         const key = cleaned.toLowerCase();
         if (!seenSensoryKeys.has(key)) {

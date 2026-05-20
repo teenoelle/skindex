@@ -547,50 +547,40 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     });
   }
 
-  function handlePhotoClick(rawName: string, safeMatch: { id: string; explanation: string | null } | null) {
-    const photoKey = `photo-${rawName}`;
+  function handleIngredientClick(
+    item: string,
+    match: { status: string; ingredient: { id: string; explanation: string | null } } | null,
+    hasPhoto: boolean,
+    hasSensory: boolean,
+  ) {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.add(photoKey);
-      if (safeMatch) next.add(safeMatch.id);
+      if (match) next.add(match.ingredient.id);
+      if (hasSensory) next.add(`sensory-${item}`);
+      if (hasPhoto) next.add(`photo-${item}`);
       return next;
     });
-    if (safeMatch && !safeMatch.explanation && !(safeMatch.id in explanations)) {
-      setExplanations((prev) => ({ ...prev, [safeMatch.id]: null }));
+    if (match && !match.ingredient.explanation && !(match.ingredient.id in explanations)) {
+      setExplanations((prev) => ({ ...prev, [match.ingredient.id]: null }));
       fetch("/api/explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: safeMatch.id }),
+        body: JSON.stringify({ id: match.ingredient.id }),
       })
         .then((r) => r.json())
-        .then((data) => setExplanations((prev) => ({ ...prev, [safeMatch.id]: data.explanation ?? null })))
+        .then((data) => setExplanations((prev) => ({ ...prev, [match.ingredient.id]: data.explanation ?? null })))
         .catch(() => {});
     }
     requestAnimationFrame(() => {
-      document.getElementById("section-photosensitive")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }
-
-  function handleSensoryClick(rawName: string, safeMatch: { id: string; explanation: string | null } | null) {
-    const sensoryKey = `sensory-${rawName}`;
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.add(sensoryKey);
-      return next;
-    });
-    if (safeMatch && !safeMatch.explanation && !(safeMatch.id in explanations)) {
-      setExplanations((prev) => ({ ...prev, [safeMatch.id]: null }));
-      fetch("/api/explain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: safeMatch.id }),
-      })
-        .then((r) => r.json())
-        .then((data) => setExplanations((prev) => ({ ...prev, [safeMatch.id]: data.explanation ?? null })))
-        .catch(() => {});
-    }
-    requestAnimationFrame(() => {
-      document.getElementById("section-sensory")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (match?.status === "flagged") {
+        document.getElementById("section-flagged")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (hasSensory) {
+        document.getElementById("section-sensory")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (hasPhoto) {
+        document.getElementById("section-photosensitive")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (match) {
+        document.getElementById(`ingredient-${match.ingredient.id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
     });
   }
 
@@ -1994,8 +1984,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   );
                   const colorKey: keyof typeof paragraphColor =
                     match?.status === "flagged" ? "flagged"
-                    : photoItem ? "photo-sensitive"
                     : sensoryItem ? "sensory-trigger"
+                    : photoItem ? "photo-sensitive"
                     : match?.status === "safe" ? "safe"
                     : "unreviewed";
                   const colorClass =
@@ -2004,39 +1994,19 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     : paragraphColor[colorKey];
                   return (
                     <Fragment key={i}>
-                      {photoItem ? (
-                        <button
-                          type="button"
-                          className={`${colorClass} hover:underline underline-offset-2`}
-                          onClick={() => handlePhotoClick(item, match ? { id: match.ingredient.id, explanation: match.ingredient.explanation } : null)}
-                        >
-                          {smartCase(item)}
-                        </button>
-                      ) : sensoryItem ? (
-                        <button
-                          type="button"
-                          className={`${colorClass} hover:underline underline-offset-2`}
-                          onClick={() => handleSensoryClick(item, match?.status === "safe" ? { id: match.ingredient.id, explanation: match.ingredient.explanation } : null)}
-                        >
-                          {smartCase(item)}
-                        </button>
-                      ) : match ? (
-                        <button
-                          type="button"
-                          className={`${colorClass} hover:underline underline-offset-2`}
-                          onClick={() => handleParagraphClick(match.ingredient.id, match.ingredient.explanation)}
-                        >
-                          {smartCase(item)}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className={`${colorClass} hover:underline underline-offset-2`}
-                          onClick={() => handleUnreviewedClick(item)}
-                        >
-                          {smartCase(item)}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className={`${colorClass} hover:underline underline-offset-2`}
+                        onClick={() => {
+                          if (match || photoItem || sensoryItem) {
+                            handleIngredientClick(item, match, !!photoItem, !!sensoryItem);
+                          } else {
+                            handleUnreviewedClick(item);
+                          }
+                        }}
+                      >
+                        {smartCase(item)}
+                      </button>
                       {i < result.originalItems.length - 1 && (
                         <span className="text-gray-400">, </span>
                       )}

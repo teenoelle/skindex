@@ -1,13 +1,19 @@
-export const PHOTO_PATTERNS: { pattern: RegExp; level: "avoid" | "caution"; note: string }[] = [
+export const PHOTO_PATTERNS: { pattern: RegExp; level: "avoid" | "caution"; note: string; maxPosition?: number }[] = [
   {
     pattern: /retinol|retinyl palmitate|retinyl acetate|retinaldehyde|tretinoin/i,
     level: "avoid",
     note: "Retinoids accelerate skin cell turnover, which progressively thins the stratum corneum — the skin's protective outer layer. This barrier thinning leaves newly formed cells more vulnerable to UV radiation. Use SPF daily and avoid prolonged sun exposure.",
   },
   {
-    pattern: /glycolic acid|lactic acid|mandelic acid|tartaric acid/i,
+    pattern: /glycolic acid|lactic acid|mandelic acid|malic acid|tartaric acid/i,
     level: "avoid",
     note: "AHA exfoliant that removes the outer protective skin layer, increasing UV vulnerability. Apply SPF daily when using.",
+  },
+  {
+    pattern: /citric acid/i,
+    level: "avoid",
+    note: "At high concentrations (indicated by appearing in the first 10 ingredients), citric acid acts as an AHA exfoliant that removes the outer protective skin layer, increasing UV vulnerability. Apply SPF daily when using products where it appears high in the ingredient list.",
+    maxPosition: 10,
   },
   {
     pattern: /\barbutin\b|alpha.arbutin/i,
@@ -34,9 +40,10 @@ export function countPhotoPatternMatches(ingredientList: string): number {
 
   let count = 0;
   const seen = new Set<string>();
-  for (const token of tokens) {
-    const cleaned = token.replace(/\([^)]*\)/g, "").trim();
+  for (let i = 0; i < tokens.length; i++) {
+    const cleaned = tokens[i].replace(/\([^)]*\)/g, "").trim();
     for (const rule of PHOTO_PATTERNS) {
+      if (rule.maxPosition !== undefined && i >= rule.maxPosition) continue;
       if (rule.pattern.test(cleaned)) {
         const key = cleaned.toLowerCase();
         if (!seen.has(key)) { seen.add(key); count++; }
