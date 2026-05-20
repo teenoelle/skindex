@@ -2288,7 +2288,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
                             <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
                           )}
-                          {!flaggedMatch && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
+                          {!flaggedMatch && !item.isPositionBased && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
                           {item.sensory_note && <p>{item.sensory_note}</p>}
                           {item.sensory_category === "Film-forming" && (
                             <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
@@ -2367,7 +2367,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
                           )}
                           {/* Only show ingredient explanation for safe+photosensitive; flagged ingredients show it in their own section */}
-                          {!flaggedMatch && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
+                          {!flaggedMatch && !item.isPositionBased && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
                           {item.photo_note && <p>{item.photo_note}</p>}
                         </div>
                       )}

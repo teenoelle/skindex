@@ -585,7 +585,7 @@ export async function POST(req: NextRequest) {
         const key = cleaned.toLowerCase();
         if (!seenPhotoKeys.has(key)) {
           seenPhotoKeys.add(key);
-          photosensitive.push({ rawName: item, sunLevel: rule.level, photo_note: rule.note, photoCategory: rule.photoCategory });
+          photosensitive.push({ rawName: item, sunLevel: rule.level, photo_note: rule.note, photoCategory: rule.photoCategory, isPositionBased: rule.maxPosition !== undefined });
         }
         break;
       }
@@ -604,7 +604,7 @@ export async function POST(req: NextRequest) {
         const key = cleaned.toLowerCase();
         if (!seenSensoryKeys.has(key)) {
           seenSensoryKeys.add(key);
-          sensoryTrigger.push({ rawName: item, sensory_note: rule.note, sensory_category: rule.sensory_category });
+          sensoryTrigger.push({ rawName: item, sensory_note: rule.note, sensory_category: rule.sensory_category, isPositionBased: rule.maxPosition !== undefined });
         }
         break;
       }

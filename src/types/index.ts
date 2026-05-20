@@ -40,12 +40,14 @@ export type PhotosensitiveItem = {
   sunLevel: "avoid" | "caution";
   photo_note?: string | null;
   photoCategory?: PhotoCategory;
+  isPositionBased?: boolean;
 };
 
 export type SensoryTriggerItem = {
   rawName: string;
   sensory_note: string;
   sensory_category?: string;
+  isPositionBased?: boolean;
 };
 
 export type AlternativeProduct = {
