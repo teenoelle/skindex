@@ -791,7 +791,7 @@ export default function AdminPage() {
                 const typeIsNonCanonical = p.type && !activeTypesSet.has(p.type);
                 const previewImage = edit.image_url || p.image_url;
                 return (
-                  <div key={p.id} className="border border-gray-200 rounded-xl p-4 space-y-3">
+                  <div key={p.id} className="border border-gray-300 rounded-xl p-4 space-y-3">
                     <div className="flex items-start gap-3">
                       {previewImage && (
                         <img
