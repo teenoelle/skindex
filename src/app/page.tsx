@@ -13,7 +13,7 @@ export default async function Home({ searchParams }: Props) {
             <span className="text-xl font-black">SKIN</span>
             <span className="text-xl font-light text-gray-500">dex</span>
             <span className="font-light text-gray-300 mx-2">·</span>
-            <span className="text-sm font-light text-gray-400">scan your skincare</span>
+            <span className="text-sm font-light text-gray-400">Scan your skincare</span>
           </span>
           <NavAuth />
         </div>
