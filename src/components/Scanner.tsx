@@ -1781,37 +1781,41 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <p className="text-xs text-gray-400 mb-1.5">Did you mean</p>
               <div className="flex flex-col divide-y divide-gray-100">
                 {result.communityVariants.map((v) => (
-                  <div key={v.id} className="flex items-center gap-3 py-2.5">
-                    {v.image_url ? (
-                      <img
-                        src={`/api/image-proxy?url=${encodeURIComponent(v.image_url)}`}
-                        alt={v.name}
-                        className="w-10 h-10 object-contain rounded-lg bg-gray-50 shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg bg-gray-50 shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate" title={v.name}>{v.name}</p>
-                      {v.brand && <p className="text-xs text-gray-400">{v.brand}</p>}
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {v.flaggedCount === 0 && v.sensoryCount === 0 && v.photoCount === 0 ? (
-                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Clean</span>
+                  <div key={v.id} className="flex gap-3 py-2.5">
+                    <div className="w-10 shrink-0">
+                      {v.image_url ? (
+                        <img
+                          src={`/api/image-proxy?url=${encodeURIComponent(v.image_url)}`}
+                          alt={v.name}
+                          className="w-10 h-10 object-contain rounded-lg bg-gray-50"
+                        />
                       ) : (
-                        <>
-                          {v.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{v.flaggedCount} flagged</span>}
-                          {v.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{v.sensoryCount} sensory triggers</span>}
-                          {v.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{v.photoCount} photosensitive</span>}
-                        </>
+                        <div className="w-10 h-10 rounded-lg bg-gray-50" />
                       )}
-                      <button
-                        type="button"
-                        onClick={() => scanVariant({ productId: v.id })}
-                        className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 ml-1.5"
-                      >
-                        Scan
-                      </button>
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800 leading-snug">{v.name}</p>
+                        {v.brand && <p className="text-xs text-gray-400 mt-0.5">{v.brand}</p>}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {v.flaggedCount === 0 && v.sensoryCount === 0 && v.photoCount === 0 ? (
+                          <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Clean</span>
+                        ) : (
+                          <>
+                            {v.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{v.flaggedCount} flagged</span>}
+                            {v.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{v.sensoryCount} sensory triggers</span>}
+                            {v.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{v.photoCount} photosensitive</span>}
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => scanVariant({ productId: v.id })}
+                          className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                        >
+                          Scan
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
