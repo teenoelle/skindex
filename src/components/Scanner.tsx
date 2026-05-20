@@ -1094,7 +1094,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {p.flaggedCount === 0 && p.sensoryCount === 0 && p.photoCount === 0 ? (
-                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Clean</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe</span>
                       ) : (
                         <>
                           {p.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{p.flaggedCount} flagged</span>}
@@ -1790,7 +1790,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {v.flaggedCount === 0 && v.sensoryCount === 0 && v.photoCount === 0 ? (
-                          <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Clean</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe</span>
                         ) : (
                           <>
                             {v.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{v.flaggedCount} flagged</span>}
@@ -1933,7 +1933,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 {alt.flaggedCount === 0 && alt.sensoryCount === 0 && alt.photoCount === 0 ? (
-                                  <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Clean</span>
+                                  <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe</span>
                                 ) : (
                                   <>
                                     {alt.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{alt.flaggedCount} flagged</span>}
