@@ -204,6 +204,9 @@ export default function AdminPage() {
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditExpanded, setAuditExpanded] = useState(false);
+  const [submissionsOpen, setSubmissionsOpen] = useState(true);
+  const [allProductsOpen, setAllProductsOpen] = useState(false);
+  const [typesOpen, setTypesOpen] = useState(false);
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [selectedTypeIds, setSelectedTypeIds] = useState<Set<string>>(new Set());
@@ -545,20 +548,27 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-white">
       {header}
-      <main className="max-w-3xl mx-auto px-6 py-12 space-y-16">
+      <main className="max-w-3xl mx-auto px-6 py-8 space-y-8">
 
         {/* Submissions */}
         <section>
-          <div className="flex items-center gap-3 mb-8">
+          <button
+            type="button"
+            onClick={() => setSubmissionsOpen((v) => !v)}
+            className="flex items-center gap-3 mb-4 group"
+          >
             <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Submissions</h1>
             {recentCount > 0 && (
               <span className="text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full px-2.5 py-0.5">
                 {recentCount} this week
               </span>
             )}
-          </div>
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${submissionsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
 
-          {submissions.length === 0 ? (
+          {submissionsOpen && (submissions.length === 0 ? (
             <p className="text-sm text-gray-400">No user-submitted products yet.</p>
           ) : (
             <div className="divide-y divide-gray-100">
@@ -609,20 +619,28 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
-          )}
+          ))}
         </section>
 
         {/* All Products */}
         <section>
-          <div className="flex items-center gap-3 mb-2">
+          <button
+            type="button"
+            onClick={() => setAllProductsOpen((v) => !v)}
+            className="flex items-center gap-3 mb-2 group"
+          >
             <h2 className="text-xl font-semibold tracking-tight text-gray-900">All Products</h2>
             {!allProductsLoading && (
               <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
                 {allStats.total}
               </span>
             )}
-          </div>
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${allProductsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
 
+          {allProductsOpen && (<>
           {!allProductsLoading && allStats.total > 0 && (
             <p className="text-xs mb-5 flex flex-wrap gap-x-2 gap-y-1">
               <span className={allStats.missingIherb > 0 ? "text-amber-600" : "text-gray-400"}>
@@ -709,7 +727,7 @@ export default function AdminPage() {
                 const typeIsNonCanonical = p.type && !activeTypesSet.has(p.type);
                 const previewImage = edit.image_url || p.image_url;
                 return (
-                  <div key={p.id} className="py-5 space-y-3">
+                  <div key={p.id} className="py-3 space-y-3">
                     <div className="flex items-start gap-3">
                       {previewImage && (
                         <img
@@ -817,19 +835,28 @@ export default function AdminPage() {
               Showing 100 of {filteredAllProducts.length}. Narrow your search to see more.
             </p>
           )}
+          </>)}
         </section>
 
         {/* Product Types */}
         <section>
-          <div className="flex items-center gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => setTypesOpen((v) => !v)}
+            className="flex items-center gap-3 mb-4 group"
+          >
             <h2 className="text-xl font-semibold tracking-tight text-gray-900">Product Types</h2>
             {!typesLoading && productTypes.length > 0 && (
               <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
                 {productTypes.length}
               </span>
             )}
-          </div>
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${typesOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
 
+          {typesOpen && (<>
           <div className="mb-6 space-y-3">
             <div className="flex gap-2 flex-wrap items-center">
               <input
@@ -976,6 +1003,7 @@ export default function AdminPage() {
               )}
             </>
           )}
+          </>)}
         </section>
 
         {/* Activity */}
