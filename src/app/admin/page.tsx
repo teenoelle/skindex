@@ -43,6 +43,14 @@ type AuditEntry = {
 
 const BODY_AREAS = ["Face", "Makeup", "Lips", "Body", "Hair"];
 
+const BODY_AREA_EMOJI: Record<string, string> = {
+  Face: "🫧",
+  Makeup: "💄",
+  Lips: "💋",
+  Body: "🧴",
+  Hair: "💇",
+};
+
 const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
   { label: "Face", types: ["Concentrate", "Exfoliant", "Eye Cream", "Eye Primer", "Face Mask", "Face Wash", "Makeup Remover", "Mist", "Moisturizer", "Oil", "Ointment", "Primer", "Serum", "Sleeping Mask", "Spot Patches", "Sun Screen", "Toner"].sort() },
   { label: "Makeup", types: ["BB Cream", "Blush", "Brow Gel", "CC Cream", "Concealer", "Eyeliner", "Eyeshadow", "Foundation", "Mascara", "Setting Spray"].sort() },
@@ -207,6 +215,7 @@ export default function AdminPage() {
   const [submissionsOpen, setSubmissionsOpen] = useState(true);
   const [allProductsOpen, setAllProductsOpen] = useState(false);
   const [typesOpen, setTypesOpen] = useState(false);
+  const [typeFormOpen, setTypeFormOpen] = useState(false);
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [selectedTypeIds, setSelectedTypeIds] = useState<Set<string>>(new Set());
@@ -717,7 +726,7 @@ export default function AdminPage() {
           )}
 
           {!allProductsLoading && isFiltered && displayedAllProducts.length > 0 && (
-            <div className="divide-y divide-gray-100">
+            <div className="space-y-2">
               {displayedAllProducts.map((p) => {
                 const edit = allEdits[p.id] ?? { type: "", iherb_url: "", image_url: "" };
                 const isSaving = allSaving === p.id;
@@ -727,7 +736,7 @@ export default function AdminPage() {
                 const typeIsNonCanonical = p.type && !activeTypesSet.has(p.type);
                 const previewImage = edit.image_url || p.image_url;
                 return (
-                  <div key={p.id} className="py-3 space-y-3">
+                  <div key={p.id} className="border border-gray-100 rounded-xl p-4 space-y-3">
                     <div className="flex items-start gap-3">
                       {previewImage && (
                         <img
@@ -857,27 +866,47 @@ export default function AdminPage() {
           </button>
 
           {typesOpen && (<>
-          <div className="mb-6 space-y-3">
-            <div className="flex gap-2 flex-wrap items-center">
-              <input
-                type="text"
-                value={newTypeName}
-                onChange={(e) => { setNewTypeName(e.target.value); setTypeAddError(null); }}
-                onKeyDown={(e) => { if (e.key === "Enter") addType(); }}
-                placeholder="New type name…"
-                className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 w-44"
-              />
+          <div className="mb-4">
+            {typeFormOpen ? (
+              <div className="space-y-2">
+                <div className="flex gap-2 flex-wrap items-center">
+                  <input
+                    type="text"
+                    value={newTypeName}
+                    onChange={(e) => { setNewTypeName(e.target.value); setTypeAddError(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") addType(); if (e.key === "Escape") { setTypeFormOpen(false); setNewTypeName(""); } }}
+                    placeholder="Type name…"
+                    autoFocus
+                    className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 w-40"
+                  />
+                  <button
+                    type="button"
+                    onClick={addType}
+                    disabled={typeAdding || !newTypeName.trim()}
+                    className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
+                  >
+                    {typeAdding ? "Adding…" : "Add"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setTypeFormOpen(false); setNewTypeName(""); setTypeAddError(null); }}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    Cancel
+                  </button>
+                  {typeAddError && <span className="text-xs text-rose-600">{typeAddError}</span>}
+                </div>
+                <BodyAreaPicker value={newTypeBodyArea} onChange={setNewTypeBodyArea} />
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={addType}
-                disabled={typeAdding || !newTypeName.trim()}
-                className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
+                onClick={() => setTypeFormOpen(true)}
+                className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
               >
-                {typeAdding ? "Adding…" : "Add type"}
+                + Add type
               </button>
-              {typeAddError && <span className="text-xs text-rose-600">{typeAddError}</span>}
-            </div>
-            <BodyAreaPicker value={newTypeBodyArea} onChange={setNewTypeBodyArea} />
+            )}
           </div>
 
           {typesLoading && <p className="text-sm text-gray-400">Loading…</p>}
@@ -893,9 +922,10 @@ export default function AdminPage() {
                       <button
                         type="button"
                         onClick={() => toggleGroup(label)}
-                        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                        className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-gray-50 transition-colors"
                       >
                         <div className="flex items-center gap-2">
+                          <span>{BODY_AREA_EMOJI[label] ?? "✨"}</span>
                           <span className="text-sm font-medium text-gray-700">{label}</span>
                           <span className="text-xs text-gray-400">({groupTypes.length})</span>
                           {selectedInGroup > 0 && (
@@ -917,7 +947,7 @@ export default function AdminPage() {
                             const isDeleting = typeDeleting === t.id;
                             const isSelected = selectedTypeIds.has(t.id);
                             return (
-                              <div key={t.id} className={`px-4 ${isEditing ? "py-3 bg-indigo-50/40" : "py-2"} ${isSelected && !isEditing ? "bg-indigo-50/30" : ""}`}>
+                              <div key={t.id} className={`px-4 ${isEditing ? "py-2 bg-indigo-50/40" : "py-1"} ${isSelected && !isEditing ? "bg-indigo-50/30" : ""}`}>
                                 {isEditing ? (
                                   <div className="space-y-2">
                                     <div className="flex items-center gap-2 flex-wrap">
