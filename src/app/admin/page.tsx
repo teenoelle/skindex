@@ -55,6 +55,58 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function BodyAreaPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isKnown = BODY_AREAS.includes(value);
+  const [showCustom, setShowCustom] = useState(!isKnown && value !== "");
+
+  function selectKnown(a: string) {
+    onChange(a);
+    setShowCustom(false);
+  }
+
+  function openCustom() {
+    setShowCustom(true);
+    if (isKnown) onChange("");
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1 items-center">
+      {BODY_AREAS.map((a) => (
+        <button
+          key={a}
+          type="button"
+          onClick={() => selectKnown(a)}
+          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+            value === a && !showCustom
+              ? "bg-indigo-600 text-white border-indigo-600"
+              : "border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700"
+          }`}
+        >
+          {a}
+        </button>
+      ))}
+      {showCustom ? (
+        <input
+          type="text"
+          value={!isKnown ? value : ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Area name…"
+          autoFocus
+          className="text-xs border border-indigo-200 rounded-full px-2.5 py-1 focus:outline-none focus:border-indigo-400 w-28"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={openCustom}
+          className="text-xs px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors"
+        >
+          + custom
+        </button>
+      )}
+    </div>
+  );
+}
+
 function initEdit(p: AllProduct, validTypes: Set<string>): AllEditState {
   return {
     type: validTypes.has(p.type ?? "") ? (p.type ?? "") : "",
@@ -645,35 +697,27 @@ export default function AdminPage() {
             )}
           </div>
 
-          <div className="flex gap-2 mb-8 flex-wrap items-center">
-            <input
-              type="text"
-              value={newTypeName}
-              onChange={(e) => { setNewTypeName(e.target.value); setTypeAddError(null); }}
-              onKeyDown={(e) => { if (e.key === "Enter") addType(); }}
-              placeholder="New type name…"
-              className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 w-44"
-            />
-            <input
-              type="text"
-              value={newTypeBodyArea}
-              onChange={(e) => setNewTypeBodyArea(e.target.value)}
-              list="body-areas-list"
-              placeholder="Body area…"
-              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 w-28"
-            />
-            <datalist id="body-areas-list">
-              {BODY_AREAS.map((a) => <option key={a} value={a} />)}
-            </datalist>
-            <button
-              type="button"
-              onClick={addType}
-              disabled={typeAdding || !newTypeName.trim()}
-              className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
-            >
-              {typeAdding ? "Adding…" : "Add type"}
-            </button>
-            {typeAddError && <span className="text-xs text-rose-600">{typeAddError}</span>}
+          <div className="mb-8 space-y-3">
+            <div className="flex gap-2 flex-wrap items-center">
+              <input
+                type="text"
+                value={newTypeName}
+                onChange={(e) => { setNewTypeName(e.target.value); setTypeAddError(null); }}
+                onKeyDown={(e) => { if (e.key === "Enter") addType(); }}
+                placeholder="New type name…"
+                className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 w-44"
+              />
+              <button
+                type="button"
+                onClick={addType}
+                disabled={typeAdding || !newTypeName.trim()}
+                className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
+              >
+                {typeAdding ? "Adding…" : "Add type"}
+              </button>
+              {typeAddError && <span className="text-xs text-rose-600">{typeAddError}</span>}
+            </div>
+            <BodyAreaPicker value={newTypeBodyArea} onChange={setNewTypeBodyArea} />
           </div>
 
           {typesLoading && <p className="text-sm text-gray-400">Loading…</p>}
@@ -689,42 +733,37 @@ export default function AdminPage() {
                       const isSaving = typeSaving === t.id;
                       const isDeleting = typeDeleting === t.id;
                       return (
-                        <div key={t.id} className="py-2 flex items-center gap-3">
+                        <div key={t.id} className="py-2">
                           {isEditing ? (
-                            <>
-                              <input
-                                value={editTypeName}
-                                onChange={(e) => setEditTypeName(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === "Enter") saveTypeEdit(t); if (e.key === "Escape") setEditingTypeId(null); }}
-                                className="text-xs border border-indigo-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 w-40"
-                                autoFocus
-                              />
-                              <input
-                                type="text"
-                                value={editTypeBodyArea}
-                                onChange={(e) => setEditTypeBodyArea(e.target.value)}
-                                list="body-areas-list"
-                                placeholder="Body area…"
-                                className="text-xs border border-indigo-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 w-24"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => saveTypeEdit(t)}
-                                disabled={isSaving}
-                                className="text-xs text-indigo-600 hover:text-indigo-800 disabled:opacity-40"
-                              >
-                                {isSaving ? "Saving…" : "Save"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingTypeId(null)}
-                                className="text-xs text-gray-400 hover:text-gray-600"
-                              >
-                                Cancel
-                              </button>
-                            </>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <input
+                                  value={editTypeName}
+                                  onChange={(e) => setEditTypeName(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") saveTypeEdit(t); if (e.key === "Escape") setEditingTypeId(null); }}
+                                  className="text-xs border border-indigo-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 w-40"
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => saveTypeEdit(t)}
+                                  disabled={isSaving}
+                                  className="text-xs text-indigo-600 hover:text-indigo-800 disabled:opacity-40"
+                                >
+                                  {isSaving ? "Saving…" : "Save"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingTypeId(null)}
+                                  className="text-xs text-gray-400 hover:text-gray-600"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              <BodyAreaPicker value={editTypeBodyArea} onChange={setEditTypeBodyArea} />
+                            </div>
                           ) : (
-                            <>
+                            <div className="flex items-center gap-3">
                               <span className="text-sm text-gray-800 flex-1">{t.name}</span>
                               <button
                                 type="button"
@@ -741,7 +780,7 @@ export default function AdminPage() {
                               >
                                 {isDeleting ? "Deleting…" : "Delete"}
                               </button>
-                            </>
+                            </div>
                           )}
                         </div>
                       );
