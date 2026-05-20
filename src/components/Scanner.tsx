@@ -48,7 +48,7 @@ function CategoryIcon({ type, size = 28 }: { type?: string | null; size?: number
   );
 }
 
-type Tab = "search" | "paste" | "url" | "import" | "browse";
+type Tab = "search" | "paste" | "add" | "browse";
 
 type ImportResult = {
   url: string;
@@ -483,7 +483,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         ? { type: "search", query: activeQuery }
         : activeTab === "paste"
         ? { type: "paste", ingredients }
-        : { type: "url", url };
+        : { type: "url", url: importUrls.split("\n").map((l) => l.trim()).filter(Boolean)[0] ?? "" };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let data: any = {};
@@ -955,27 +955,28 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setBrowseLoading(false);
   }
 
+  const addTabUrls = importUrls.split("\n").map((l) => l.trim()).filter(Boolean);
+  const addTabUrlCount = addTabUrls.length;
+
   const canScan =
     tab === "search" ? query.trim().length > 0
     : tab === "paste" ? ingredients.trim().length > 0
-    : tab === "url" ? url.trim().length > 0
+    : tab === "add" ? addTabUrlCount === 1
     : false;
-
-  const urlTabGated = tab === "url" && !isSignedIn;
 
   return (
     <div>
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-4">
-        {(["search", "paste", "url", "import", "browse"] as Tab[]).map((t) => (
+        {(["search", "paste", "add", "browse"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => resetTab(t)}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+            className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${
               tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600"
             }`}
           >
-            {t === "search" ? "Search" : t === "paste" ? "Paste ingredients" : t === "url" ? "Paste URL" : t === "import" ? "Import" : "Browse"}
+            {t === "search" ? "Search Product" : t === "paste" ? "Scan Ingredient(s)" : t === "add" ? "Add Product(s)" : "Browse"}
           </button>
         ))}
       </div>
@@ -1000,30 +1001,21 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400 mb-3 resize-none font-mono leading-relaxed"
         />
       )}
-      {tab === "url" && (
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="INCIDecoder or iHerb product URL…"
-          disabled={urlTabGated}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400 mb-3 disabled:bg-gray-50 disabled:text-gray-400"
-        />
-      )}
-      {tab === "import" && (
+      {tab === "add" && (
         <textarea
           value={importUrls}
           onChange={(e) => setImportUrls(e.target.value)}
-          placeholder={"Paste one URL per line (INCIDecoder or iHerb)\nhttps://incidecoder.com/products/...\nhttps://www.iherb.com/pr/..."}
-          rows={6}
+          placeholder={"Paste a product URL to scan it (INCIDecoder or iHerb)\nPaste multiple URLs (one per line) to bulk import"}
+          rows={4}
           disabled={!isSignedIn}
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400 mb-1 resize-none font-mono leading-relaxed disabled:bg-gray-50 disabled:text-gray-400"
         />
       )}
-      {tab === "import" && isSignedIn && (() => {
-        const count = importUrls.split("\n").map((l) => l.trim()).filter((l) => l.length > 0).length;
-        return count > 0 ? <p className="text-xs text-gray-400 mb-3">{count} URL{count !== 1 ? "s" : ""} detected{count > 50 ? " — first 50 will be imported" : ""}</p> : <div className="mb-3" />;
-      })()}
+      {tab === "add" && isSignedIn && (
+        addTabUrlCount > 1
+          ? <p className="text-xs text-gray-400 mb-3">{addTabUrlCount} URLs{addTabUrlCount > 50 ? " — first 50 will be imported" : ""}</p>
+          : <div className="mb-3" />
+      )}
 
       {tab === "browse" ? (
         <div>
@@ -1133,16 +1125,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
           )}
         </div>
-      ) : tab === "import" ? (
+      ) : tab === "add" ? (
         !isSignedIn ? (
           <Link href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
-            Sign in to import products
+            Sign in to add products
           </Link>
-        ) : (
+        ) : addTabUrlCount >= 2 ? (
           <div className="space-y-4">
             <button
               onClick={async () => {
-                const urls = importUrls.split("\n").map((l) => l.trim()).filter(Boolean);
+                const urls = addTabUrls;
                 if (!urls.length) return;
                 setImportLoading(true);
                 setImportResults(null);
@@ -1160,7 +1152,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   setImportLoading(false);
                 }
               }}
-              disabled={importLoading || importUrls.trim().length === 0}
+              disabled={importLoading || addTabUrlCount === 0}
               className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {importLoading ? "Importing…" : "Import all"}
@@ -1203,11 +1195,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               </div>
             )}
           </div>
+        ) : (
+          <button
+            onClick={() => handleScan()}
+            disabled={!canScan || loading}
+            className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? "Scanning…" : "Scan"}
+          </button>
         )
-      ) : urlTabGated ? (
-        <Link href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
-          Sign in to use URL scanning
-        </Link>
       ) : (
         <button
           onClick={() => handleScan()}
