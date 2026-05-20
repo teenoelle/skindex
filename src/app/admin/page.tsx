@@ -3,6 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import {
+  Smile, Palette, Heart, PersonStanding, Scissors,
+  FlaskConical, Sparkles, Eye, Shield, BrushCleaning,
+  Eraser, Droplets, Droplet, Layers, Moon, Pill, Sun,
+  GlassWater, Pencil, Brush, Pen, Wind, Footprints,
+  Hand, Pipette, Waves,
+  type LucideIcon,
+} from "lucide-react";
 
 type Submission = {
   id: string;
@@ -43,12 +51,59 @@ type AuditEntry = {
 
 const BODY_AREAS = ["Face", "Makeup", "Lips", "Body", "Hair"];
 
-const BODY_AREA_EMOJI: Record<string, string> = {
-  Face: "🫧",
-  Makeup: "💄",
-  Lips: "💋",
-  Body: "🧴",
-  Hair: "💇",
+const BODY_AREA_ICON: Record<string, LucideIcon> = {
+  Face: Smile,
+  Makeup: Palette,
+  Lips: Heart,
+  Body: PersonStanding,
+  Hair: Scissors,
+};
+
+const PRODUCT_TYPE_ICON: Record<string, LucideIcon> = {
+  // Face
+  Concentrate: FlaskConical,
+  Exfoliant: Sparkles,
+  "Eye Cream": Eye,
+  "Eye Primer": Eye,
+  "Face Mask": Shield,
+  "Face Wash": BrushCleaning,
+  "Makeup Remover": Eraser,
+  Mist: Droplets,
+  Moisturizer: Droplet,
+  Oil: Droplet,
+  Ointment: Layers,
+  Primer: Layers,
+  Serum: Pipette,
+  "Sleeping Mask": Moon,
+  "Spot Patches": Pill,
+  "Sun Screen": Sun,
+  Toner: GlassWater,
+  // Makeup
+  "BB Cream": Layers,
+  Blush: Heart,
+  "Brow Gel": Pencil,
+  "CC Cream": Layers,
+  Concealer: Brush,
+  Eyeliner: Pen,
+  Eyeshadow: Eye,
+  Foundation: Layers,
+  Mascara: Eye,
+  "Setting Spray": Wind,
+  // Lips
+  "Lip Balm": Heart,
+  "Lip Treatment": Heart,
+  // Body
+  "Body Lotion": Droplets,
+  "Body Wash": BrushCleaning,
+  Deodorant: Wind,
+  "Foot Cream": Footprints,
+  "Hand Cream": Hand,
+  // Hair
+  Conditioner: Droplets,
+  "Hair Styler": Wind,
+  "Hair Treatment": Sparkles,
+  "Scalp Treatment": Pipette,
+  Shampoo: Waves,
 };
 
 const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
@@ -736,7 +791,7 @@ export default function AdminPage() {
                 const typeIsNonCanonical = p.type && !activeTypesSet.has(p.type);
                 const previewImage = edit.image_url || p.image_url;
                 return (
-                  <div key={p.id} className="border border-gray-100 rounded-xl p-4 space-y-3">
+                  <div key={p.id} className="border border-gray-200 rounded-xl p-4 space-y-3">
                     <div className="flex items-start gap-3">
                       {previewImage && (
                         <img
@@ -917,6 +972,7 @@ export default function AdminPage() {
                 {typeGroups.map(({ label, types: groupTypes }) => {
                   const isOpen = openGroups.has(label);
                   const selectedInGroup = groupTypes.filter((t) => selectedTypeIds.has(t.id)).length;
+                  const AreaIcon = BODY_AREA_ICON[label] ?? null;
                   return (
                     <div key={label}>
                       <button
@@ -925,7 +981,7 @@ export default function AdminPage() {
                         className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-gray-50 transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <span>{BODY_AREA_EMOJI[label] ?? "✨"}</span>
+                          {AreaIcon && <AreaIcon size={15} className="text-gray-500 shrink-0" />}
                           <span className="text-sm font-medium text-gray-700">{label}</span>
                           <span className="text-xs text-gray-400">({groupTypes.length})</span>
                           {selectedInGroup > 0 && (
@@ -946,6 +1002,7 @@ export default function AdminPage() {
                             const isSaving = typeSaving === t.id;
                             const isDeleting = typeDeleting === t.id;
                             const isSelected = selectedTypeIds.has(t.id);
+                            const TypeIcon = PRODUCT_TYPE_ICON[t.name] ?? BODY_AREA_ICON[t.body_area] ?? null;
                             return (
                               <div key={t.id} className={`px-4 ${isEditing ? "py-2 bg-indigo-50/40" : "py-1"} ${isSelected && !isEditing ? "bg-indigo-50/30" : ""}`}>
                                 {isEditing ? (
@@ -975,6 +1032,7 @@ export default function AdminPage() {
                                       onChange={() => toggleTypeSelection(t.id, t.name, t.body_area)}
                                       className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
                                     />
+                                    {TypeIcon && <TypeIcon size={12} className="text-gray-400 shrink-0" />}
                                     <span className="text-sm text-gray-800 flex-1">{t.name}</span>
                                     <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <button type="button" onClick={() => startEditType(t)} className="text-xs text-gray-400 hover:text-gray-700">
