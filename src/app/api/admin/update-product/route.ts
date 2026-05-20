@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { writeAuditLog } from "@/lib/audit-log";
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -29,11 +30,29 @@ export async function POST(req: NextRequest) {
 
   if (Object.keys(patch).length === 0) return NextResponse.json({ ok: true });
 
+  const { data: existing } = await supabaseAdmin
+    .from("products")
+    .select("name")
+    .eq("id", productId)
+    .maybeSingle();
+
   const { error } = await supabaseAdmin
     .from("products")
     .update(patch)
     .eq("id", productId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const changes: Record<string, string | null> = {};
+  if (type !== undefined) changes.type = patch.type;
+  if (iherb_url !== undefined) changes.iherb_url = patch.iherb_url;
+  if (image_url !== undefined) changes.image_url = patch.image_url;
+  if (name !== undefined) changes.name = patch.name;
+
+  await writeAuditLog(userId, "update_product", "product", productId, {
+    name: existing?.name ?? productId,
+    changes,
+  });
+
   return NextResponse.json({ ok: true });
 }

@@ -32,6 +32,15 @@ type AllEditState = {
 
 type ProductType = { id: string; name: string; body_area: string };
 
+type AuditEntry = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  detail: Record<string, unknown>;
+  created_at: string;
+};
+
 const BODY_AREAS = ["Face", "Makeup", "Lips", "Body", "Hair"];
 
 const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
@@ -53,6 +62,50 @@ function relativeTime(iso: string): string {
   const days = Math.floor(hrs / 24);
   if (days < 30) return `${days}d ago`;
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function describeAction(entry: AuditEntry): string {
+  const d = entry.detail;
+  switch (entry.action) {
+    case "add_type":
+      return `Added type "${d.name}" (${d.body_area})`;
+    case "edit_type": {
+      const before = d.before as { name: string; body_area: string };
+      const after = d.after as { name: string; body_area: string };
+      if (before.name !== after.name && before.body_area !== after.body_area)
+        return `Renamed "${before.name}" → "${after.name}" · moved to ${after.body_area}`;
+      if (before.name !== after.name)
+        return `Renamed type "${before.name}" → "${after.name}"`;
+      return `Moved "${after.name}" to ${after.body_area}`;
+    }
+    case "delete_type":
+      return `Deleted type "${d.name}"`;
+    case "merge_types": {
+      const sources = (d.sources as string[]).map((s) => `"${s}"`).join(", ");
+      const target = d.target as { name: string };
+      return `Merged ${sources} → "${target.name}"`;
+    }
+    case "update_product": {
+      const changes = Object.entries(d.changes as Record<string, string | null>)
+        .filter(([, v]) => v)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(", ");
+      return `Updated "${d.name}"${changes ? ` — ${changes}` : ""}`;
+    }
+    case "delete_product":
+      return `Deleted product "${d.name}"`;
+    case "archive_submission":
+      return `Archived submission "${d.name}"`;
+    default:
+      return entry.action;
+  }
+}
+
+function actionColor(action: string): string {
+  if (action.startsWith("delete")) return "text-rose-500";
+  if (action === "merge_types") return "text-indigo-600";
+  if (action === "add_type") return "text-teal-600";
+  return "text-gray-700";
 }
 
 function BodyAreaPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -148,6 +201,10 @@ export default function AdminPage() {
   const [typeSaving, setTypeSaving] = useState<string | null>(null);
   const [typeDeleting, setTypeDeleting] = useState<string | null>(null);
   const [typeOpError, setTypeOpError] = useState<string | null>(null);
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditExpanded, setAuditExpanded] = useState(false);
+
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [selectedTypeIds, setSelectedTypeIds] = useState<Set<string>>(new Set());
   const [mergeTargetName, setMergeTargetName] = useState("");
@@ -195,6 +252,7 @@ export default function AdminPage() {
         setLoading(false);
         loadAllProducts();
         loadTypes();
+        loadAuditLog();
       })
       .catch(() => setLoading(false));
   }, [isLoaded, isSignedIn]);
@@ -213,6 +271,20 @@ export default function AdminPage() {
       // ignore
     }
     setAllProductsLoading(false);
+  }
+
+  async function loadAuditLog() {
+    setAuditLoading(true);
+    try {
+      const res = await fetch("/api/admin/audit-log");
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLog(data.entries ?? []);
+      }
+    } catch {
+      // ignore
+    }
+    setAuditLoading(false);
   }
 
   async function loadTypes() {
@@ -900,6 +972,48 @@ export default function AdminPage() {
                     {mergeError && <span className="text-xs text-rose-600">{mergeError}</span>}
                   </div>
                   <BodyAreaPicker value={mergeTargetArea} onChange={setMergeTargetArea} />
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* Activity */}
+        <section>
+          <button
+            type="button"
+            onClick={() => setAuditExpanded((v) => !v)}
+            className="flex items-center gap-3 mb-4 group"
+          >
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">Activity</h2>
+            {!auditLoading && auditLog.length > 0 && (
+              <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
+                {auditLog.length}
+              </span>
+            )}
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${auditExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {auditExpanded && (
+            <>
+              {auditLoading && <p className="text-sm text-gray-400">Loading…</p>}
+              {!auditLoading && auditLog.length === 0 && (
+                <p className="text-sm text-gray-400">No activity yet.</p>
+              )}
+              {!auditLoading && auditLog.length > 0 && (
+                <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
+                  {auditLog.map((entry) => (
+                    <div key={entry.id} className="flex items-baseline justify-between px-4 py-2.5 gap-4">
+                      <span className={`text-sm ${actionColor(entry.action)}`}>
+                        {describeAction(entry)}
+                      </span>
+                      <span className="text-xs text-gray-400 shrink-0">
+                        {relativeTime(entry.created_at)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </>

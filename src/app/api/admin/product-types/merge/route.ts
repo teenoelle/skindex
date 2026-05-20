@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { writeAuditLog } from "@/lib/audit-log";
 
 async function isAdmin(userId: string | null): Promise<boolean> {
   if (!userId) return false;
@@ -25,7 +26,6 @@ export async function POST(req: NextRequest) {
   const cleanName = targetName.trim();
   const cleanArea = targetBodyArea.trim();
 
-  // Fetch all source types
   const { data: types } = await supabaseAdmin
     .from("product_types")
     .select("id, name")
@@ -35,7 +35,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not find all specified types" }, { status: 404 });
   }
 
-  // Check targetName isn't already taken by a type outside the merge set
   const { data: conflict } = await supabaseAdmin
     .from("product_types")
     .select("id")
@@ -49,11 +48,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Bulk-update all products that have any of the source type names
   const sourceNames = types.map((t) => t.name);
   await supabaseAdmin.from("products").update({ type: cleanName }).in("type", sourceNames);
 
-  // Keep the first type record, update it to the target; delete the rest
   const keepId = types[0].id;
   const deleteIds = types.slice(1).map((t) => t.id);
 
@@ -67,6 +64,11 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await supabaseAdmin.from("product_types").delete().in("id", deleteIds);
+
+  await writeAuditLog(userId!, "merge_types", "product_type", keepId, {
+    sources: sourceNames,
+    target: { name: cleanName, body_area: cleanArea },
+  });
 
   return NextResponse.json({ type: updated });
 }

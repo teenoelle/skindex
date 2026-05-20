@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { writeAuditLog } from "@/lib/audit-log";
 
 async function isAdmin(userId: string | null): Promise<boolean> {
   if (!userId) return false;
@@ -39,5 +40,11 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await writeAuditLog(userId!, "add_type", "product_type", data.id, {
+    name: data.name,
+    body_area: data.body_area,
+  });
+
   return NextResponse.json({ type: data });
 }

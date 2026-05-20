@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { writeAuditLog } from "@/lib/audit-log";
 
 async function isAdmin(userId: string | null): Promise<boolean> {
   if (!userId) return false;
@@ -20,7 +21,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 
   const { data: existing } = await supabaseAdmin
     .from("product_types")
-    .select("name")
+    .select("name, body_area")
     .eq("id", id)
     .maybeSingle();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -42,6 +43,11 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     await supabaseAdmin.from("products").update({ type: patch.name }).eq("type", existing.name);
   }
 
+  await writeAuditLog(userId!, "edit_type", "product_type", id, {
+    before: { name: existing.name, body_area: existing.body_area },
+    after: { name: data.name, body_area: data.body_area },
+  });
+
   return NextResponse.json({ type: data });
 }
 
@@ -53,7 +59,7 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
 
   const { data: existing } = await supabaseAdmin
     .from("product_types")
-    .select("name")
+    .select("name, body_area")
     .eq("id", id)
     .maybeSingle();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -72,5 +78,11 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
 
   const { error } = await supabaseAdmin.from("product_types").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await writeAuditLog(userId!, "delete_type", "product_type", id, {
+    name: existing.name,
+    body_area: existing.body_area,
+  });
+
   return NextResponse.json({ ok: true });
 }
