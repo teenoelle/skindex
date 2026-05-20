@@ -39,7 +39,7 @@ const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
   { label: "Makeup", types: ["BB Cream", "Blush", "Brow Gel", "CC Cream", "Concealer", "Eyeliner", "Eyeshadow", "Foundation", "Mascara", "Setting Spray"].sort() },
   { label: "Lips", types: ["Lip Balm", "Lip Treatment"] },
   { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream", "Hand Cream"].sort() },
-  { label: "Hair", types: ["Conditioner", "Hair Treatment", "Scalp Treatment", "Shampoo"].sort() },
+  { label: "Hair", types: ["Conditioner", "Hair Styler", "Hair Treatment", "Scalp Treatment", "Shampoo"].sort() },
 ];
 
 const FALLBACK_TYPES_SET = new Set(PRODUCT_TYPE_GROUPS.flatMap((g) => g.types));
@@ -654,13 +654,17 @@ export default function AdminPage() {
               placeholder="New type name…"
               className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 w-44"
             />
-            <select
+            <input
+              type="text"
               value={newTypeBodyArea}
               onChange={(e) => setNewTypeBodyArea(e.target.value)}
-              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-gray-400"
-            >
-              {BODY_AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
+              list="body-areas-list"
+              placeholder="Body area…"
+              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 w-28"
+            />
+            <datalist id="body-areas-list">
+              {BODY_AREAS.map((a) => <option key={a} value={a} />)}
+            </datalist>
             <button
               type="button"
               onClick={addType}
@@ -695,13 +699,14 @@ export default function AdminPage() {
                                 className="text-xs border border-indigo-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 w-40"
                                 autoFocus
                               />
-                              <select
+                              <input
+                                type="text"
                                 value={editTypeBodyArea}
                                 onChange={(e) => setEditTypeBodyArea(e.target.value)}
-                                className="text-xs border border-indigo-200 rounded px-2 py-1 bg-white focus:outline-none"
-                              >
-                                {BODY_AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
-                              </select>
+                                list="body-areas-list"
+                                placeholder="Body area…"
+                                className="text-xs border border-indigo-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 w-24"
+                              />
                               <button
                                 type="button"
                                 onClick={() => saveTypeEdit(t)}

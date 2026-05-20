@@ -201,7 +201,7 @@ const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
   { label: "Makeup", types: ["BB Cream", "Blush", "Brow Gel", "CC Cream", "Concealer", "Eyeliner", "Eyeshadow", "Foundation", "Mascara", "Setting Spray"].sort() },
   { label: "Lips", types: ["Lip Balm", "Lip Treatment"] },
   { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream", "Hand Cream"].sort() },
-  { label: "Hair", types: ["Conditioner", "Hair Treatment", "Scalp Treatment", "Shampoo"].sort() },
+  { label: "Hair", types: ["Conditioner", "Hair Styler", "Hair Treatment", "Scalp Treatment", "Shampoo"].sort() },
 ];
 
 const RINSE_OFF_TYPES = new Set(["Face Wash", "Body Wash", "Shampoo", "Makeup Remover"]);
