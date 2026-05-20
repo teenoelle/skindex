@@ -148,6 +148,12 @@ export default function AdminPage() {
   const [typeSaving, setTypeSaving] = useState<string | null>(null);
   const [typeDeleting, setTypeDeleting] = useState<string | null>(null);
   const [typeOpError, setTypeOpError] = useState<string | null>(null);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const [selectedTypeIds, setSelectedTypeIds] = useState<Set<string>>(new Set());
+  const [mergeTargetName, setMergeTargetName] = useState("");
+  const [mergeTargetArea, setMergeTargetArea] = useState("Face");
+  const [merging, setMerging] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
 
   const activeTypesSet = productTypes.length > 0
     ? new Set(productTypes.map((t) => t.name))
@@ -351,6 +357,61 @@ export default function AdminPage() {
       setTypeOpError((e as Error).message);
     }
     setTypeDeleting(null);
+  }
+
+  function toggleGroup(label: string) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  }
+
+  function toggleTypeSelection(id: string, name: string, bodyArea: string) {
+    setSelectedTypeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        if (next.size === 0) { setMergeTargetName(""); setMergeTargetArea("Face"); }
+      } else {
+        next.add(id);
+        if (next.size === 1) { setMergeTargetName(name); setMergeTargetArea(bodyArea); }
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedTypeIds(new Set());
+    setMergeTargetName("");
+    setMergeError(null);
+  }
+
+  async function mergeTypes() {
+    if (selectedTypeIds.size < 2 || !mergeTargetName.trim()) return;
+    setMerging(true);
+    setMergeError(null);
+    try {
+      const res = await fetch("/api/admin/product-types/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          typeIds: Array.from(selectedTypeIds),
+          targetName: mergeTargetName.trim(),
+          targetBodyArea: mergeTargetArea,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Merge failed");
+      setProductTypes((prev) => {
+        const filtered = prev.filter((t) => !selectedTypeIds.has(t.id));
+        return [...filtered, data.type];
+      });
+      clearSelection();
+    } catch (e) {
+      setMergeError((e as Error).message);
+    }
+    setMerging(false);
   }
 
   const allStats = {
@@ -697,7 +758,7 @@ export default function AdminPage() {
             )}
           </div>
 
-          <div className="mb-8 space-y-3">
+          <div className="mb-6 space-y-3">
             <div className="flex gap-2 flex-wrap items-center">
               <input
                 type="text"
@@ -723,73 +784,125 @@ export default function AdminPage() {
           {typesLoading && <p className="text-sm text-gray-400">Loading…</p>}
 
           {!typesLoading && typeGroups.length > 0 && (
-            <div className="space-y-6">
-              {typeGroups.map(({ label, types: groupTypes }) => (
-                <div key={label}>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
-                  <div className="divide-y divide-gray-50">
-                    {groupTypes.map((t) => {
-                      const isEditing = editingTypeId === t.id;
-                      const isSaving = typeSaving === t.id;
-                      const isDeleting = typeDeleting === t.id;
-                      return (
-                        <div key={t.id} className="py-2">
-                          {isEditing ? (
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <input
-                                  value={editTypeName}
-                                  onChange={(e) => setEditTypeName(e.target.value)}
-                                  onKeyDown={(e) => { if (e.key === "Enter") saveTypeEdit(t); if (e.key === "Escape") setEditingTypeId(null); }}
-                                  className="text-xs border border-indigo-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 w-40"
-                                  autoFocus
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => saveTypeEdit(t)}
-                                  disabled={isSaving}
-                                  className="text-xs text-indigo-600 hover:text-indigo-800 disabled:opacity-40"
-                                >
-                                  {isSaving ? "Saving…" : "Save"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingTypeId(null)}
-                                  className="text-xs text-gray-400 hover:text-gray-600"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                              <BodyAreaPicker value={editTypeBodyArea} onChange={setEditTypeBodyArea} />
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm text-gray-800 flex-1">{t.name}</span>
-                              <button
-                                type="button"
-                                onClick={() => startEditType(t)}
-                                className="text-xs text-gray-400 hover:text-gray-700"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => deleteType(t)}
-                                disabled={isDeleting}
-                                className="text-xs text-rose-400 hover:text-rose-600 disabled:opacity-40"
-                              >
-                                {isDeleting ? "Deleting…" : "Delete"}
-                              </button>
-                            </div>
+            <>
+              <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-100">
+                {typeGroups.map(({ label, types: groupTypes }) => {
+                  const isOpen = openGroups.has(label);
+                  const selectedInGroup = groupTypes.filter((t) => selectedTypeIds.has(t.id)).length;
+                  return (
+                    <div key={label}>
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(label)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-700">{label}</span>
+                          <span className="text-xs text-gray-400">({groupTypes.length})</span>
+                          {selectedInGroup > 0 && (
+                            <span className="text-xs bg-indigo-100 text-indigo-700 rounded-full px-1.5 py-0.5 font-medium">
+                              {selectedInGroup} selected
+                            </span>
                           )}
                         </div>
-                      );
+                        <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      {isOpen && (
+                        <div className="border-t border-gray-100 divide-y divide-gray-50">
+                          {groupTypes.map((t) => {
+                            const isEditing = editingTypeId === t.id;
+                            const isSaving = typeSaving === t.id;
+                            const isDeleting = typeDeleting === t.id;
+                            const isSelected = selectedTypeIds.has(t.id);
+                            return (
+                              <div key={t.id} className={`px-4 ${isEditing ? "py-3 bg-indigo-50/40" : "py-2"} ${isSelected && !isEditing ? "bg-indigo-50/30" : ""}`}>
+                                {isEditing ? (
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <input
+                                        value={editTypeName}
+                                        onChange={(e) => setEditTypeName(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") saveTypeEdit(t); if (e.key === "Escape") setEditingTypeId(null); }}
+                                        className="text-xs border border-indigo-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 w-40"
+                                        autoFocus
+                                      />
+                                      <button type="button" onClick={() => saveTypeEdit(t)} disabled={isSaving} className="text-xs text-indigo-600 hover:text-indigo-800 disabled:opacity-40">
+                                        {isSaving ? "Saving…" : "Save"}
+                                      </button>
+                                      <button type="button" onClick={() => setEditingTypeId(null)} className="text-xs text-gray-400 hover:text-gray-600">
+                                        Cancel
+                                      </button>
+                                    </div>
+                                    <BodyAreaPicker value={editTypeBodyArea} onChange={setEditTypeBodyArea} />
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-3 group">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => toggleTypeSelection(t.id, t.name, t.body_area)}
+                                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+                                    />
+                                    <span className="text-sm text-gray-800 flex-1">{t.name}</span>
+                                    <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button type="button" onClick={() => startEditType(t)} className="text-xs text-gray-400 hover:text-gray-700">
+                                        Edit
+                                      </button>
+                                      <button type="button" onClick={() => deleteType(t)} disabled={isDeleting} className="text-xs text-rose-400 hover:text-rose-600 disabled:opacity-40">
+                                        {isDeleting ? "Deleting…" : "Delete"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {typeOpError && <p className="text-xs text-rose-600 mt-3">{typeOpError}</p>}
+
+              {selectedTypeIds.size >= 2 && (
+                <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-xl space-y-3">
+                  <div className="flex flex-wrap gap-1 items-center">
+                    <span className="text-xs font-medium text-indigo-800 mr-1">Merging:</span>
+                    {Array.from(selectedTypeIds).map((id) => {
+                      const t = productTypes.find((x) => x.id === id);
+                      return t ? (
+                        <span key={id} className="text-xs bg-white border border-indigo-200 rounded-full px-2 py-0.5 text-indigo-700">
+                          {t.name}
+                        </span>
+                      ) : null;
                     })}
                   </div>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    <input
+                      type="text"
+                      value={mergeTargetName}
+                      onChange={(e) => { setMergeTargetName(e.target.value); setMergeError(null); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") mergeTypes(); }}
+                      placeholder="Merged name…"
+                      className="text-xs border border-indigo-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-400 w-44"
+                    />
+                    <button type="button" onClick={mergeTypes} disabled={merging || !mergeTargetName.trim()} className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors">
+                      {merging ? "Merging…" : "Merge"}
+                    </button>
+                    <button type="button" onClick={clearSelection} className="text-xs text-gray-500 hover:text-gray-700">
+                      Cancel
+                    </button>
+                    {mergeError && <span className="text-xs text-rose-600">{mergeError}</span>}
+                  </div>
+                  <BodyAreaPicker value={mergeTargetArea} onChange={setMergeTargetArea} />
                 </div>
-              ))}
-              {typeOpError && <p className="text-xs text-rose-600 mt-2">{typeOpError}</p>}
-            </div>
+              )}
+            </>
           )}
         </section>
 
