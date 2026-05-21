@@ -1308,10 +1308,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       {/* Browse grid — shown as background when no result */}
       {!result && !loading && !notFound && !limitReached && (
         <div className="mt-4">
+          <p className="text-sm text-gray-400 text-center mb-5">Know what&apos;s in your skincare before it touches your skin.</p>
           {browseLoading && !browseSelectedType && (
             <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
           )}
           {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
+            <>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Browse</p>
             <div className="space-y-5">
               {(() => {
                 const AREA_ORDER = ["Face", "Body", "Hair", "Lip", "Makeup", "Sun"];
@@ -1351,6 +1354,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 return sections;
               })()}
             </div>
+            </>
           )}
           {browseSelectedType && (
             <div>
