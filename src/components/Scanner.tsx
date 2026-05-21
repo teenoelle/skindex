@@ -206,14 +206,6 @@ const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
 
 const RINSE_OFF_TYPES = new Set(["Face Wash", "Body Wash", "Shampoo", "Makeup Remover"]);
 
-const BROWSE_AREA_GROUPS: { label: string; types: string[] }[] = [
-  { label: "Face", types: ["Concentrate", "Exfoliant", "Eye Cream", "Eye Primer", "Face Mask", "Face Wash", "Makeup Remover", "Mist", "Moisturizer", "Oil", "Ointment", "Primer", "Serum", "Sleeping Mask", "Spot Patches", "Toner"] },
-  { label: "Hair", types: ["Brow Gel", "Conditioner", "Hair Treatment", "Scalp Treatment", "Shampoo"] },
-  { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream", "Hand Cream"] },
-  { label: "Lip", types: ["Lip Balm", "Lip Treatment"] },
-  { label: "Makeup", types: ["BB Cream", "Blush", "CC Cream", "Concealer", "Eyeliner", "Eyeshadow", "Foundation", "Mascara", "Setting Spray"] },
-  { label: "Sun", types: ["Sun Screen"] },
-];
 
 function toTitleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -1322,49 +1314,40 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
             <div className="space-y-5">
               {(() => {
-                const typeMap = new Map(browseTypes.map((t) => [t.name, t]));
-                const seen = new Set<string>();
+                const AREA_ORDER = ["Face", "Body", "Hair", "Lip", "Makeup", "Sun"];
+                const grouped = new Map<string, BrowseType[]>();
+                const ungrouped: BrowseType[] = [];
+                for (const t of browseTypes) {
+                  const area = typeBodyAreaMap.get(t.name);
+                  if (area) {
+                    if (!grouped.has(area)) grouped.set(area, []);
+                    grouped.get(area)!.push(t);
+                  } else {
+                    ungrouped.push(t);
+                  }
+                }
+                const typeButton = (t: BrowseType) => (
+                  <button
+                    key={t.name}
+                    onClick={() => selectBrowseType(t.name)}
+                    className="text-sm text-gray-700 border border-gray-200 rounded-full px-3 py-1 hover:border-gray-400 hover:text-gray-900 transition-colors"
+                  >
+                    {t.name} <span className="text-gray-400 text-xs">{t.count}</span>
+                  </button>
+                );
+                const areaSection = (label: string, types: BrowseType[]) => (
+                  <div key={label}>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">{label}</p>
+                    <div className="flex flex-wrap gap-2">{types.map(typeButton)}</div>
+                  </div>
+                );
                 const sections: React.ReactNode[] = [];
-                for (const group of BROWSE_AREA_GROUPS) {
-                  const groupTypes = group.types.map((n) => typeMap.get(n)).filter(Boolean) as BrowseType[];
-                  if (groupTypes.length === 0) continue;
-                  groupTypes.forEach((t) => seen.add(t.name));
-                  sections.push(
-                    <div key={group.label}>
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">{group.label}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {groupTypes.map((t) => (
-                          <button
-                            key={t.name}
-                            onClick={() => selectBrowseType(t.name)}
-                            className="text-sm text-gray-700 border border-gray-200 rounded-full px-3 py-1 hover:border-gray-400 hover:text-gray-900 transition-colors"
-                          >
-                            {t.name} <span className="text-gray-400 text-xs">{t.count}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
+                for (const area of AREA_ORDER) {
+                  const types = grouped.get(area);
+                  if (types?.length) { sections.push(areaSection(area, types)); grouped.delete(area); }
                 }
-                const misc = browseTypes.filter((t) => !seen.has(t.name));
-                if (misc.length > 0) {
-                  sections.push(
-                    <div key="other">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Other</p>
-                      <div className="flex flex-wrap gap-2">
-                        {misc.map((t) => (
-                          <button
-                            key={t.name}
-                            onClick={() => selectBrowseType(t.name)}
-                            className="text-sm text-gray-700 border border-gray-200 rounded-full px-3 py-1 hover:border-gray-400 hover:text-gray-900 transition-colors"
-                          >
-                            {t.name} <span className="text-gray-400 text-xs">{t.count}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                }
+                for (const [area, types] of grouped) sections.push(areaSection(area, types));
+                if (ungrouped.length > 0) sections.push(areaSection("Other", ungrouped));
                 return sections;
               })()}
             </div>
