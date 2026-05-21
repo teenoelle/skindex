@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct } from "@/types";
+import type { IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant } from "@/types";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -380,8 +380,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [suggestLinkUrl, setSuggestLinkUrl] = useState("");
   const [suggestLinkLoading, setSuggestLinkLoading] = useState(false);
   const [suggestLinkError, setSuggestLinkError] = useState<string | null>(null);
+  const [pinnedVariants, setPinnedVariants] = useState<CommunityVariant[] | null>(null);
+  const [pinnedTopProduct, setPinnedTopProduct] = useState<CommunityVariant | null>(null);
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
 
   const initialProductIdRef = useRef(initialProductId);
+  const scrollToProductRef = useRef(false);
   useEffect(() => {
     if (initialProductIdRef.current) {
       scanVariant({ productId: initialProductIdRef.current });
@@ -424,6 +428,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       setIsRinseOff(RINSE_OFF_TYPES.has(result.product.type ?? ""));
     }
   }, [result?.product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (scrollToProductRef.current && result) {
+      scrollToProductRef.current = false;
+      requestAnimationFrame(() => {
+        document.getElementById("product-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, [result]);
 
   // Auto-trigger review when scan finds unreviewed ingredients.
   // Delay gives the scan's fire-and-forget queue push time to complete.
@@ -475,6 +488,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setSuggestLinkOpen(false);
     setSuggestLinkUrl("");
     setSuggestLinkError(null);
+    setPinnedVariants(null);
+    setPinnedTopProduct(null);
+    setActiveVariantId(null);
 
     const activeTab = override?.tab ?? tab;
     const activeQuery = override?.query ?? query;
@@ -509,6 +525,19 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     }
     if (!Array.isArray(data.flagged)) { setNotFound(true); return; }
     setResult(data);
+    if (data.communityVariants?.length && data.product?.id) {
+      setPinnedVariants(data.communityVariants);
+      setPinnedTopProduct({
+        id: data.product.id,
+        name: data.product.name,
+        brand: data.product.brand ?? null,
+        image_url: data.product.image_url ?? null,
+        flaggedCount: data.flagged?.length ?? 0,
+        sensoryCount: data.sensoryTrigger?.length ?? 0,
+        photoCount: data.photosensitive?.length ?? 0,
+      });
+      setActiveVariantId(data.product.id);
+    }
   }
 
   async function toggleExpand(id: string, existingExplanation: string | null) {
@@ -592,7 +621,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     });
   }
 
-  async function scanVariant(opts: { productId?: string; pasteIngredients?: string; productName?: string; productBrand?: string | null }) {
+  async function scanVariant(opts: { productId?: string; pasteIngredients?: string; productName?: string; productBrand?: string | null }, preservePinned = false) {
     setLoading(true);
     setNotFound(false); setIHerbBlocked(false);
     setResult(null);
@@ -647,6 +676,29 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       };
     }
     setResult(data);
+    if (!preservePinned && data.communityVariants?.length && data.product?.id) {
+      setPinnedVariants(data.communityVariants);
+      setPinnedTopProduct({
+        id: data.product.id,
+        name: data.product.name,
+        brand: data.product.brand ?? null,
+        image_url: data.product.image_url ?? null,
+        flaggedCount: data.flagged?.length ?? 0,
+        sensoryCount: data.sensoryTrigger?.length ?? 0,
+        photoCount: data.photosensitive?.length ?? 0,
+      });
+      setActiveVariantId(data.product.id);
+    }
+  }
+
+  async function handleDymVariantClick(variantId: string) {
+    if (variantId === activeVariantId) {
+      document.getElementById("product-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    scrollToProductRef.current = true;
+    setActiveVariantId(variantId);
+    await scanVariant({ productId: variantId }, true);
   }
 
   async function fetchAlternatives() {
@@ -1335,6 +1387,56 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         </div>
       )}
 
+      {/* Did you mean */}
+      {pinnedTopProduct && pinnedVariants && pinnedVariants.length > 0 && (
+        <div className="mt-8">
+          <p className="text-xs text-gray-400 mb-1.5">Did you mean</p>
+          <div className="flex flex-col divide-y divide-gray-100">
+            {[pinnedTopProduct, ...pinnedVariants].map((v) => {
+              const isActive = v.id === activeVariantId;
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => handleDymVariantClick(v.id)}
+                  className={`flex gap-3 py-2.5 text-left w-full transition-colors${isActive ? " -mx-2 px-2 bg-gray-50 rounded-lg" : " hover:bg-gray-50 -mx-2 px-2 rounded-lg"}`}
+                >
+                  <div className="w-10 shrink-0">
+                    {v.image_url ? (
+                      <img
+                        src={`/api/image-proxy?url=${encodeURIComponent(v.image_url)}`}
+                        alt={v.name}
+                        className="w-10 h-10 object-contain rounded-lg bg-gray-50"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-gray-50" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div>
+                      <p className={`text-sm leading-snug${isActive ? " font-semibold text-gray-900" : " font-medium text-gray-800"}`}>{v.name}</p>
+                      {v.brand && <p className="text-xs text-gray-400 mt-0.5">{v.brand}</p>}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {v.flaggedCount === 0 && v.sensoryCount === 0 && v.photoCount === 0 ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe</span>
+                      ) : (
+                        <>
+                          {v.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{v.flaggedCount} flagged</span>}
+                          {v.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{v.sensoryCount} sensory triggers</span>}
+                          {v.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{v.photoCount} photosensitive</span>}
+                        </>
+                      )}
+                      {isActive && <span className="text-xs text-gray-400">↓ viewing</span>}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Results */}
       {result && (
         <div className="mt-8 space-y-8">
@@ -1342,7 +1444,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           <div className="space-y-4">
           {/* Product header */}
           {result.product && (
-            <div className="flex flex-col sm:flex-row rounded-xl border border-gray-100 overflow-hidden">
+            <div id="product-card" className="flex flex-col sm:flex-row rounded-xl border border-gray-100 overflow-hidden">
               {/* Image panel */}
               <div className={`sm:w-64 shrink-0 bg-gray-50${result.product.image_url ? "" : " flex items-center justify-center min-h-[200px]"}`}>
                 {result.product.image_url ? (
@@ -1765,53 +1867,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
           )}
 
-          {/* Did you mean */}
-          {result.communityVariants && result.communityVariants.length > 0 && (
-            <div>
-              <p className="text-xs text-gray-400 mb-1.5">Did you mean</p>
-              <div className="flex flex-col divide-y divide-gray-100">
-                {result.communityVariants.map((v) => (
-                  <div key={v.id} className="flex gap-3 py-2.5">
-                    <div className="w-10 shrink-0">
-                      {v.image_url ? (
-                        <img
-                          src={`/api/image-proxy?url=${encodeURIComponent(v.image_url)}`}
-                          alt={v.name}
-                          className="w-10 h-10 object-contain rounded-lg bg-gray-50"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-gray-50" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-1.5">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800 leading-snug">{v.name}</p>
-                        {v.brand && <p className="text-xs text-gray-400 mt-0.5">{v.brand}</p>}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {v.flaggedCount === 0 && v.sensoryCount === 0 && v.photoCount === 0 ? (
-                          <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe</span>
-                        ) : (
-                          <>
-                            {v.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{v.flaggedCount} flagged</span>}
-                            {v.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{v.sensoryCount} sensory triggers</span>}
-                            {v.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{v.photoCount} photosensitive</span>}
-                          </>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => scanVariant({ productId: v.id })}
-                          className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
-                        >
-                          Scan
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           </div>
 
           {/* Summary line + safe alternatives group */}
