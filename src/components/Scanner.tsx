@@ -393,6 +393,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   const initialProductIdRef = useRef(initialProductId);
   const scrollToProductRef = useRef(false);
+  const scrollToDymRef = useRef(false);
   useEffect(() => {
     if (initialProductIdRef.current) {
       scanVariant({ productId: initialProductIdRef.current });
@@ -468,6 +469,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       scrollToProductRef.current = false;
       requestAnimationFrame(() => {
         document.getElementById("product-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+    if (scrollToDymRef.current && result) {
+      scrollToDymRef.current = false;
+      requestAnimationFrame(() => {
+        document.getElementById("did-you-mean")?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
   }, [result]);
@@ -573,7 +580,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         sensoryCount: data.sensoryTrigger?.length ?? 0,
         photoCount: data.photosensitive?.length ?? 0,
       });
-      setActiveVariantId(data.product.id);
+      scrollToDymRef.current = true;
     }
   }
 
@@ -1231,7 +1238,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               )}
               <div className="space-y-2">
                 {browseProducts.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 border border-gray-300 rounded-xl p-3">
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => { resetTab("search"); setQuery(p.name); handleScan({ tab: "search", query: p.name }); }}
+                    className="w-full flex items-center gap-3 border border-gray-300 rounded-xl p-3 text-left hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                  >
                     {p.image_url && (
                       <img
                         src={`/api/image-proxy?url=${encodeURIComponent(p.image_url)}`}
@@ -1253,14 +1265,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photosensitive</span>}
                         </>
                       )}
-                      <button
-                        onClick={() => { resetTab("search"); setQuery(p.name); handleScan({ tab: "search", query: p.name }); }}
-                        className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 shrink-0 ml-1.5"
-                      >
-                        Scan
-                      </button>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -1488,7 +1494,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
       {/* Did you mean */}
       {pinnedTopProduct && pinnedVariants && pinnedVariants.length > 0 && (
-        <div className="mt-8">
+        <div id="did-you-mean" className="mt-8">
           <button
             type="button"
             onClick={() => setDymOpen((v) => !v)}
