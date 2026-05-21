@@ -185,6 +185,7 @@ export async function POST(req: NextRequest) {
             id: p.id,
             name: p.name,
             brand: p.brand ?? null,
+            type: p.type ?? null,
             image_url: null,
             flaggedCount: 0,
             sensoryCount: 0,
@@ -226,6 +227,7 @@ export async function POST(req: NextRequest) {
                 id: s.p.id,
                 name: s.p.name,
                 brand: s.p.brand ?? null,
+                type: s.p.type ?? null,
                 image_url: null,
                 flaggedCount: 0,
                 sensoryCount: 0,
@@ -376,13 +378,13 @@ export async function POST(req: NextRequest) {
     if (dbProduct && !communityVariants?.length && !productId && query) {
       const { data: alts } = await supabase
         .from("products")
-        .select("id, name, brand")
+        .select("id, name, brand, type")
         .ilike("name", `%${query}%`)
         .not("ingredient_list", "is", null)
         .neq("id", dbProduct.id)
         .limit(10);
       if (alts?.length) {
-        communityVariants = alts.map((p) => ({ id: p.id, name: p.name, brand: p.brand ?? null, image_url: null, flaggedCount: 0, sensoryCount: 0, photoCount: 0 }));
+        communityVariants = alts.map((p) => ({ id: p.id, name: p.name, brand: p.brand ?? null, type: p.type ?? null, image_url: null, flaggedCount: 0, sensoryCount: 0, photoCount: 0 }));
       }
     }
 

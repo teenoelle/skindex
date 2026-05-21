@@ -383,6 +383,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [pinnedVariants, setPinnedVariants] = useState<CommunityVariant[] | null>(null);
   const [pinnedTopProduct, setPinnedTopProduct] = useState<CommunityVariant | null>(null);
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
+  const [typeBodyAreaMap, setTypeBodyAreaMap] = useState<Map<string, string>>(new Map());
 
   const initialProductIdRef = useRef(initialProductId);
   const scrollToProductRef = useRef(false);
@@ -391,6 +392,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       scanVariant({ productId: initialProductIdRef.current });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    fetch("/api/product-types")
+      .then((r) => r.json())
+      .then((d: { types?: { name: string; body_area: string }[] }) => {
+        if (d.types) setTypeBodyAreaMap(new Map(d.types.map((t) => [t.name, t.body_area])));
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (result?.product?.id) {
@@ -531,6 +541,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         id: data.product.id,
         name: data.product.name,
         brand: data.product.brand ?? null,
+        type: data.product.type ?? null,
         image_url: data.product.image_url ?? null,
         flaggedCount: data.flagged?.length ?? 0,
         sensoryCount: data.sensoryTrigger?.length ?? 0,
@@ -682,6 +693,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         id: data.product.id,
         name: data.product.name,
         brand: data.product.brand ?? null,
+        type: data.product.type ?? null,
         image_url: data.product.image_url ?? null,
         flaggedCount: data.flagged?.length ?? 0,
         sensoryCount: data.sensoryTrigger?.length ?? 0,
@@ -1401,21 +1413,26 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   onClick={() => handleDymVariantClick(v.id)}
                   className={`flex gap-3 py-2.5 text-left w-full transition-colors${isActive ? " -mx-2 px-2 bg-gray-50 rounded-lg" : " hover:bg-gray-50 -mx-2 px-2 rounded-lg"}`}
                 >
-                  <div className="w-10 shrink-0">
+                  <div className="w-12 shrink-0">
                     {v.image_url ? (
                       <img
                         src={`/api/image-proxy?url=${encodeURIComponent(v.image_url)}`}
                         alt={v.name}
-                        className="w-10 h-10 object-contain rounded-lg bg-gray-50"
+                        className="w-12 h-14 object-contain rounded-lg bg-gray-50"
                       />
                     ) : (
-                      <div className="w-10 h-10 rounded-lg bg-gray-50" />
+                      <div className="w-12 h-14 rounded-lg bg-gray-50" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div>
                       <p className={`text-sm leading-snug${isActive ? " font-semibold text-gray-900" : " font-medium text-gray-800"}`}>{v.name}</p>
                       {v.brand && <p className="text-xs text-gray-400 mt-0.5">{v.brand}</p>}
+                      {v.type && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {[typeBodyAreaMap.get(v.type), v.type].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {v.flaggedCount === 0 && v.sensoryCount === 0 && v.photoCount === 0 ? (
@@ -1470,6 +1487,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     ? (() => { try { return new URL(result.product.name).hostname.replace("www.", ""); } catch { return result.product.name; } })()
                     : result.product.name}
                 </h2>
+                {result.product.type && (
+                  <p className="text-xs text-gray-400">
+                    {[typeBodyAreaMap.get(result.product.type), result.product.type].filter(Boolean).join(" · ")}
+                  </p>
+                )}
                 {(result.product.brand || result.product.iherb_url || (isSignedIn && result.product.id)) && (
                   <div className="flex flex-col gap-0.5">
                     <p className="text-sm text-gray-400 flex items-center gap-2 flex-wrap">
@@ -1985,6 +2007,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-800 truncate" title={alt.name}>{alt.name}</p>
                                 {alt.brand && <p className="text-xs text-gray-400">{alt.brand}</p>}
+                                {alt.type && (
+                                  <p className="text-xs text-gray-400">
+                                    {[typeBodyAreaMap.get(alt.type), alt.type].filter(Boolean).join(" · ")}
+                                  </p>
+                                )}
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 {alt.flaggedCount === 0 && alt.sensoryCount === 0 && alt.photoCount === 0 ? (
