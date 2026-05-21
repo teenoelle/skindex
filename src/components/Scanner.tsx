@@ -2052,7 +2052,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           </div>{/* end summary + alternatives group */}
 
           {/* Ingredients parent section */}
-          <section className="space-y-8">
+          <section className="space-y-8 mt-4">
           <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest">
             Ingredients
           </p>
