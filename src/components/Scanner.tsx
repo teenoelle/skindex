@@ -1989,7 +1989,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       return (
                         <Fragment key={alt.id}>
                           <div className="py-2">
-                            <div className="flex items-center gap-3">
+                            <div className="flex gap-3">
                               {alt.image_url ? (
                                 <Image
                                   src={proxyImage(alt.image_url)!}
@@ -2004,32 +2004,34 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                   <CategoryIcon type={alt.type} size={18} />
                                 </div>
                               )}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-800 truncate" title={alt.name}>{alt.name}</p>
-                                {alt.brand && <p className="text-xs text-gray-400">{alt.brand}</p>}
-                                {alt.type && (
-                                  <p className="text-xs text-gray-400">
-                                    {[typeBodyAreaMap.get(alt.type), alt.type].filter(Boolean).join(" · ")}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {alt.flaggedCount === 0 && alt.sensoryCount === 0 && alt.photoCount === 0 ? (
-                                  <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe</span>
-                                ) : (
-                                  <>
-                                    {alt.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{alt.flaggedCount} flagged</span>}
-                                    {alt.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{alt.sensoryCount} sensory triggers</span>}
-                                    {alt.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{alt.photoCount} photosensitive</span>}
-                                  </>
-                                )}
-                                <button
-                                  type="button"
-                                  className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 ml-1.5"
-                                  onClick={() => scanVariant({ productId: alt.id })}
-                                >
-                                  Scan
-                                </button>
+                              <div className="flex-1 min-w-0 space-y-1.5">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-800 leading-snug">{alt.name}</p>
+                                  {alt.brand && <p className="text-xs text-gray-400">{alt.brand}</p>}
+                                  {alt.type && (
+                                    <p className="text-xs text-gray-400">
+                                      {[typeBodyAreaMap.get(alt.type), alt.type].filter(Boolean).join(" · ")}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {alt.flaggedCount === 0 && alt.sensoryCount === 0 && alt.photoCount === 0 ? (
+                                    <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe</span>
+                                  ) : (
+                                    <>
+                                      {alt.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{alt.flaggedCount} flagged</span>}
+                                      {alt.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{alt.sensoryCount} sensory triggers</span>}
+                                      {alt.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{alt.photoCount} photosensitive</span>}
+                                    </>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                                    onClick={() => scanVariant({ productId: alt.id })}
+                                  >
+                                    Scan
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
