@@ -46,3 +46,5 @@ next-env.d.ts
 # temp / generated files
 iherb-report.html
 supabase/.temp/
+
+.vercel
