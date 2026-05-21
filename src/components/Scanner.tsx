@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X, Menu, ChevronDown } from "lucide-react";
+import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X, Menu } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant } from "@/types";
 
@@ -421,6 +421,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     const onScroll = () => setShowStickyHeader(window.scrollY > 56);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      setTab("browse");
+      setResult(null);
+      setNotFound(false);
+      setIHerbBlocked(false);
+      setLimitReached(false);
+    };
+    window.addEventListener("skindex:reset", handler);
+    return () => window.removeEventListener("skindex:reset", handler);
   }, []);
 
   useEffect(() => {
@@ -1026,13 +1038,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setLimitReached(false);
   }
 
-  function cycleMode() {
-    if (tab === "browse") { setTab("search"); return; }
-    const modes: Tab[] = ["search", "paste", "add"];
-    const idx = modes.indexOf(tab);
-    setTab(modes[(idx + 1) % modes.length]);
-  }
-
   function resetTab(t: Tab) {
     setTab(t);
     setResult(null);
@@ -1076,10 +1081,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       <div className={`fixed top-0 left-0 right-0 z-50 bg-white transition-transform duration-200 ${showStickyHeader ? "translate-y-0 shadow-sm" : "-translate-y-full"}`}>
         {/* Row 1: logo + search + auth */}
         <div className="max-w-2xl mx-auto px-6 h-14 flex items-center gap-3">
-          <Link href="/" className="tracking-tight select-none shrink-0">
+          <button
+            type="button"
+            onClick={() => resetTab("browse")}
+            className="tracking-tight select-none shrink-0 text-left"
+          >
             <span className="font-black">SKIN</span>
             <span className="font-light text-gray-500">dex</span>
-          </Link>
+          </button>
+          <span className="hidden sm:block text-sm text-gray-400 shrink-0">Scan your skincare</span>
           <div className="flex-1" />
           {stickySearchOpen ? (
             <form
@@ -1158,15 +1168,24 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         )}
       </div>
 
-      {/* Mode pill */}
-      <div className="mb-3">
-        <button
-          type="button"
-          onClick={cycleMode}
-          className="text-sm border border-gray-200 rounded-full px-4 py-1.5 text-gray-700 hover:border-gray-400 transition-colors"
-        >
-          {tab === "paste" ? "Scan Ingredients" : tab === "add" ? "Add Product(s)" : "Search Product"} ↻
-        </button>
+      {/* Mode segmented control */}
+      <div className="flex mb-3 rounded-full border border-gray-200 overflow-hidden">
+        {([
+          ["search", "Search Product"],
+          ["paste", "Scan Ingredients"],
+          ["add", "Add Product(s)"],
+        ] as [Tab, string][]).map(([t, label], i) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`flex-1 py-1.5 text-xs font-medium transition-colors${i > 0 ? " border-l border-gray-200" : ""}${
+              tab === t ? " bg-gray-900 text-white" : " bg-white text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Inputs */}
