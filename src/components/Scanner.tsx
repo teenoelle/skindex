@@ -381,6 +381,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [suggestLinkLoading, setSuggestLinkLoading] = useState(false);
   const [suggestLinkError, setSuggestLinkError] = useState<string | null>(null);
   const [pinnedVariants, setPinnedVariants] = useState<CommunityVariant[] | null>(null);
+  const [dymOpen, setDymOpen] = useState(true);
   const [pinnedTopProduct, setPinnedTopProduct] = useState<CommunityVariant | null>(null);
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
   const [typeBodyAreaMap, setTypeBodyAreaMap] = useState<Map<string, string>>(new Map());
@@ -500,6 +501,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setSuggestLinkError(null);
     setPinnedVariants(null);
     setPinnedTopProduct(null);
+    setDymOpen(true);
     setActiveVariantId(null);
 
     const activeTab = override?.tab ?? tab;
@@ -1402,8 +1404,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       {/* Did you mean */}
       {pinnedTopProduct && pinnedVariants && pinnedVariants.length > 0 && (
         <div className="mt-8">
-          <p className="text-xs text-gray-400 mb-1.5">Did you mean</p>
-          <div className="flex flex-col space-y-2">
+          <button
+            type="button"
+            onClick={() => setDymOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 mb-1.5"
+          >
+            Did you mean
+            <span className="text-gray-300">{dymOpen ? "▲" : "▼"}</span>
+          </button>
+          {dymOpen && <div className="flex flex-col space-y-2">
             {[pinnedTopProduct, ...pinnedVariants].map((v) => {
               const isActive = v.id === activeVariantId;
               return (
@@ -1411,7 +1420,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   key={v.id}
                   type="button"
                   onClick={() => handleDymVariantClick(v.id)}
-                  className={`flex gap-3 p-3 text-left w-full transition-colors rounded-xl border border-gray-300${isActive ? " bg-gray-50" : " hover:bg-gray-50"}`}
+                  className={`flex gap-3 p-3 text-left w-full transition-colors rounded-xl border${isActive ? " border-gray-400 bg-gray-50" : " border-gray-300 hover:border-gray-400 hover:bg-gray-50"}`}
                 >
                   <div className="w-12 shrink-0">
                     {v.image_url ? (
@@ -1427,7 +1436,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div>
                       <p className={`text-sm leading-snug${isActive ? " font-semibold text-gray-900" : " font-medium text-gray-800"}`}>{v.name}</p>
-                      {v.brand && <p className="text-xs text-gray-400 mt-0.5">{v.brand}</p>}
+                      {v.brand && <p className={`text-xs mt-0.5${isActive ? " text-gray-600" : " text-gray-400"}`}>{v.brand}</p>}
                       {v.type && (
                         <p className="text-xs text-gray-400 mt-0.5">
                           {[typeBodyAreaMap.get(v.type), v.type].filter(Boolean).join(" · ")}
@@ -1450,7 +1459,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 </button>
               );
             })}
-          </div>
+          </div>}
         </div>
       )}
 
