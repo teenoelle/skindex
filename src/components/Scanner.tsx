@@ -1142,9 +1142,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               {!browseLoading && browseProducts.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-6">No products found.</p>
               )}
-              <div className="divide-y divide-gray-100">
+              <div className="space-y-2">
                 {browseProducts.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 py-3">
+                  <div key={p.id} className="flex items-center gap-3 border border-gray-100 rounded-xl p-3">
                     {p.image_url && (
                       <img
                         src={`/api/image-proxy?url=${encodeURIComponent(p.image_url)}`}
@@ -1403,7 +1403,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       {pinnedTopProduct && pinnedVariants && pinnedVariants.length > 0 && (
         <div className="mt-8">
           <p className="text-xs text-gray-400 mb-1.5">Did you mean</p>
-          <div className="flex flex-col divide-y divide-gray-100">
+          <div className="flex flex-col space-y-2">
             {[pinnedTopProduct, ...pinnedVariants].map((v) => {
               const isActive = v.id === activeVariantId;
               return (
@@ -1411,7 +1411,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   key={v.id}
                   type="button"
                   onClick={() => handleDymVariantClick(v.id)}
-                  className={`flex gap-3 py-2.5 text-left w-full transition-colors${isActive ? " -mx-2 px-2 bg-gray-50 rounded-lg" : " hover:bg-gray-50 -mx-2 px-2 rounded-lg"}`}
+                  className={`flex gap-3 p-3 text-left w-full transition-colors rounded-xl border${isActive ? " bg-gray-50 border-gray-200" : " border-gray-100 hover:bg-gray-50"}`}
                 >
                   <div className="w-12 shrink-0">
                     {v.image_url ? (
@@ -1984,11 +1984,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     Safer alternatives — {alternatives.length}
                     <span className="text-gray-300">{alternativesOpen ? "▲" : "▼"}</span>
                   </button>
-                  {alternativesOpen && <div className="divide-y divide-gray-100">
+                  {alternativesOpen && <div className="space-y-2">
                     {alternatives.map((alt) => {
                       return (
                         <Fragment key={alt.id}>
-                          <div className="py-2">
+                          <div className="border border-gray-100 rounded-xl p-3">
                             <div className="flex gap-3">
                               {alt.image_url ? (
                                 <Image
