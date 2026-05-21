@@ -1420,7 +1420,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   key={v.id}
                   type="button"
                   onClick={() => handleDymVariantClick(v.id)}
-                  className={`flex gap-3 p-3 text-left w-full transition-colors rounded-xl border${isActive ? " border-gray-400 bg-gray-50" : " border-gray-300 hover:border-gray-400 hover:bg-gray-50"}`}
+                  className={`flex gap-3 p-3 text-left w-full transition-colors rounded-xl border${isActive ? " bg-teal-50 border-teal-200" : " border-gray-300 hover:border-gray-400 hover:bg-gray-50"}`}
                 >
                   <div className="w-12 shrink-0">
                     {v.image_url ? (
@@ -1453,7 +1453,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           {v.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{v.photoCount} photosensitive</span>}
                         </>
                       )}
-                      {isActive && <span className="text-xs text-gray-400">↓ viewing</span>}
+                      {isActive && <span className="text-xs text-teal-600">↓ viewing</span>}
                     </div>
                   </div>
                 </button>
