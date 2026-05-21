@@ -300,7 +300,7 @@ const paragraphColor = {
 export default function Scanner({ initialProductId }: { initialProductId?: string | null }) {
   const { isSignedIn, isLoaded } = useUser();
 
-  const [tab, setTab] = useState<Tab>("browse");
+  const [tab, setTab] = useState<Tab>("search");
   const [query, setQuery] = useState("");
   const [ingredients, setIngredients] = useState("");
   const [url, setUrl] = useState("");
