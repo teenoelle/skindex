@@ -1,10 +1,10 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
+import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant } from "@/types";
 
@@ -306,7 +306,7 @@ const paragraphColor = {
 };
 
 export default function Scanner({ initialProductId }: { initialProductId?: string | null }) {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, isLoaded } = useUser();
 
   const [tab, setTab] = useState<Tab>("search");
   const [query, setQuery] = useState("");
@@ -385,6 +385,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [pinnedTopProduct, setPinnedTopProduct] = useState<CommunityVariant | null>(null);
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
   const [typeBodyAreaMap, setTypeBodyAreaMap] = useState<Map<string, string>>(new Map());
+  const [showStickyHeader, setShowStickyHeader] = useState(false);
+  const [showStickyProduct, setShowStickyProduct] = useState(false);
+  const [stickySearchOpen, setStickySearchOpen] = useState(false);
+  const [stickyQuery, setStickyQuery] = useState("");
+  const stickySearchRef = useRef<HTMLInputElement>(null);
 
   const initialProductIdRef = useRef(initialProductId);
   const scrollToProductRef = useRef(false);
@@ -402,6 +407,24 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const onScroll = () => setShowStickyHeader(window.scrollY > 56);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!result?.product?.id) { setShowStickyProduct(false); return; }
+    const card = document.getElementById("product-card");
+    if (!card) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setShowStickyProduct(!entry.isIntersecting),
+      { threshold: 0, rootMargin: "-56px 0px 0px 0px" }
+    );
+    obs.observe(card);
+    return () => obs.disconnect();
+  }, [result?.product?.id]);
 
   useEffect(() => {
     if (result?.product?.id) {
@@ -503,6 +526,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setPinnedTopProduct(null);
     setDymOpen(true);
     setActiveVariantId(null);
+    setShowStickyProduct(false);
 
     const activeTab = override?.tab ?? tab;
     const activeQuery = override?.query ?? query;
@@ -1022,6 +1046,67 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   return (
     <div>
+      {/* Sticky header */}
+      <div className={`fixed top-0 left-0 right-0 z-50 bg-white transition-transform duration-200 ${showStickyHeader ? "translate-y-0 shadow-sm" : "-translate-y-full"}`}>
+        {/* Row 1: logo + search + auth */}
+        <div className="max-w-2xl mx-auto px-6 h-14 flex items-center gap-3">
+          <Link href="/" className="tracking-tight select-none shrink-0">
+            <span className="font-black">SKIN</span>
+            <span className="font-light text-gray-500">dex</span>
+          </Link>
+          <div className="flex-1" />
+          {stickySearchOpen ? (
+            <form
+              className="flex items-center gap-2 flex-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = stickyQuery.trim();
+                if (!q) return;
+                setStickySearchOpen(false);
+                setStickyQuery("");
+                setTab("search");
+                setQuery(q);
+                handleScan({ tab: "search", query: q });
+              }}
+            >
+              <input
+                ref={stickySearchRef}
+                value={stickyQuery}
+                onChange={(e) => setStickyQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Escape") { setStickySearchOpen(false); setStickyQuery(""); } }}
+                placeholder="Search products…"
+                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400"
+                autoFocus
+              />
+              <button type="button" onClick={() => { setStickySearchOpen(false); setStickyQuery(""); }} className="text-gray-400 hover:text-gray-700">
+                <X size={16} />
+              </button>
+            </form>
+          ) : (
+            <button type="button" onClick={() => setStickySearchOpen(true)} className="p-1.5 text-gray-400 hover:text-gray-700 transition-colors">
+              <Search size={18} />
+            </button>
+          )}
+          {isLoaded && (isSignedIn ? <UserButton /> : <Link href="/sign-in" className="text-sm text-gray-400 hover:text-gray-900 transition-colors">Sign in</Link>)}
+        </div>
+        {/* Row 2: product context */}
+        {showStickyProduct && result?.product && (
+          <div className="border-t border-gray-100 max-w-2xl mx-auto px-6 py-2 flex items-center gap-3">
+            {result.product.image_url && (
+              <img
+                src={proxyImage(result.product.image_url)!}
+                alt=""
+                className="w-8 h-8 object-contain rounded bg-gray-50 shrink-0"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-gray-900 truncate">{result.product.name}</p>
+              {result.product.brand && <p className="text-xs text-gray-400 truncate">{result.product.brand}</p>}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-4">
         {(["search", "paste", "add", "browse"] as Tab[]).map((t) => (
