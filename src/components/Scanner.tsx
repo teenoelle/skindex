@@ -1411,7 +1411,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   key={v.id}
                   type="button"
                   onClick={() => handleDymVariantClick(v.id)}
-                  className={`flex gap-3 p-3 text-left w-full transition-colors rounded-xl border${isActive ? " bg-gray-50 border-gray-400" : " border-gray-300 hover:bg-gray-50"}`}
+                  className={`flex gap-3 p-3 text-left w-full transition-colors rounded-xl border border-gray-300${isActive ? " bg-gray-50" : " hover:bg-gray-50"}`}
                 >
                   <div className="w-12 shrink-0">
                     {v.image_url ? (
