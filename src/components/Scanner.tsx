@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X } from "lucide-react";
+import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X, Menu, ChevronDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant } from "@/types";
 
@@ -308,7 +308,7 @@ const paragraphColor = {
 export default function Scanner({ initialProductId }: { initialProductId?: string | null }) {
   const { isSignedIn, isLoaded } = useUser();
 
-  const [tab, setTab] = useState<Tab>("search");
+  const [tab, setTab] = useState<Tab>("browse");
   const [query, setQuery] = useState("");
   const [ingredients, setIngredients] = useState("");
   const [url, setUrl] = useState("");
@@ -389,6 +389,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [showStickyProduct, setShowStickyProduct] = useState(false);
   const [stickySearchOpen, setStickySearchOpen] = useState(false);
   const [stickyQuery, setStickyQuery] = useState("");
+  const [hamburgerOpen, setHamburgerOpen] = useState(false);
   const stickySearchRef = useRef<HTMLInputElement>(null);
 
   const initialProductIdRef = useRef(initialProductId);
@@ -406,6 +407,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       .then((d: { types?: { name: string; body_area: string }[] }) => {
         if (d.types) setTypeBodyAreaMap(new Map(d.types.map((t) => [t.name, t.body_area])));
       })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/browse")
+      .then((r) => r.json())
+      .then((d) => setBrowseTypes(d.types ?? []))
       .catch(() => {});
   }, []);
 
@@ -1018,6 +1026,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setLimitReached(false);
   }
 
+  function cycleMode() {
+    if (tab === "browse") { setTab("search"); return; }
+    const modes: Tab[] = ["search", "paste", "add"];
+    const idx = modes.indexOf(tab);
+    setTab(modes[(idx + 1) % modes.length]);
+  }
+
   function resetTab(t: Tab) {
     setTab(t);
     setResult(null);
@@ -1053,6 +1068,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   return (
     <div>
+      {/* Hamburger backdrop */}
+      {hamburgerOpen && (
+        <div className="fixed inset-0 z-40" onClick={() => setHamburgerOpen(false)} aria-hidden />
+      )}
       {/* Sticky header */}
       <div className={`fixed top-0 left-0 right-0 z-50 bg-white transition-transform duration-200 ${showStickyHeader ? "translate-y-0 shadow-sm" : "-translate-y-full"}`}>
         {/* Row 1: logo + search + auth */}
@@ -1094,7 +1113,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <Search size={18} />
             </button>
           )}
-          {isLoaded && (isSignedIn ? <UserButton /> : <Link href="/sign-in" className="text-sm text-gray-400 hover:text-gray-900 transition-colors">Sign in</Link>)}
+          <button
+            type="button"
+            onClick={() => setHamburgerOpen((v) => !v)}
+            className="p-1.5 text-gray-400 hover:text-gray-700 transition-colors"
+          >
+            <Menu size={18} />
+          </button>
         </div>
         {/* Row 2: product context */}
         {showStickyProduct && result?.product && (
@@ -1112,21 +1137,36 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
           </div>
         )}
+        {/* Drawer */}
+        {hamburgerOpen && (
+          <div className="border-t border-gray-100 bg-white">
+            <div className="max-w-2xl mx-auto px-6 py-3 space-y-1">
+              {isLoaded && isSignedIn && (
+                <>
+                  <Link href="/lists" onClick={() => setHamburgerOpen(false)} className="block text-sm text-gray-700 hover:text-gray-900 py-1.5">My Lists</Link>
+                  {isAdmin && <Link href="/admin" onClick={() => setHamburgerOpen(false)} className="block text-sm text-gray-700 hover:text-gray-900 py-1.5">Admin</Link>}
+                  <div className="py-1.5">
+                    <UserButton />
+                  </div>
+                </>
+              )}
+              {isLoaded && !isSignedIn && (
+                <Link href="/sign-in" onClick={() => setHamburgerOpen(false)} className="block text-sm text-gray-700 hover:text-gray-900 py-1.5">Sign in</Link>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-4">
-        {(["search", "paste", "add", "browse"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => resetTab(t)}
-            className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${
-              tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600"
-            }`}
-          >
-            {t === "search" ? "Search Product" : t === "paste" ? "Scan Ingredient(s)" : t === "add" ? "Add Product(s)" : "Browse"}
-          </button>
-        ))}
+      {/* Mode pill */}
+      <div className="mb-3">
+        <button
+          type="button"
+          onClick={cycleMode}
+          className="text-sm border border-gray-200 rounded-full px-4 py-1.5 text-gray-700 hover:border-gray-400 transition-colors"
+        >
+          {tab === "paste" ? "Scan Ingredients" : tab === "add" ? "Add Product(s)" : "Search Product"} ↻
+        </button>
       </div>
 
       {/* Inputs */}
@@ -1165,8 +1205,98 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           : <div className="mb-3" />
       )}
 
-      {tab === "browse" ? (
-        <div>
+      {tab === "add" ? (
+        !isSignedIn ? (
+          <Link href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
+            Sign in to add products
+          </Link>
+        ) : addTabUrlCount >= 2 ? (
+          <div className="space-y-4">
+            <button
+              onClick={async () => {
+                const urls = addTabUrls;
+                if (!urls.length) return;
+                setImportLoading(true);
+                setImportResults(null);
+                try {
+                  const res = await fetch("/api/bulk-import", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ urls }),
+                  });
+                  const data = await res.json();
+                  setImportResults(data.results ?? []);
+                } catch {
+                  setImportResults([]);
+                } finally {
+                  setImportLoading(false);
+                }
+              }}
+              disabled={importLoading || addTabUrlCount === 0}
+              className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {importLoading ? "Importing…" : "Import all"}
+            </button>
+            {importResults && (
+              <div className="border border-gray-100 rounded-xl overflow-hidden">
+                <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest flex-1">Import results</p>
+                  {(() => { const n = importResults.filter((r) => r.status === "imported").length; return <span className={`text-xs ${n > 0 ? "text-green-700" : "text-gray-400"}`}>{n} imported</span>; })()}
+                  {importResults.some((r) => r.status === "skipped") && <span className="text-xs text-gray-400">{importResults.filter((r) => r.status === "skipped").length} skipped</span>}
+                  {importResults.some((r) => r.status === "failed") && <span className="text-xs text-rose-600">{importResults.filter((r) => r.status === "failed").length} failed</span>}
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {importResults.map((r, i) => (
+                    <div key={i} className="px-4 py-2 flex items-start gap-3">
+                      <span className={`text-xs shrink-0 mt-0.5 ${r.status === "imported" ? "text-green-600" : r.status === "skipped" ? "text-gray-400" : "text-rose-500"}`}>
+                        {r.status === "imported" ? "✓" : r.status === "skipped" ? "→" : "✗"}
+                      </span>
+                      <div className="min-w-0">
+                        {r.name ? (
+                          <p className="text-xs text-gray-700 font-medium truncate">{r.brand ? `${r.brand} ` : ""}{r.name}</p>
+                        ) : (
+                          <p className="text-xs text-gray-400 truncate">{r.url}</p>
+                        )}
+                        <p className="text-xs text-gray-400">{
+                          r.status === "imported" ? "Added to database" :
+                          r.status === "skipped" ? "Already in database" :
+                          r.reason === "iherb-blocked" ? "iHerb blocks imports — paste ingredients instead" :
+                          r.reason === "rate-limited" ? "Rate limited (429)" :
+                          r.reason === "blocked" ? "Blocked (403)" :
+                          r.reason === "parse-failed" ? "Loaded but ingredients not found (200)" :
+                          r.fetchError ? r.fetchError :
+                          r.httpStatus ? `Failed (HTTP ${r.httpStatus})` :
+                          "Could not extract ingredients"
+                        }</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => handleScan()}
+            disabled={!canScan || loading}
+            className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? "Scanning…" : "Scan"}
+          </button>
+        )
+      ) : tab !== "browse" ? (
+        <button
+          onClick={() => handleScan()}
+          disabled={!canScan || loading}
+          className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          {loading ? "Scanning…" : "Scan"}
+        </button>
+      ) : null}
+
+      {/* Browse grid — shown as background when no result */}
+      {!result && !loading && !notFound && !limitReached && (
+        <div className="mt-4">
           {browseLoading && !browseSelectedType && (
             <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
           )}
@@ -1272,93 +1402,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
           )}
         </div>
-      ) : tab === "add" ? (
-        !isSignedIn ? (
-          <Link href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
-            Sign in to add products
-          </Link>
-        ) : addTabUrlCount >= 2 ? (
-          <div className="space-y-4">
-            <button
-              onClick={async () => {
-                const urls = addTabUrls;
-                if (!urls.length) return;
-                setImportLoading(true);
-                setImportResults(null);
-                try {
-                  const res = await fetch("/api/bulk-import", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ urls }),
-                  });
-                  const data = await res.json();
-                  setImportResults(data.results ?? []);
-                } catch {
-                  setImportResults([]);
-                } finally {
-                  setImportLoading(false);
-                }
-              }}
-              disabled={importLoading || addTabUrlCount === 0}
-              className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              {importLoading ? "Importing…" : "Import all"}
-            </button>
-            {importResults && (
-              <div className="border border-gray-100 rounded-xl overflow-hidden">
-                <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest flex-1">Import results</p>
-                  {(() => { const n = importResults.filter((r) => r.status === "imported").length; return <span className={`text-xs ${n > 0 ? "text-green-700" : "text-gray-400"}`}>{n} imported</span>; })()}
-                  {importResults.some((r) => r.status === "skipped") && <span className="text-xs text-gray-400">{importResults.filter((r) => r.status === "skipped").length} skipped</span>}
-                  {importResults.some((r) => r.status === "failed") && <span className="text-xs text-rose-600">{importResults.filter((r) => r.status === "failed").length} failed</span>}
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {importResults.map((r, i) => (
-                    <div key={i} className="px-4 py-2 flex items-start gap-3">
-                      <span className={`text-xs shrink-0 mt-0.5 ${r.status === "imported" ? "text-green-600" : r.status === "skipped" ? "text-gray-400" : "text-rose-500"}`}>
-                        {r.status === "imported" ? "✓" : r.status === "skipped" ? "→" : "✗"}
-                      </span>
-                      <div className="min-w-0">
-                        {r.name ? (
-                          <p className="text-xs text-gray-700 font-medium truncate">{r.brand ? `${r.brand} ` : ""}{r.name}</p>
-                        ) : (
-                          <p className="text-xs text-gray-400 truncate">{r.url}</p>
-                        )}
-                        <p className="text-xs text-gray-400">{
-                          r.status === "imported" ? "Added to database" :
-                          r.status === "skipped" ? "Already in database" :
-                          r.reason === "iherb-blocked" ? "iHerb blocks imports — paste ingredients instead" :
-                          r.reason === "rate-limited" ? "Rate limited (429)" :
-                          r.reason === "blocked" ? "Blocked (403)" :
-                          r.reason === "parse-failed" ? "Loaded but ingredients not found (200)" :
-                          r.fetchError ? r.fetchError :
-                          r.httpStatus ? `Failed (HTTP ${r.httpStatus})` :
-                          "Could not extract ingredients"
-                        }</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <button
-            onClick={() => handleScan()}
-            disabled={!canScan || loading}
-            className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? "Scanning…" : "Scan"}
-          </button>
-        )
-      ) : (
-        <button
-          onClick={() => handleScan()}
-          disabled={!canScan || loading}
-          className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading ? "Scanning…" : "Scan"}
-        </button>
       )}
 
       {/* Limit reached */}
