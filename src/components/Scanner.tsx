@@ -1144,7 +1144,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               )}
               <div className="space-y-2">
                 {browseProducts.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 border border-gray-100 rounded-xl p-3">
+                  <div key={p.id} className="flex items-center gap-3 border border-gray-300 rounded-xl p-3">
                     {p.image_url && (
                       <img
                         src={`/api/image-proxy?url=${encodeURIComponent(p.image_url)}`}
@@ -1411,7 +1411,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   key={v.id}
                   type="button"
                   onClick={() => handleDymVariantClick(v.id)}
-                  className={`flex gap-3 p-3 text-left w-full transition-colors rounded-xl border${isActive ? " bg-gray-50 border-gray-200" : " border-gray-100 hover:bg-gray-50"}`}
+                  className={`flex gap-3 p-3 text-left w-full transition-colors rounded-xl border${isActive ? " bg-gray-50 border-gray-400" : " border-gray-300 hover:bg-gray-50"}`}
                 >
                   <div className="w-12 shrink-0">
                     {v.image_url ? (
@@ -1988,7 +1988,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     {alternatives.map((alt) => {
                       return (
                         <Fragment key={alt.id}>
-                          <div className="border border-gray-100 rounded-xl p-3">
+                          <div className="border border-gray-300 rounded-xl p-3">
                             <div className="flex gap-3">
                               {alt.image_url ? (
                                 <Image
