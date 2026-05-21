@@ -1997,7 +1997,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     {alternatives.map((alt) => {
                       return (
                         <Fragment key={alt.id}>
-                          <div className="border border-gray-300 rounded-xl p-3">
+                          <button
+                            type="button"
+                            onClick={() => scanVariant({ productId: alt.id })}
+                            className="w-full text-left border border-gray-300 rounded-xl p-3 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                          >
                             <div className="flex gap-3">
                               {alt.image_url ? (
                                 <Image
@@ -2033,17 +2037,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                       {alt.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{alt.photoCount} photosensitive</span>}
                                     </>
                                   )}
-                                  <button
-                                    type="button"
-                                    className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
-                                    onClick={() => scanVariant({ productId: alt.id })}
-                                  >
-                                    Scan
-                                  </button>
                                 </div>
                               </div>
                             </div>
-                          </div>
+                          </button>
                         </Fragment>
                       );
                     })}
