@@ -3,6 +3,42 @@ import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { writeAuditLog } from "@/lib/audit-log";
+import { matchIngredients } from "@/lib/scanner";
+
+async function rescanIngredients(productId: string, productName: string, newList: string) {
+  try {
+    const { safe, flagged, unreviewed } = await matchIngredients(newList);
+
+    const seenIds = new Set<string>();
+    const rows = [...safe, ...flagged]
+      .filter((m) => !m.ingredient.id.startsWith("comedo-"))
+      .filter((m) => { if (seenIds.has(m.ingredient.id)) return false; seenIds.add(m.ingredient.id); return true; })
+      .map((m, idx) => ({ product_id: productId, ingredient_id: m.ingredient.id, position: idx + 1 }));
+
+    await supabaseAdmin.from("product_ingredients").delete().eq("product_id", productId);
+    if (rows.length > 0) {
+      await supabaseAdmin.from("product_ingredients").insert(rows);
+    }
+
+    for (const name of unreviewed) {
+      const { data: existing } = await supabase
+        .from("ingredient_queue")
+        .select("id, times_seen")
+        .ilike("name", name)
+        .maybeSingle();
+      if (existing) {
+        await supabase
+          .from("ingredient_queue")
+          .update({ times_seen: existing.times_seen + 1, last_seen: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("ingredient_queue")
+          .insert({ name, found_in: productName, times_seen: 1 });
+      }
+    }
+  } catch { /* fire-and-forget: never block the save response */ }
+}
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -32,7 +68,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existing } = await supabaseAdmin
     .from("products")
-    .select("name")
+    .select("name, ingredient_list")
     .eq("id", productId)
     .maybeSingle();
 
@@ -53,6 +89,12 @@ export async function POST(req: NextRequest) {
     name: existing?.name ?? productId,
     changes,
   });
+
+  const newList = patch.ingredient_list;
+  if (newList && newList !== existing?.ingredient_list) {
+    const productDisplayName = patch.name ?? existing?.name ?? productId;
+    rescanIngredients(productId, productDisplayName, newList);
+  }
 
   return NextResponse.json({ ok: true });
 }
