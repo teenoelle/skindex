@@ -847,25 +847,10 @@ export default function AdminPage() {
           </button>
 
           {allProductsOpen && (<>
-          {/* Stats */}
-          {!allProductsLoading && allStats.total > 0 && (
-            <p className="text-xs mb-4 flex flex-wrap gap-x-2 gap-y-1">
-              <span className={allStats.missingSource > 0 ? "text-amber-600" : "text-gray-400"}>{allStats.missingSource} missing source</span>
-              <span className="text-gray-300">·</span>
-              <span className={allStats.missingIherb > 0 ? "text-amber-600" : "text-gray-400"}>{allStats.missingIherb} missing iHerb</span>
-              <span className="text-gray-300">·</span>
-              <span className={allStats.missingImage > 0 ? "text-amber-600" : "text-gray-400"}>{allStats.missingImage} missing image</span>
-              <span className="text-gray-300">·</span>
-              <span className={allStats.missingType > 0 ? "text-amber-600" : "text-gray-400"}>{allStats.missingType} no type</span>
-              <span className="text-gray-300">·</span>
-              <span className={allStats.missingIngredients > 0 ? "text-amber-600" : "text-gray-400"}>{allStats.missingIngredients} no ingredients</span>
-            </p>
-          )}
-
           {/* Filter bar */}
           {!allProductsLoading && (
             <div className="space-y-3 mb-6">
-              {/* Search + sort */}
+              {/* Search + sort + brand */}
               <div className="flex flex-wrap gap-2">
                 <input
                   type="text"
@@ -884,15 +869,12 @@ export default function AdminPage() {
                   <option value="az">A → Z</option>
                   <option value="za">Z → A</option>
                 </select>
-              </div>
-              {/* Brand filter */}
-              <div className="flex flex-col gap-1 w-48">
                 <input
                   type="text"
                   value={allBrandSearch}
                   onChange={(e) => setAllBrandSearch(e.target.value)}
                   placeholder="Filter brands…"
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400"
+                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 w-36"
                 />
                 <select
                   value={allBrandFilter}
@@ -906,27 +888,36 @@ export default function AdminPage() {
                   ).map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
-              {/* Missing field chips */}
+              {/* Missing field chips — label + count badge */}
+              {allStats.total > 0 && (
               <div className="flex flex-wrap gap-2">
                 {([
-                  ["Missing source", filterMissingSource, setFilterMissingSource],
-                  ["Missing iHerb", filterMissingIherb, setFilterMissingIherb],
-                  ["Missing image", filterMissingImage, setFilterMissingImage],
-                  ["No type", filterMissingType, setFilterMissingType],
-                  ["No ingredients", filterMissingIngredients, setFilterMissingIngredients],
-                ] as [string, boolean, (v: (p: boolean) => boolean) => void][]).map(([label, value, set]) => (
+                  ["Missing source", filterMissingSource, setFilterMissingSource, allStats.missingSource],
+                  ["Missing iHerb", filterMissingIherb, setFilterMissingIherb, allStats.missingIherb],
+                  ["Missing image", filterMissingImage, setFilterMissingImage, allStats.missingImage],
+                  ["No type", filterMissingType, setFilterMissingType, allStats.missingType],
+                  ["No ingredients", filterMissingIngredients, setFilterMissingIngredients, allStats.missingIngredients],
+                ] as [string, boolean, (v: (p: boolean) => boolean) => void, number][]).map(([label, value, set, count]) => (
                   <button
                     key={label}
                     type="button"
                     onClick={() => set((v) => !v)}
-                    className={`text-xs rounded-lg px-3 py-1.5 border transition-colors ${
+                    className={`text-xs rounded-lg px-3 py-1.5 border transition-colors flex items-center gap-1.5 ${
                       value ? "bg-amber-100 text-amber-800 border-amber-200" : "border-gray-200 text-gray-500 hover:border-gray-400"
                     }`}
                   >
                     {label}
+                    {count > 0 && (
+                      <span className={`text-xs font-medium rounded-full px-1.5 py-0 leading-5 ${
+                        value ? "bg-amber-200 text-amber-900" : "bg-amber-100 text-amber-700"
+                      }`}>
+                        {count}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
+              )}
             </div>
           )}
 
@@ -949,11 +940,12 @@ export default function AdminPage() {
                 const confirming = clearConfirming[p.id] ?? null;
                 const marked = clearMarked[p.id] ?? new Set<string>();
 
-                const UrlField = ({ field, placeholder, href, alwaysEnabled }: {
+                const UrlField = ({ field, placeholder, href, alwaysEnabled, btnLabel }: {
                   field: "source_url" | "image_url" | "iherb_url";
                   placeholder: string;
                   href: string | undefined;
                   alwaysEnabled: boolean;
+                  btnLabel: string;
                 }) => {
                   const isMarked = marked.has(field);
                   const storedValue = p[field];
@@ -969,11 +961,11 @@ export default function AdminPage() {
                           target="_blank"
                           rel="noopener noreferrer"
                           tabIndex={btnDisabled ? -1 : undefined}
-                          className={`text-xs px-2 py-1.5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                          className={`text-xs px-2 py-1.5 rounded-lg border flex items-center justify-center shrink-0 transition-colors whitespace-nowrap ${
                             btnDisabled ? "border-gray-100 text-gray-300 cursor-not-allowed pointer-events-none" : "border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700"
                           }`}
                         >
-                          ↗
+                          {btnLabel} ↗
                         </a>
                         <input
                           type="url"
@@ -1101,9 +1093,9 @@ export default function AdminPage() {
                           </optgroup>
                         ))}
                       </select>
-                      <UrlField field="source_url" placeholder="Source URL (INCIDecoder)" href={sourceHref} alwaysEnabled={false} />
-                      <UrlField field="image_url" placeholder="Image URL" href={imageHref} alwaysEnabled={true} />
-                      <UrlField field="iherb_url" placeholder="iHerb URL" href={iherbHref} alwaysEnabled={true} />
+                      <UrlField field="source_url" placeholder="Source URL (INCIDecoder)" href={sourceHref} alwaysEnabled={false} btnLabel="INCIDecoder" />
+                      <UrlField field="image_url" placeholder="Image URL" href={imageHref} alwaysEnabled={true} btnLabel="Image" />
+                      <UrlField field="iherb_url" placeholder="iHerb URL" href={iherbHref} alwaysEnabled={true} btnLabel="iHerb" />
                       <textarea
                         value={edit.ingredient_list}
                         onChange={(e) => updateAllEdit(p.id, "ingredient_list", e.target.value)}
