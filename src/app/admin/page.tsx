@@ -36,6 +36,7 @@ type AllEditState = {
   type: string;
   iherb_url: string;
   image_url: string;
+  source_url: string;
 };
 
 type ProductType = { id: string; name: string; body_area: string };
@@ -228,6 +229,7 @@ function initEdit(p: AllProduct, validTypes: Set<string>): AllEditState {
     type: validTypes.has(p.type ?? "") ? (p.type ?? "") : "",
     iherb_url: p.iherb_url ?? "",
     image_url: p.image_url ?? "",
+    source_url: p.source_url ?? "",
   };
 }
 
@@ -378,7 +380,7 @@ export default function AdminPage() {
     const edit = allEdits[p.id];
     if (!edit) return false;
     const base = initEdit(p, FALLBACK_TYPES_SET);
-    return edit.type !== base.type || edit.iherb_url !== base.iherb_url || edit.image_url !== base.image_url;
+    return edit.type !== base.type || edit.iherb_url !== base.iherb_url || edit.image_url !== base.image_url || edit.source_url !== base.source_url;
   }
 
   async function saveAllProduct(p: AllProduct) {
@@ -395,6 +397,7 @@ export default function AdminPage() {
           type: edit.type || undefined,
           iherb_url: edit.iherb_url || undefined,
           image_url: edit.image_url || undefined,
+          source_url: edit.source_url || undefined,
         }),
       });
       const data = await res.json();
@@ -404,6 +407,7 @@ export default function AdminPage() {
         type: edit.type || p.type,
         iherb_url: edit.iherb_url || p.iherb_url,
         image_url: edit.image_url || p.image_url,
+        source_url: edit.source_url || p.source_url,
       };
       setAllProducts((prev) => prev.map((q) => q.id === p.id ? updated : q));
       setAllEdits((prev) => ({ ...prev, [p.id]: initEdit(updated, FALLBACK_TYPES_SET) }));
@@ -783,7 +787,7 @@ export default function AdminPage() {
           {!allProductsLoading && isFiltered && displayedAllProducts.length > 0 && (
             <div className="space-y-2">
               {displayedAllProducts.map((p) => {
-                const edit = allEdits[p.id] ?? { type: "", iherb_url: "", image_url: "" };
+                const edit = allEdits[p.id] ?? { type: "", iherb_url: "", image_url: "", source_url: "" };
                 const isSaving = allSaving === p.id;
                 const isSaved = allSaved.has(p.id);
                 const error = allSaveError[p.id];
@@ -849,6 +853,13 @@ export default function AdminPage() {
                         onChange={(e) => updateAllEdit(p.id, "image_url", e.target.value)}
                         placeholder="Image URL"
                         className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
+                      />
+                      <input
+                        type="url"
+                        value={edit.source_url}
+                        onChange={(e) => updateAllEdit(p.id, "source_url", e.target.value)}
+                        placeholder="INCIDecoder URL"
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 sm:col-span-3"
                       />
                     </div>
 

@@ -1314,7 +1314,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
           {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
             <>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Browse</p>
+            <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
             <div className="space-y-5">
               {(() => {
                 const AREA_ORDER = ["Face", "Body", "Hair", "Lip", "Makeup", "Sun"];
