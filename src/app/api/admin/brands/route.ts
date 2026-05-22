@@ -13,10 +13,15 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("products")
-    .select("id, name, brand, type, image_url, iherb_url, source_url, source, created_at, ingredient_list")
-    .limit(500);
+    .select("brand")
+    .not("brand", "is", null)
+    .order("brand");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ products: data ?? [] });
+  const brands = [...new Set((data ?? []).map((r) => r.brand as string))].sort((a, b) =>
+    a.localeCompare(b)
+  );
+
+  return NextResponse.json({ brands });
 }
