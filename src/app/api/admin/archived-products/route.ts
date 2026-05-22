@@ -13,9 +13,9 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("products")
-    .select("id, name, brand, type, image_url, iherb_url, source_url, source, created_at, ingredient_list")
-    .eq("is_archived", false)
-    .limit(500);
+    .select("id, name, brand, type, source, created_at")
+    .eq("is_archived", true)
+    .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

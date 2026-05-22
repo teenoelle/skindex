@@ -12,7 +12,8 @@ export async function GET(req: NextRequest) {
     const { data } = await supabase
       .from("products")
       .select("type")
-      .not("ingredient_list", "is", null);
+      .not("ingredient_list", "is", null)
+      .eq("is_archived", false);
 
     const counts: Record<string, number> = {};
     for (const row of data ?? []) {
@@ -32,7 +33,8 @@ export async function GET(req: NextRequest) {
     .from("products")
     .select("id, name, brand, image_url, ingredient_list")
     .eq("type", type)
-    .not("ingredient_list", "is", null);
+    .not("ingredient_list", "is", null)
+    .eq("is_archived", false);
 
   if (!products?.length) return NextResponse.json({ products: [] });
 

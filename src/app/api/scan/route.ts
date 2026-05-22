@@ -175,6 +175,7 @@ export async function POST(req: NextRequest) {
         .select("*")
         .ilike("name", `%${query}%`)
         .not("ingredient_list", "is", null)
+        .eq("is_archived", false)
         .limit(10);
       if (data?.length) {
         // Check for close scores — if top match is exact, take it; otherwise collect ambiguous ones
@@ -205,6 +206,7 @@ export async function POST(req: NextRequest) {
           .select("*")
           .or(orFilter)
           .not("ingredient_list", "is", null)
+          .eq("is_archived", false)
           .limit(20);
         if (candidates?.length) {
           const scored = candidates

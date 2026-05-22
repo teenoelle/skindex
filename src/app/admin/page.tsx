@@ -34,6 +34,15 @@ type AllProduct = {
   ingredient_list: string | null;
 };
 
+type ArchivedProduct = {
+  id: string;
+  name: string;
+  brand: string | null;
+  type: string | null;
+  source: string | null;
+  created_at: string | null;
+};
+
 type AllEditState = {
   name: string;
   brand: string;
@@ -270,9 +279,14 @@ export default function AdminPage() {
   const [allSaveError, setAllSaveError] = useState<Record<string, string>>({});
   const [clearConfirming, setClearConfirming] = useState<Record<string, string | null>>({});
   const [clearMarked, setClearMarked] = useState<Record<string, Set<string>>>({});
-  const [deleteConfirming, setDeleteConfirming] = useState<string | null>(null);
-  const [deleteNameInput, setDeleteNameInput] = useState<Record<string, string>>({});
-  const [allProductDeleting, setAllProductDeleting] = useState<string | null>(null);
+  const [archivingProduct, setArchivingProduct] = useState<string | null>(null);
+  const [archivedProducts, setArchivedProducts] = useState<ArchivedProduct[]>([]);
+  const [archivedLoading, setArchivedLoading] = useState(false);
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const [restoringProduct, setRestoringProduct] = useState<string | null>(null);
+  const [archivedDeleteConfirming, setArchivedDeleteConfirming] = useState<string | null>(null);
+  const [archivedDeleteNameInput, setArchivedDeleteNameInput] = useState<Record<string, string>>({});
+  const [archivedDeleting, setArchivedDeleting] = useState<string | null>(null);
 
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [typesLoading, setTypesLoading] = useState(false);
@@ -469,19 +483,59 @@ export default function AdminPage() {
     setAllSaving(null);
   }
 
-  async function handleDeleteAllProduct(id: string, name: string) {
-    setAllProductDeleting(id);
+  async function handleArchiveAllProduct(p: AllProduct) {
+    setArchivingProduct(p.id);
+    const res = await fetch("/api/admin/archive-product", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId: p.id }),
+    });
+    if (res.ok) {
+      setAllProducts((prev) => prev.filter((q) => q.id !== p.id));
+      if (archivedOpen) {
+        setArchivedProducts((prev) => [
+          { id: p.id, name: p.name, brand: p.brand, type: p.type, source: p.source, created_at: p.created_at },
+          ...prev,
+        ]);
+      }
+    }
+    setArchivingProduct(null);
+  }
+
+  async function loadArchivedProducts() {
+    setArchivedLoading(true);
+    try {
+      const res = await fetch("/api/admin/archived-products");
+      const data = await res.json();
+      setArchivedProducts(data.products ?? []);
+    } catch { }
+    setArchivedLoading(false);
+  }
+
+  async function handleRestoreProduct(id: string) {
+    setRestoringProduct(id);
+    const res = await fetch("/api/admin/restore-product", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId: id }),
+    });
+    if (res.ok) setArchivedProducts((prev) => prev.filter((p) => p.id !== id));
+    setRestoringProduct(null);
+  }
+
+  async function handleDeleteArchivedProduct(id: string) {
+    setArchivedDeleting(id);
     const res = await fetch("/api/admin/delete-product", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ productId: id }),
     });
     if (res.ok) {
-      setAllProducts((prev) => prev.filter((p) => p.id !== id));
-      setDeleteConfirming(null);
-      setDeleteNameInput((prev) => { const next = { ...prev }; delete next[id]; return next; });
+      setArchivedProducts((prev) => prev.filter((p) => p.id !== id));
+      setArchivedDeleteConfirming(null);
+      setArchivedDeleteNameInput((prev) => { const next = { ...prev }; delete next[id]; return next; });
     }
-    setAllProductDeleting(null);
+    setArchivedDeleting(null);
   }
 
   async function handleArchive(id: string) {
@@ -1078,47 +1132,15 @@ export default function AdminPage() {
                       >
                         Scan ↗
                       </Link>
-                      {deleteConfirming !== p.id && (
-                        <button
-                          type="button"
-                          onClick={() => setDeleteConfirming(p.id)}
-                          className="text-xs text-rose-400 hover:text-rose-600"
-                        >
-                          Delete
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleArchiveAllProduct(p)}
+                        disabled={archivingProduct === p.id}
+                        className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-40"
+                      >
+                        {archivingProduct === p.id ? "Archiving…" : "Archive"}
+                      </button>
                     </div>
-
-                    {/* Delete confirmation */}
-                    {deleteConfirming === p.id && (
-                      <div className="border border-rose-100 bg-rose-50 rounded-lg p-3 space-y-2">
-                        <p className="text-xs text-rose-700">Type the product name to confirm deletion.</p>
-                        <input
-                          type="text"
-                          value={deleteNameInput[p.id] ?? ""}
-                          onChange={(e) => setDeleteNameInput((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                          placeholder={p.name}
-                          className="w-full text-xs border border-rose-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-rose-400 bg-white"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            disabled={allProductDeleting === p.id || (deleteNameInput[p.id] ?? "") !== p.name}
-                            onClick={() => handleDeleteAllProduct(p.id, p.name)}
-                            className="text-xs px-3 py-1.5 bg-rose-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-rose-700 transition-colors"
-                          >
-                            {allProductDeleting === p.id ? "Deleting…" : "Delete"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setDeleteConfirming(null); setDeleteNameInput((prev) => ({ ...prev, [p.id]: "" })); }}
-                            className="text-xs text-gray-400 hover:text-gray-700"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -1149,6 +1171,96 @@ export default function AdminPage() {
             </div>
           )}
           </>)}
+        </section>
+
+        {/* Archived Products */}
+        <section>
+          <button
+            type="button"
+            onClick={() => {
+              const opening = !archivedOpen;
+              setArchivedOpen(opening);
+              if (opening && archivedProducts.length === 0) loadArchivedProducts();
+            }}
+            className="flex items-center gap-3 mb-4 group"
+          >
+            <h2 className="text-xl font-semibold tracking-tight text-gray-400">Archived</h2>
+            {archivedProducts.length > 0 && (
+              <span className="text-xs font-medium bg-gray-100 text-gray-400 rounded-full px-2.5 py-0.5">
+                {archivedProducts.length}
+              </span>
+            )}
+            <svg className={`w-4 h-4 text-gray-300 transition-transform ${archivedOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {archivedOpen && (
+            archivedLoading ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : archivedProducts.length === 0 ? (
+              <p className="text-sm text-gray-400">No archived products.</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {archivedProducts.map((p) => (
+                  <div key={p.id} className="py-3 flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-500 truncate">{p.name}</p>
+                      <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                        {p.brand && <span className="text-xs text-gray-400">{p.brand}</span>}
+                        {p.type && <span className="text-xs text-gray-300 border border-gray-100 rounded-full px-2 py-0.5">{p.type}</span>}
+                        {p.created_at && <span className="text-xs text-gray-300">{relativeTime(p.created_at)}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreProduct(p.id)}
+                        disabled={restoringProduct === p.id}
+                        className="text-xs text-indigo-500 hover:text-indigo-700 disabled:opacity-40"
+                      >
+                        {restoringProduct === p.id ? "Restoring…" : "Restore"}
+                      </button>
+                      {archivedDeleteConfirming === p.id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={archivedDeleteNameInput[p.id] ?? ""}
+                            onChange={(e) => setArchivedDeleteNameInput((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                            placeholder={p.name}
+                            className="text-xs border border-rose-200 rounded px-2 py-1 w-36 focus:outline-none focus:border-rose-400"
+                          />
+                          <button
+                            type="button"
+                            disabled={archivedDeleting === p.id || (archivedDeleteNameInput[p.id] ?? "") !== p.name}
+                            onClick={() => handleDeleteArchivedProduct(p.id)}
+                            className="text-xs px-2 py-1 bg-rose-600 text-white rounded disabled:opacity-40 hover:bg-rose-700 transition-colors"
+                          >
+                            {archivedDeleting === p.id ? "Deleting…" : "Delete"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setArchivedDeleteConfirming(null); setArchivedDeleteNameInput((prev) => ({ ...prev, [p.id]: "" })); }}
+                            className="text-xs text-gray-400 hover:text-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setArchivedDeleteConfirming(p.id)}
+                          className="text-xs text-rose-400 hover:text-rose-600"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
         </section>
 
         {/* Product Types */}

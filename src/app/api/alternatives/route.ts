@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
   const base = supabase
     .from("products")
     .select("id, name, brand, type, image_url")
-    .not("ingredient_list", "is", null);
+    .not("ingredient_list", "is", null)
+    .eq("is_archived", false);
 
   const { data: candidates } = await (
     excludedIds.length > 0
