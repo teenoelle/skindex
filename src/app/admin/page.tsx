@@ -266,8 +266,9 @@ export default function AdminPage() {
   const [allSort, setAllSort] = useState<"newest" | "oldest" | "az" | "za">("newest");
   const [allPage, setAllPage] = useState(1);
   const [allBrands, setAllBrands] = useState<string[]>([]);
-  const [allBrandSearch, setAllBrandSearch] = useState("");
+  const [allBrandInput, setAllBrandInput] = useState("");
   const [allBrandFilter, setAllBrandFilter] = useState("");
+  const [allBrandComboOpen, setAllBrandComboOpen] = useState(false);
   const [filterMissingSource, setFilterMissingSource] = useState(false);
   const [filterMissingIherb, setFilterMissingIherb] = useState(false);
   const [filterMissingImage, setFilterMissingImage] = useState(false);
@@ -869,24 +870,47 @@ export default function AdminPage() {
                   <option value="az">A → Z</option>
                   <option value="za">Z → A</option>
                 </select>
-                <input
-                  type="text"
-                  value={allBrandSearch}
-                  onChange={(e) => setAllBrandSearch(e.target.value)}
-                  placeholder="Filter brands…"
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 w-36"
-                />
-                <select
-                  value={allBrandFilter}
-                  onChange={(e) => setAllBrandFilter(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 bg-white"
-                >
-                  <option value="">All brands</option>
-                  {(allBrandSearch
-                    ? allBrands.filter((b) => b.toLowerCase().includes(allBrandSearch.toLowerCase()))
-                    : allBrands
-                  ).map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
+                <div className="relative">
+                  <div className="flex items-center">
+                    <input
+                      type="text"
+                      value={allBrandInput}
+                      onChange={(e) => { setAllBrandInput(e.target.value); setAllBrandFilter(""); }}
+                      onFocus={() => setAllBrandComboOpen(true)}
+                      onBlur={() => setTimeout(() => setAllBrandComboOpen(false), 150)}
+                      placeholder="Brand…"
+                      className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 pr-6 focus:outline-none focus:border-gray-400 w-36"
+                    />
+                    {allBrandFilter && (
+                      <button
+                        type="button"
+                        onMouseDown={() => { setAllBrandFilter(""); setAllBrandInput(""); }}
+                        className="absolute right-2 text-gray-300 hover:text-gray-600 text-sm leading-none"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                  {allBrandComboOpen && (() => {
+                    const opts = allBrandInput && !allBrandFilter
+                      ? allBrands.filter((b) => b.toLowerCase().includes(allBrandInput.toLowerCase()))
+                      : allBrands;
+                    return opts.length > 0 ? (
+                      <div className="absolute z-10 top-full mt-1 left-0 w-52 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-sm">
+                        {opts.map((b) => (
+                          <button
+                            key={b}
+                            type="button"
+                            onMouseDown={() => { setAllBrandFilter(b); setAllBrandInput(b); setAllBrandComboOpen(false); }}
+                            className={`w-full text-left text-xs px-3 py-1.5 hover:bg-gray-50 transition-colors ${allBrandFilter === b ? "bg-indigo-50 text-indigo-700" : "text-gray-700"}`}
+                          >
+                            {b}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
               </div>
               {/* Missing field chips — label + count badge */}
               {allStats.total > 0 && (
@@ -940,12 +964,13 @@ export default function AdminPage() {
                 const confirming = clearConfirming[p.id] ?? null;
                 const marked = clearMarked[p.id] ?? new Set<string>();
 
-                const UrlField = ({ field, placeholder, href, alwaysEnabled, btnLabel }: {
+                const UrlField = ({ field, placeholder, href, alwaysEnabled, btnLabel, rowLabel }: {
                   field: "source_url" | "image_url" | "iherb_url";
                   placeholder: string;
                   href: string | undefined;
                   alwaysEnabled: boolean;
                   btnLabel: string;
+                  rowLabel: string;
                 }) => {
                   const isMarked = marked.has(field);
                   const storedValue = p[field];
@@ -954,77 +979,80 @@ export default function AdminPage() {
                   const showClear = !isMarked && !isConfirming && (!!storedValue || !!editValue);
                   const btnDisabled = !alwaysEnabled && !href;
                   return (
-                    <div>
-                      <div className="flex gap-1 items-center">
-                        <a
-                          href={btnDisabled ? undefined : href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          tabIndex={btnDisabled ? -1 : undefined}
-                          className={`text-xs px-2 py-1.5 rounded-lg border flex items-center justify-center shrink-0 transition-colors whitespace-nowrap ${
-                            btnDisabled ? "border-gray-100 text-gray-300 cursor-not-allowed pointer-events-none" : "border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700"
-                          }`}
-                        >
-                          {btnLabel} ↗
-                        </a>
-                        <input
-                          type="url"
-                          value={isMarked ? "" : editValue}
-                          disabled={isMarked}
-                          onChange={(e) => updateAllEdit(p.id, field, e.target.value)}
-                          placeholder={placeholder}
-                          className={`flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0 ${isMarked ? "opacity-40 bg-gray-50" : ""}`}
-                        />
-                        {showClear && (
-                          <button
-                            type="button"
-                            onClick={() => setClearConfirming((prev) => ({ ...prev, [p.id]: field }))}
-                            className="text-xs text-gray-300 hover:text-rose-400 shrink-0 px-1"
+                    <div className="flex gap-2">
+                      <span className="text-xs text-gray-400 w-14 shrink-0 pt-1.5">{rowLabel}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex gap-1 items-center">
+                          <a
+                            href={btnDisabled ? undefined : href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            tabIndex={btnDisabled ? -1 : undefined}
+                            className={`text-xs px-2 py-1.5 rounded-lg border flex items-center justify-center shrink-0 transition-colors whitespace-nowrap ${
+                              btnDisabled ? "border-gray-100 text-gray-300 cursor-not-allowed pointer-events-none" : "border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                            }`}
                           >
-                            Clear
-                          </button>
-                        )}
-                        {isMarked && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setClearMarked((prev) => {
-                                const next = new Set(prev[p.id] ?? []);
-                                next.delete(field);
-                                return { ...prev, [p.id]: next };
-                              });
-                              updateAllEdit(p.id, field, storedValue ?? "");
-                            }}
-                            className="text-xs text-gray-400 hover:text-gray-700 shrink-0 px-1"
-                          >
-                            Undo
-                          </button>
+                            {btnLabel} ↗
+                          </a>
+                          <input
+                            type="url"
+                            value={isMarked ? "" : editValue}
+                            disabled={isMarked}
+                            onChange={(e) => updateAllEdit(p.id, field, e.target.value)}
+                            placeholder={placeholder}
+                            className={`flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0 ${isMarked ? "opacity-40 bg-gray-50" : ""}`}
+                          />
+                          {showClear && (
+                            <button
+                              type="button"
+                              onClick={() => setClearConfirming((prev) => ({ ...prev, [p.id]: field }))}
+                              className="text-xs text-gray-300 hover:text-rose-400 shrink-0 px-1"
+                            >
+                              Clear
+                            </button>
+                          )}
+                          {isMarked && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setClearMarked((prev) => {
+                                  const next = new Set(prev[p.id] ?? []);
+                                  next.delete(field);
+                                  return { ...prev, [p.id]: next };
+                                });
+                                updateAllEdit(p.id, field, storedValue ?? "");
+                              }}
+                              className="text-xs text-gray-400 hover:text-gray-700 shrink-0 px-1"
+                            >
+                              Undo
+                            </button>
+                          )}
+                        </div>
+                        {isConfirming && (
+                          <div className="mt-1 flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-gray-400 line-through">{storedValue || editValue}</span>
+                            <span className="text-xs text-gray-400">— Are you sure?</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setClearMarked((prev) => ({ ...prev, [p.id]: new Set([...(prev[p.id] ?? []), field]) }));
+                                updateAllEdit(p.id, field, "");
+                                setClearConfirming((prev) => ({ ...prev, [p.id]: null }));
+                              }}
+                              className="text-xs text-rose-600 hover:text-rose-800"
+                            >
+                              Yes, clear
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setClearConfirming((prev) => ({ ...prev, [p.id]: null }))}
+                              className="text-xs text-gray-400 hover:text-gray-700"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         )}
                       </div>
-                      {isConfirming && (
-                        <div className="mt-1 pl-9 flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-gray-400 line-through">{storedValue || editValue}</span>
-                          <span className="text-xs text-gray-400">— Are you sure?</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setClearMarked((prev) => ({ ...prev, [p.id]: new Set([...(prev[p.id] ?? []), field]) }));
-                              updateAllEdit(p.id, field, "");
-                              setClearConfirming((prev) => ({ ...prev, [p.id]: null }));
-                            }}
-                            className="text-xs text-rose-600 hover:text-rose-800"
-                          >
-                            Yes, clear
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setClearConfirming((prev) => ({ ...prev, [p.id]: null }))}
-                            className="text-xs text-gray-400 hover:text-gray-700"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
                     </div>
                   );
                 };
@@ -1067,42 +1095,54 @@ export default function AdminPage() {
 
                     {/* Edit fields */}
                     <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={edit.brand}
-                        onChange={(e) => updateAllEdit(p.id, "brand", e.target.value)}
-                        placeholder="Brand"
-                        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
-                      />
-                      <input
-                        type="text"
-                        value={edit.name}
-                        onChange={(e) => updateAllEdit(p.id, "name", e.target.value)}
-                        placeholder="Product name"
-                        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
-                      />
-                      <select
-                        value={edit.type}
-                        onChange={(e) => updateAllEdit(p.id, "type", e.target.value)}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-white"
-                      >
-                        <option value="">Type…</option>
-                        {dropdownGroups.map(({ label, types }) => (
-                          <optgroup key={label} label={label}>
-                            {types.map((t) => <option key={t} value={t}>{t}</option>)}
-                          </optgroup>
-                        ))}
-                      </select>
-                      <UrlField field="source_url" placeholder="Source URL (INCIDecoder)" href={sourceHref} alwaysEnabled={false} btnLabel="INCIDecoder" />
-                      <UrlField field="image_url" placeholder="Image URL" href={imageHref} alwaysEnabled={true} btnLabel="Image" />
-                      <UrlField field="iherb_url" placeholder="iHerb URL" href={iherbHref} alwaysEnabled={true} btnLabel="iHerb" />
-                      <textarea
-                        value={edit.ingredient_list}
-                        onChange={(e) => updateAllEdit(p.id, "ingredient_list", e.target.value)}
-                        placeholder="Ingredient list…"
-                        rows={3}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 resize-none font-mono leading-relaxed"
-                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 w-14 shrink-0">Brand</span>
+                        <input
+                          type="text"
+                          value={edit.brand}
+                          onChange={(e) => updateAllEdit(p.id, "brand", e.target.value)}
+                          placeholder="Brand"
+                          className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 w-14 shrink-0">Name</span>
+                        <input
+                          type="text"
+                          value={edit.name}
+                          onChange={(e) => updateAllEdit(p.id, "name", e.target.value)}
+                          placeholder="Product name"
+                          className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 w-14 shrink-0">Type</span>
+                        <select
+                          value={edit.type}
+                          onChange={(e) => updateAllEdit(p.id, "type", e.target.value)}
+                          className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-white min-w-0"
+                        >
+                          <option value="">Type…</option>
+                          {dropdownGroups.map(({ label, types }) => (
+                            <optgroup key={label} label={label}>
+                              {types.map((t) => <option key={t} value={t}>{t}</option>)}
+                            </optgroup>
+                          ))}
+                        </select>
+                      </div>
+                      <UrlField field="source_url" rowLabel="Source" placeholder="Source URL" href={sourceHref} alwaysEnabled={false} btnLabel="INCIDecoder" />
+                      <UrlField field="image_url" rowLabel="Image" placeholder="Image URL" href={imageHref} alwaysEnabled={true} btnLabel="Image" />
+                      <UrlField field="iherb_url" rowLabel="iHerb" placeholder="iHerb URL" href={iherbHref} alwaysEnabled={true} btnLabel="iHerb" />
+                      <div>
+                        <span className="text-xs text-gray-400 block mb-1">Ingredients</span>
+                        <textarea
+                          value={edit.ingredient_list}
+                          onChange={(e) => updateAllEdit(p.id, "ingredient_list", e.target.value)}
+                          placeholder="Ingredient list…"
+                          rows={3}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 resize-none font-mono leading-relaxed"
+                        />
+                      </div>
                     </div>
 
                     {/* Actions */}
