@@ -348,6 +348,9 @@ export default function AdminPage() {
   const [classifyingAll, setClassifyingAll] = useState(false);
   const [removingFromQueue, setRemovingFromQueue] = useState<string | null>(null);
   const [classifyAllResult, setClassifyAllResult] = useState<{ classified: number; skipped: number } | null>(null);
+  const [upgradingExplanations, setUpgradingExplanations] = useState(false);
+  const [upgradeResult, setUpgradeResult] = useState<{ upgraded: number; remaining: number } | null>(null);
+  const [upgradeStats, setUpgradeStats] = useState<{ weak: number; total: number } | null>(null);
 
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannersLoading, setBannersLoading] = useState(false);
@@ -527,6 +530,30 @@ export default function AdminPage() {
       } : prev);
     } catch { }
     setClassifyingAll(false);
+  }
+
+  async function loadUpgradeStats() {
+    try {
+      const res = await fetch("/api/admin/upgrade-explanations");
+      const data = await res.json();
+      setUpgradeStats({ weak: data.weak ?? 0, total: data.total ?? 0 });
+    } catch { }
+  }
+
+  async function runUpgradeExplanations() {
+    setUpgradingExplanations(true);
+    setUpgradeResult(null);
+    try {
+      const res = await fetch("/api/admin/upgrade-explanations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "weak" }),
+      });
+      const data = await res.json();
+      setUpgradeResult({ upgraded: data.upgraded ?? 0, remaining: data.remaining ?? 0 });
+      if (data.remaining > 0) setUpgradeStats((prev) => prev ? { ...prev, weak: data.remaining } : prev);
+    } catch { }
+    setUpgradingExplanations(false);
   }
 
   async function removeFromQueue(item: QueueItem) {
@@ -1835,6 +1862,40 @@ export default function AdminPage() {
                     ))}
                   </div>
                 </>
+              )}
+              {/* Upgrade existing explanations with AI */}
+              {!queueLoading && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={async () => { await loadUpgradeStats(); }}
+                      className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
+                    >
+                      Check existing explanations
+                    </button>
+                    {upgradeStats && (
+                      <span className="text-xs text-gray-500">
+                        {upgradeStats.weak} of {upgradeStats.total} need AI upgrade
+                      </span>
+                    )}
+                    {upgradeStats && upgradeStats.weak > 0 && (
+                      <button
+                        type="button"
+                        onClick={runUpgradeExplanations}
+                        disabled={upgradingExplanations}
+                        className="text-xs px-3 py-1.5 bg-teal-600 text-white rounded-lg disabled:opacity-40 hover:bg-teal-700 transition-colors"
+                      >
+                        {upgradingExplanations ? "Upgrading…" : `Upgrade ${Math.min(20, upgradeStats.weak)} with AI`}
+                      </button>
+                    )}
+                    {upgradeResult && (
+                      <span className="text-xs text-teal-600">
+                        {upgradeResult.upgraded} upgraded{upgradeResult.remaining > 0 ? ` — ${upgradeResult.remaining} remaining` : " — all done"}
+                      </span>
+                    )}
+                  </div>
+                </div>
               )}
             </>
           )}

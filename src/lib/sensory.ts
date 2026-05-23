@@ -141,6 +141,60 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
     sensory_category: "Film-forming",
     note: "A synthetic film-forming polymer used to create gel or serum textures. It lays a continuous surface film that can trap dead skin cells underneath, preventing normal shedding and contributing to milia — small, hard, keratin-filled bumps just under the skin surface that are distinct from comedones.",
   },
+
+  // ── Chemical-itch ────────────────────────────────────────────────────────
+  // Ingredients that trigger nerve irritation or histamine responses
+  {
+    pattern: /\bfragrance\b|\bparfum\b/i,
+    sensory_category: "chemical-itch",
+    note: "Fragrance is one of the most common contact allergens in skincare. It can trigger histamine responses, contact dermatitis, and an itch-and-scratch cycle on reactive skin — and repeated exposure progressively increases sensitization even in people who initially tolerate it.",
+  },
+  {
+    pattern: /methylisothiazolinone|methylchloroisothiazolinone|chloromethylisothiazolinone/i,
+    sensory_category: "chemical-itch",
+    note: "Methylisothiazolinone (MI) and its chlorinated form MCI are biocide preservatives classified as strong contact allergens by the EU Scientific Committee. They can cause itching, burning, and allergic contact dermatitis — even at very low concentrations in leave-on formulas.",
+  },
+  {
+    pattern: /dmdm hydantoin|imidazolidinyl urea|diazolidinyl urea|quaternium-15|\bbronopol\b/i,
+    sensory_category: "chemical-itch",
+    note: "A formaldehyde-releasing preservative that slowly releases small amounts of formaldehyde to prevent microbial growth. Formaldehyde is a recognized allergen and sensitizer that can cause itching, redness, and contact dermatitis on sensitive or already-reactive skin.",
+  },
+  {
+    pattern: /iodopropynyl butylcarbamate|\bipbc\b/i,
+    sensory_category: "chemical-itch",
+    note: "IPBC is a biocide preservative and recognized skin sensitizer. It can cause allergic contact dermatitis, particularly in leave-on products or when applied to skin with a compromised barrier.",
+  },
+
+  // ── Occlusive-itch ───────────────────────────────────────────────────────
+  // Heavy waxy esters that trap heat and sebum, not yet covered by Occlusive
+  {
+    pattern: /myristyl myristate/i,
+    sensory_category: "occlusive-itch",
+    note: "Myristyl myristate is a heavy wax ester that forms a dense occlusive layer on skin. It traps heat and sebum beneath the surface, causing a stuffy, itching sensation — and rates moderately high on comedogenicity scales for pore congestion.",
+  },
+  {
+    pattern: /cetyl palmitate|cetyl esters wax/i,
+    sensory_category: "occlusive-itch",
+    note: "Cetyl palmitate is a waxy ester used as an emollient and thickener. It creates a semi-occlusive seal that can trap warmth and sebum, causing an itching sensation and contributing to congestion on oily or reactive skin.",
+  },
+
+  // ── Comedogenic-itch ─────────────────────────────────────────────────────
+  // Pore-blocking ingredients that cause congestion and inflammatory itch
+  {
+    pattern: /isopropyl myristate|isopropyl palmitate/i,
+    sensory_category: "comedogenic-itch",
+    note: "Isopropyl myristate and isopropyl palmitate rate 5/5 on comedogenicity scales — among the highest of any cosmetic ingredient. They penetrate into follicles and physically block pores, leading to congestion, closed comedones, and an inflammatory itch over time on acne-prone or oily skin.",
+  },
+  {
+    pattern: /cocos nucifera|coconut oil/i,
+    sensory_category: "comedogenic-itch",
+    note: "Coconut oil is rich in lauric acid, which rates 4/5 on comedogenicity scales. While effective as an antimicrobial, it readily blocks pores for acne-prone and oily skin types, leading to congestion and inflammatory itch over time.",
+  },
+  {
+    pattern: /butyl stearate/i,
+    sensory_category: "comedogenic-itch",
+    note: "Butyl stearate is a synthetic ester that rates 3–4/5 on comedogenicity scales. It provides a smooth, silky texture but can block pores and worsen congestion on oily or acne-prone skin, contributing to closed comedones and an inflammatory itch over time.",
+  },
 ];
 
 export function countSensoryPatternMatches(ingredientList: string): number {

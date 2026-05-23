@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { classifyIngredient } from "@/lib/ingredient-classifier";
 import { generateExplanation } from "@/lib/generate-explanation";
+import { generateCuratedExplanation } from "@/lib/curated-explanation";
 
 async function guard() {
   const { userId } = await auth();
@@ -37,7 +38,9 @@ async function classifyOne(queueId: string): Promise<{ classified: boolean; alre
 
   if (!existing) {
     const cl = classifyIngredient(item.name);
-    const explanation = generateExplanation(item.name, cl.status, cl.structural_category, cl.category, cl.flagged_category);
+    const ctx = { name: item.name, status: cl.status, structural_category: cl.structural_category, category: cl.category, flagged_category: cl.flagged_category };
+    const aiResult = await generateCuratedExplanation(ctx);
+    const explanation = aiResult?.explanation ?? generateExplanation(item.name, cl.status, cl.structural_category, cl.category, cl.flagged_category);
     await supabaseAdmin.from("ingredients").insert({
       name: item.name,
       status: cl.status,
@@ -45,6 +48,8 @@ async function classifyOne(queueId: string): Promise<{ classified: boolean; alre
       category: cl.category,
       flagged_category: cl.flagged_category,
       explanation,
+      explanation_source: aiResult ? "ai" : "template",
+      skin_climate_notes: aiResult?.skin_climate_notes ?? null,
     });
   }
 
@@ -75,9 +80,14 @@ export async function POST(req: NextRequest) {
       .from("ingredient_queue").select("id").order("times_seen", { ascending: false }).limit(500);
     if (!allItems?.length) return NextResponse.json({ classified: 0, skipped: 0 });
 
-    const results = await Promise.allSettled(allItems.map((item) => classifyOne(item.id)));
-    const classified = results.filter((r) => r.status === "fulfilled" && (r.value as { classified: boolean }).classified).length;
-    const skipped = results.length - classified;
+    let classified = 0, skipped = 0;
+    const BATCH = 5;
+    for (let i = 0; i < allItems.length; i += BATCH) {
+      const chunk = allItems.slice(i, i + BATCH);
+      const results = await Promise.allSettled(chunk.map((item) => classifyOne(item.id)));
+      classified += results.filter((r) => r.status === "fulfilled" && (r.value as { classified: boolean }).classified).length;
+      skipped += results.filter((r) => r.status === "fulfilled" && !(r.value as { classified: boolean }).classified).length;
+    }
     return NextResponse.json({ classified, skipped });
   }
 
