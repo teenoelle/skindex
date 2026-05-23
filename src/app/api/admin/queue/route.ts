@@ -3,7 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { classifyIngredient } from "@/lib/ingredient-classifier";
-import { generateCuratedExplanation } from "@/lib/curated-explanation";
+import { generateExplanation } from "@/lib/generate-explanation";
+import { getSensoryCategories, computeSkinClimateNotes } from "@/lib/curated-explanation";
 
 async function guard() {
   const { userId } = await auth();
@@ -27,7 +28,7 @@ export async function GET() {
   return NextResponse.json({ items: data ?? [] });
 }
 
-async function classifyOne(queueId: string): Promise<{ classified: boolean; alreadyExists: boolean; aiUnavailable?: boolean }> {
+async function classifyOne(queueId: string): Promise<{ classified: boolean; alreadyExists: boolean }> {
   const { data: item } = await supabaseAdmin
     .from("ingredient_queue").select("id, name").eq("id", queueId).maybeSingle();
   if (!item) return { classified: false, alreadyExists: false };
@@ -42,14 +43,9 @@ async function classifyOne(queueId: string): Promise<{ classified: boolean; alre
 
   const cl = classifyIngredient(item.name);
   const ctx = { name: item.name, status: cl.status, structural_category: cl.structural_category, category: cl.category, flagged_category: cl.flagged_category };
-  let aiResult;
-  try {
-    aiResult = await generateCuratedExplanation(ctx);
-  } catch {
-    return { classified: false, alreadyExists: false, aiUnavailable: true };
-  }
-
-  if (!aiResult) return { classified: false, alreadyExists: false, aiUnavailable: true };
+  const sensoryCategories = getSensoryCategories(item.name);
+  const skin_climate_notes = computeSkinClimateNotes(ctx, sensoryCategories);
+  const explanation = generateExplanation(item.name, cl.status, cl.structural_category, cl.category, cl.flagged_category);
 
   await supabaseAdmin.from("ingredients").insert({
     name: item.name,
@@ -57,9 +53,9 @@ async function classifyOne(queueId: string): Promise<{ classified: boolean; alre
     structural_category: cl.structural_category,
     category: cl.category,
     flagged_category: cl.flagged_category,
-    explanation: aiResult.explanation,
-    explanation_source: "ai",
-    skin_climate_notes: aiResult.skin_climate_notes,
+    explanation,
+    explanation_source: "template",
+    skin_climate_notes,
   });
   await supabaseAdmin.from("ingredient_queue").delete().eq("id", queueId);
   return { classified: true, alreadyExists: false };
@@ -88,22 +84,10 @@ export async function POST(req: NextRequest) {
       .from("ingredient_queue").select("id").order("times_seen", { ascending: false }).limit(500);
     if (!allItems?.length) return NextResponse.json({ classified: 0, skipped: 0 });
 
-    let classified = 0, skipped = 0, held = 0;
-    const BATCH = 5;
-    for (let i = 0; i < allItems.length; i += BATCH) {
-      const chunk = allItems.slice(i, i + BATCH);
-      const results = await Promise.allSettled(chunk.map((item) => classifyOne(item.id)));
-      for (const r of results) {
-        if (r.status !== "fulfilled") continue;
-        const v = r.value as { classified: boolean; alreadyExists: boolean; aiUnavailable?: boolean };
-        if (v.classified) classified++;
-        else if (v.aiUnavailable) held++;
-        else skipped++;
-      }
-      // Stop batching if AI is unavailable — no point continuing
-      if (held > 0) break;
-    }
-    return NextResponse.json({ classified, skipped, held });
+    const results = await Promise.allSettled(allItems.map((item) => classifyOne(item.id)));
+    const classified = results.filter((r) => r.status === "fulfilled" && (r.value as { classified: boolean }).classified).length;
+    const skipped = results.filter((r) => r.status === "fulfilled" && !(r.value as { classified: boolean }).classified).length;
+    return NextResponse.json({ classified, skipped });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

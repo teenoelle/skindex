@@ -347,9 +347,7 @@ export default function AdminPage() {
   const [classifyingOne, setClassifyingOne] = useState<string | null>(null);
   const [classifyingAll, setClassifyingAll] = useState(false);
   const [removingFromQueue, setRemovingFromQueue] = useState<string | null>(null);
-  const [classifyAllResult, setClassifyAllResult] = useState<{ classified: number; skipped: number; held: number } | null>(null);
-  const [upgradingExplanations, setUpgradingExplanations] = useState(false);
-  const [upgradeResult, setUpgradeResult] = useState<{ upgraded: number; remaining: number; ai_error?: string } | null>(null);
+  const [classifyAllResult, setClassifyAllResult] = useState<{ classified: number; skipped: number } | null>(null);
   const [upgradeStats, setUpgradeStats] = useState<{ weak: number; total: number } | null>(null);
 
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -521,7 +519,7 @@ export default function AdminPage() {
         body: JSON.stringify({ action: "classify-all" }),
       });
       const data = await res.json();
-      setClassifyAllResult({ classified: data.classified ?? 0, skipped: data.skipped ?? 0, held: data.held ?? 0 });
+      setClassifyAllResult({ classified: data.classified ?? 0, skipped: data.skipped ?? 0 });
       setQueueItems([]);
       setSiteStats((prev) => prev ? {
         ...prev,
@@ -538,22 +536,6 @@ export default function AdminPage() {
       const data = await res.json();
       setUpgradeStats({ weak: data.weak ?? 0, total: data.total ?? 0 });
     } catch { }
-  }
-
-  async function runUpgradeExplanations() {
-    setUpgradingExplanations(true);
-    setUpgradeResult(null);
-    try {
-      const res = await fetch("/api/admin/upgrade-explanations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "weak" }),
-      });
-      const data = await res.json();
-      setUpgradeResult({ upgraded: data.upgraded ?? 0, remaining: data.remaining ?? 0, ai_error: data.ai_error ?? undefined });
-      if (data.remaining > 0) setUpgradeStats((prev) => prev ? { ...prev, weak: data.remaining } : prev);
-    } catch { }
-    setUpgradingExplanations(false);
   }
 
   async function removeFromQueue(item: QueueItem) {
@@ -1813,10 +1795,9 @@ export default function AdminPage() {
                 <p className="text-sm text-gray-400">Queue is empty — all ingredients classified.</p>
               )}
               {!queueLoading && classifyAllResult && (
-                <p className={`text-sm mb-4 ${classifyAllResult.held > 0 ? "text-amber-600" : "text-teal-600"}`}>
+                <p className="text-sm text-teal-600 mb-4">
                   Done — {classifyAllResult.classified} classified
-                  {classifyAllResult.skipped > 0 ? `, ${classifyAllResult.skipped} already in DB` : ""}
-                  {classifyAllResult.held > 0 ? ` — ${classifyAllResult.held} held (Claude unavailable, retry later)` : ""}.
+                  {classifyAllResult.skipped > 0 ? `, ${classifyAllResult.skipped} already in DB` : ""}.
                 </p>
               )}
               {!queueLoading && queueItems.length > 0 && (
@@ -1864,37 +1845,22 @@ export default function AdminPage() {
                   </div>
                 </>
               )}
-              {/* Upgrade existing explanations with AI */}
+              {/* Explanation upgrade stats */}
               {!queueLoading && (
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <div className="flex items-center gap-3 flex-wrap">
                     <button
                       type="button"
-                      onClick={async () => { await loadUpgradeStats(); }}
+                      onClick={loadUpgradeStats}
                       className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
                     >
-                      Check existing explanations
+                      Check explanation coverage
                     </button>
                     {upgradeStats && (
-                      <span className="text-xs text-gray-500">
-                        {upgradeStats.weak} of {upgradeStats.total} need AI upgrade
-                      </span>
-                    )}
-                    {upgradeStats && upgradeStats.weak > 0 && (
-                      <button
-                        type="button"
-                        onClick={runUpgradeExplanations}
-                        disabled={upgradingExplanations}
-                        className="text-xs px-3 py-1.5 bg-teal-600 text-white rounded-lg disabled:opacity-40 hover:bg-teal-700 transition-colors"
-                      >
-                        {upgradingExplanations ? "Upgrading…" : `Upgrade ${Math.min(20, upgradeStats.weak)} with AI`}
-                      </button>
-                    )}
-                    {upgradeResult && (
-                      <span className={`text-xs ${upgradeResult.ai_error ? "text-rose-600" : "text-teal-600"}`}>
-                        {upgradeResult.ai_error
-                          ? `AI error: ${upgradeResult.ai_error}`
-                          : `${upgradeResult.upgraded} upgraded${upgradeResult.remaining > 0 ? ` — ${upgradeResult.remaining} remaining` : " — all done"}`}
+                      <span className={`text-xs ${upgradeStats.weak > 0 ? "text-amber-600" : "text-teal-600"}`}>
+                        {upgradeStats.weak > 0
+                          ? `${upgradeStats.weak} of ${upgradeStats.total} need curated explanation`
+                          : `All ${upgradeStats.total} explanations are curated`}
                       </span>
                     )}
                   </div>
