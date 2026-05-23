@@ -55,6 +55,14 @@ type AllEditState = {
 
 type ProductType = { id: string; name: string; body_area: string };
 
+type QueueItem = {
+  id: string;
+  name: string;
+  times_seen: number;
+  found_in: string | null;
+  last_seen: string | null;
+};
+
 type SiteStats = {
   totalProducts: number;
   archivedCount: number;
@@ -311,6 +319,14 @@ export default function AdminPage() {
 
   const [siteStats, setSiteStats] = useState<SiteStats | null>(null);
 
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
+  const [queueLoading, setQueueLoading] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [classifyingOne, setClassifyingOne] = useState<string | null>(null);
+  const [classifyingAll, setClassifyingAll] = useState(false);
+  const [removingFromQueue, setRemovingFromQueue] = useState<string | null>(null);
+  const [classifyAllResult, setClassifyAllResult] = useState<{ classified: number; skipped: number } | null>(null);
+
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [typesLoading, setTypesLoading] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
@@ -397,6 +413,71 @@ export default function AdminPage() {
     } catch {
       // ignore
     }
+  }
+
+  async function loadQueue() {
+    setQueueLoading(true);
+    try {
+      const res = await fetch("/api/admin/queue");
+      if (res.ok) {
+        const data = await res.json();
+        setQueueItems(data.items ?? []);
+      }
+    } catch { }
+    setQueueLoading(false);
+  }
+
+  async function classifyQueueOne(item: QueueItem) {
+    setClassifyingOne(item.id);
+    try {
+      await fetch("/api/admin/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "classify-one", queueId: item.id }),
+      });
+      setQueueItems((prev) => prev.filter((q) => q.id !== item.id));
+      setSiteStats((prev) => prev ? {
+        ...prev,
+        classifiedIngredients: prev.classifiedIngredients + 1,
+        queueLength: Math.max(0, prev.queueLength - 1),
+      } : prev);
+    } catch { }
+    setClassifyingOne(null);
+  }
+
+  async function classifyQueueAll() {
+    setClassifyingAll(true);
+    setClassifyAllResult(null);
+    try {
+      const res = await fetch("/api/admin/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "classify-all" }),
+      });
+      const data = await res.json();
+      setClassifyAllResult({ classified: data.classified ?? 0, skipped: data.skipped ?? 0 });
+      setQueueItems([]);
+      setSiteStats((prev) => prev ? {
+        ...prev,
+        classifiedIngredients: prev.classifiedIngredients + (data.classified ?? 0),
+        queueLength: 0,
+      } : prev);
+    } catch { }
+    setClassifyingAll(false);
+  }
+
+  async function removeFromQueue(item: QueueItem) {
+    setRemovingFromQueue(item.id);
+    try {
+      await fetch("/api/admin/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove", queueId: item.id }),
+      });
+      setQueueItems((prev) => prev.filter((q) => q.id !== item.id));
+      setSiteStats((prev) => prev ? { ...prev, queueLength: Math.max(0, prev.queueLength - 1) } : prev);
+    } catch { }
+    setRemovingFromQueue(null);
   }
 
   async function loadAllProducts() {
@@ -1349,6 +1430,89 @@ export default function AdminPage() {
                 ))}
               </div>
             )
+          )}
+        </section>
+
+        {/* Ingredient Queue */}
+        <section>
+          <button
+            type="button"
+            onClick={() => {
+              const opening = !queueOpen;
+              setQueueOpen(opening);
+              if (opening && queueItems.length === 0) loadQueue();
+            }}
+            className="flex items-center gap-3 mb-4 group"
+          >
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">Ingredient Queue</h2>
+            {siteStats && siteStats.queueLength > 0 && (
+              <span className="text-xs font-medium bg-amber-100 text-amber-700 rounded-full px-2.5 py-0.5">
+                {siteStats.queueLength}
+              </span>
+            )}
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${queueOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {queueOpen && (
+            <>
+              {queueLoading && <p className="text-sm text-gray-400">Loading…</p>}
+              {!queueLoading && queueItems.length === 0 && !classifyAllResult && (
+                <p className="text-sm text-gray-400">Queue is empty — all ingredients classified.</p>
+              )}
+              {!queueLoading && classifyAllResult && (
+                <p className="text-sm text-teal-600 mb-4">
+                  Done — {classifyAllResult.classified} classified
+                  {classifyAllResult.skipped > 0 ? `, ${classifyAllResult.skipped} already in DB` : ""}.
+                </p>
+              )}
+              {!queueLoading && queueItems.length > 0 && (
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <button
+                      type="button"
+                      onClick={classifyQueueAll}
+                      disabled={classifyingAll}
+                      className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 hover:bg-indigo-700 transition-colors"
+                    >
+                      {classifyingAll ? "Classifying…" : `Classify all (${queueItems.length})`}
+                    </button>
+                  </div>
+                  <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
+                    {queueItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between px-4 py-2.5 gap-4">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm text-gray-900 font-mono">{item.name}</span>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-amber-600 font-medium">×{item.times_seen}</span>
+                            {item.found_in && <span className="text-xs text-gray-400 truncate">{item.found_in}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => classifyQueueOne(item)}
+                            disabled={classifyingOne === item.id}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 disabled:opacity-40"
+                          >
+                            {classifyingOne === item.id ? "Classifying…" : "Classify"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeFromQueue(item)}
+                            disabled={removingFromQueue === item.id}
+                            className="text-xs text-gray-400 hover:text-rose-500 disabled:opacity-40"
+                          >
+                            {removingFromQueue === item.id ? "Removing…" : "Remove"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
           )}
         </section>
 
