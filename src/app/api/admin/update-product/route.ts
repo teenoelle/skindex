@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existing } = await supabaseAdmin
     .from("products")
-    .select("name, ingredient_list")
+    .select("name, brand, type, source_url, image_url, iherb_url, ingredient_list")
     .eq("id", productId)
     .maybeSingle();
 
@@ -79,11 +79,13 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const changes: Record<string, string | null> = {};
-  if (type !== undefined) changes.type = patch.type;
-  if (iherb_url !== undefined) changes.iherb_url = patch.iherb_url;
-  if (image_url !== undefined) changes.image_url = patch.image_url;
-  if (name !== undefined) changes.name = patch.name;
+  const changes: Record<string, { before: string | null; after: string | null }> = {};
+  if (name !== undefined) changes.name = { before: existing?.name ?? null, after: patch.name ?? null };
+  if (brand !== undefined) changes.brand = { before: existing?.brand ?? null, after: patch.brand ?? null };
+  if (type !== undefined) changes.type = { before: existing?.type ?? null, after: patch.type ?? null };
+  if (source_url !== undefined) changes.source_url = { before: existing?.source_url ?? null, after: patch.source_url ?? null };
+  if (image_url !== undefined) changes.image_url = { before: existing?.image_url ?? null, after: patch.image_url ?? null };
+  if (iherb_url !== undefined) changes.iherb_url = { before: existing?.iherb_url ?? null, after: patch.iherb_url ?? null };
 
   await writeAuditLog(userId, "update_product", "product", productId, {
     name: existing?.name ?? productId,

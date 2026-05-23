@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import {
@@ -55,9 +55,23 @@ type AllEditState = {
 
 type ProductType = { id: string; name: string; body_area: string };
 
-type AdminUser = { clerk_id: string; email: string | null; name: string | null };
-type AdminInvite = { id: string; code: string; expires_at: string; claimed_by: string | null; claimed_at: string | null; created_at: string };
+type AdminUser = {
+  clerk_id: string; email: string | null; name: string | null;
+  granted_by: string | null; granted_by_email: string | null;
+  granted_at: string | null; activity_count: number; is_self: boolean;
+};
+type AdminInvite = {
+  id: string; code: string; expires_at: string; is_expired: boolean;
+  claimed_by: string | null; claimed_by_email: string | null; claimed_at: string | null;
+  created_by: string; created_by_email: string | null; created_at: string;
+};
 type LookupResult = { found: boolean; clerk_id?: string; email?: string; name?: string | null; role?: string | null };
+
+type AuditEntry = {
+  id: string; action: string; entity_type: string; entity_id: string | null;
+  detail: Record<string, unknown>; created_at: string;
+  admin_clerk_id: string; admin_email: string | null; admin_name: string | null;
+};
 
 type Banner = {
   id: string;
@@ -87,14 +101,6 @@ type SiteStats = {
   pendingSubmissions: number;
 };
 
-type AuditEntry = {
-  id: string;
-  action: string;
-  entity_type: string;
-  entity_id: string | null;
-  detail: Record<string, unknown>;
-  created_at: string;
-};
 
 const BODY_AREAS = ["Face", "Makeup", "Lips", "Body", "Hair"];
 
@@ -362,13 +368,15 @@ export default function AdminPage() {
 
   const [adminsOpen, setAdminsOpen] = useState(false);
   const [adminsList, setAdminsList] = useState<AdminUser[]>([]);
+  const [invites, setInvites] = useState<AdminInvite[]>([]);
   const [adminsLoading, setAdminsLoading] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState<string | null>(null);
+  const [inviteHistoryOpen, setInviteHistoryOpen] = useState(false);
   const [lookupEmail, setLookupEmail] = useState("");
   const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [grantingAdmin, setGrantingAdmin] = useState(false);
   const [revokingAdmin, setRevokingAdmin] = useState<string | null>(null);
-  const [invites, setInvites] = useState<AdminInvite[]>([]);
   const [inviteExpiry, setInviteExpiry] = useState("7d");
   const [inviteCustomDate, setInviteCustomDate] = useState("");
   const [creatingInvite, setCreatingInvite] = useState(false);
@@ -392,6 +400,13 @@ export default function AdminPage() {
   const [auditExpanded, setAuditExpanded] = useState(false);
   const [auditRange, setAuditRange] = useState<"7d" | "30d" | "all">("7d");
   const [auditActionFilter, setAuditActionFilter] = useState<string | null>(null);
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditAdminFilter, setAuditAdminFilter] = useState<string | null>(null);
+  const [auditAdminFilterEmail, setAuditAdminFilterEmail] = useState<string | null>(null);
+  const [auditEntityFilter, setAuditEntityFilter] = useState<string | null>(null);
+  const [auditEntityFilterName, setAuditEntityFilterName] = useState<string | null>(null);
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+  const [revertingEntryId, setRevertingEntryId] = useState<string | null>(null);
   const [submissionsOpen, setSubmissionsOpen] = useState(true);
   const [allProductsOpen, setAllProductsOpen] = useState(false);
   const [typesOpen, setTypesOpen] = useState(false);
@@ -602,24 +617,10 @@ export default function AdminPage() {
       if (res.ok) {
         const data = await res.json();
         setAdminsList(data.admins ?? []);
-      }
-    } catch { }
-    setAdminsLoading(false);
-    loadAdminInvites();
-  }
-
-  async function loadAdminInvites() {
-    try {
-      const res = await fetch("/api/admin/admins", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "list-invites" }),
-      });
-      if (res.ok) {
-        const data = await res.json();
         setInvites(data.invites ?? []);
       }
     } catch { }
+    setAdminsLoading(false);
   }
 
   async function lookupUser() {
@@ -638,7 +639,7 @@ export default function AdminPage() {
     setLookupLoading(false);
   }
 
-  async function grantAdmin(clerkId: string, email: string | null) {
+  async function grantAdmin(clerkId: string, email: string | null, name: string | null) {
     setGrantingAdmin(true);
     try {
       await fetch("/api/admin/admins", {
@@ -646,7 +647,10 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "grant", clerk_id: clerkId }),
       });
-      setAdminsList((prev) => prev.some((a) => a.clerk_id === clerkId) ? prev : [...prev, { clerk_id: clerkId, email, name: null }]);
+      setAdminsList((prev) => prev.some((a) => a.clerk_id === clerkId) ? prev : [
+        ...prev,
+        { clerk_id: clerkId, email, name, granted_by: null, granted_by_email: null, granted_at: new Date().toISOString(), activity_count: 0, is_self: false },
+      ]);
       setLookupResult((prev) => prev ? { ...prev, role: "admin" } : null);
     } catch { }
     setGrantingAdmin(false);
@@ -687,7 +691,8 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (data.invite) {
-        setNewInviteCode(data.invite.code);
+        const claimUrl = `${window.location.origin}/claim-invite?code=${data.invite.code}`;
+        setNewInviteCode(claimUrl);
         setInvites((prev) => [data.invite, ...prev]);
       }
     } catch { }
@@ -705,10 +710,26 @@ export default function AdminPage() {
       setInvites((prev) => prev.filter((i) => i.id !== id));
       if (newInviteCode) {
         const removed = invites.find((i) => i.id === id);
-        if (removed?.code === newInviteCode) setNewInviteCode(null);
+        if (removed && newInviteCode.includes(removed.code)) setNewInviteCode(null);
       }
     } catch { }
     setRevokingInvite(null);
+  }
+
+  async function handleRevertEntry(entryId: string) {
+    setRevertingEntryId(entryId);
+    try {
+      const res = await fetch("/api/admin/undo-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entryId }),
+      });
+      if (res.ok) {
+        setExpandedEntryId(null);
+        loadAuditLog(auditRange);
+      }
+    } catch { }
+    setRevertingEntryId(null);
   }
 
   async function loadAllProducts() {
@@ -1027,6 +1048,58 @@ export default function AdminPage() {
     setMerging(false);
   }
 
+  function adminInitials(a: { email: string | null; name: string | null }): string {
+    if (a.name) return a.name.split(" ").map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
+    return (a.email?.[0] ?? "?").toUpperCase();
+  }
+
+  function dateGroup(iso: string): string {
+    const d = new Date(iso);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 86400000);
+    const weekAgo = new Date(today.getTime() - 6 * 86400000);
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (day.getTime() === today.getTime()) return "Today";
+    if (day.getTime() === yesterday.getTime()) return "Yesterday";
+    if (day >= weekAgo) return "This week";
+    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+
+  function renderEntryDetail(entry: AuditEntry): React.ReactNode {
+    if (entry.action === "update_product") {
+      const changes = (entry.detail.changes ?? {}) as Record<string, { before: string | null; after: string | null } | string | null>;
+      const pairs = Object.entries(changes)
+        .map(([field, v]) => ({ field, v }))
+        .filter(({ v }) => typeof v === "object" && v !== null && "before" in v) as { field: string; v: { before: string | null; after: string | null } }[];
+      if (pairs.length === 0) return <p className="text-xs text-gray-400 italic">No detail available — edit predates before-state tracking.</p>;
+      const hasChanges = pairs.some(({ v }) => v.before !== v.after);
+      return (
+        <div className="space-y-1">
+          {pairs.map(({ field, v }) => (
+            <div key={field} className="flex items-center gap-2 text-xs">
+              <span className="text-gray-400 w-20 shrink-0 font-mono">{field}</span>
+              <span className="text-rose-500">{v.before ?? "—"}</span>
+              <span className="text-gray-300">→</span>
+              <span className="text-teal-600">{v.after ?? "—"}</span>
+            </div>
+          ))}
+          {hasChanges && (
+            <button
+              type="button"
+              onClick={() => handleRevertEntry(entry.id)}
+              disabled={revertingEntryId === entry.id}
+              className="mt-2 text-xs text-rose-500 hover:text-rose-700 disabled:opacity-40"
+            >
+              {revertingEntryId === entry.id ? "Reverting…" : "Revert to previous values"}
+            </button>
+          )}
+        </div>
+      );
+    }
+    return null;
+  }
+
   const PAGE_SIZE = 100;
 
   const allStats = {
@@ -1061,6 +1134,26 @@ export default function AdminPage() {
     .filter((p) => !filterMissingType || !p.type || !activeTypesSet.has(p.type))
     .filter((p) => !filterMissingIngredients || !p.ingredient_list),
   [sortedAllProducts, allSearch, allBrandFilter, filterMissingSource, filterMissingIherb, filterMissingImage, filterMissingType, filterMissingIngredients, activeTypesSet]);
+
+  const filteredAuditLog = useMemo(() => {
+    const search = auditSearch.toLowerCase();
+    return auditLog
+      .filter((e) => !auditActionFilter || ACTION_GROUPS[auditActionFilter]?.includes(e.action))
+      .filter((e) => !auditAdminFilter || e.admin_clerk_id === auditAdminFilter)
+      .filter((e) => !auditEntityFilter || e.entity_id === auditEntityFilter)
+      .filter((e) => !search || describeAction(e).toLowerCase().includes(search) || (e.admin_email ?? "").toLowerCase().includes(search));
+  }, [auditLog, auditActionFilter, auditAdminFilter, auditEntityFilter, auditSearch]);
+
+  const groupedAuditLog = useMemo(() => {
+    const groups: { label: string; entries: AuditEntry[] }[] = [];
+    for (const entry of filteredAuditLog) {
+      const label = dateGroup(entry.created_at);
+      const last = groups[groups.length - 1];
+      if (last?.label === label) last.entries.push(entry);
+      else groups.push({ label, entries: [entry] });
+    }
+    return groups;
+  }, [filteredAuditLog]);
 
   const totalPages = Math.max(1, Math.ceil(filteredAllProducts.length / PAGE_SIZE));
   const displayedAllProducts = filteredAllProducts.slice((allPage - 1) * PAGE_SIZE, allPage * PAGE_SIZE);
@@ -2148,22 +2241,12 @@ export default function AdminPage() {
         <section>
           <button
             type="button"
-            onClick={() => {
-              const opening = !adminsOpen;
-              setAdminsOpen(opening);
-              if (opening && adminsList.length === 0) loadAdmins();
-            }}
+            onClick={() => { const o = !adminsOpen; setAdminsOpen(o); if (o && adminsList.length === 0) loadAdmins(); }}
             className="flex items-center gap-3 mb-4 group"
           >
             <h2 className="text-xl font-semibold tracking-tight text-gray-900">Admin Management</h2>
-            {adminsList.length > 0 && (
-              <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
-                {adminsList.length}
-              </span>
-            )}
-            <svg className={`w-4 h-4 text-gray-400 transition-transform ${adminsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+            {adminsList.length > 0 && <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">{adminsList.length}</span>}
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${adminsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
           </button>
 
           {adminsOpen && (
@@ -2171,55 +2254,130 @@ export default function AdminPage() {
               {adminsLoading && <p className="text-sm text-gray-400">Loading…</p>}
               {!adminsLoading && (
                 <div className="space-y-6">
-                  {/* Current admins */}
-                  {adminsList.length > 0 && (
-                    <div>
-                      <p className="text-xs text-gray-400 mb-2 font-medium">Current admins</p>
-                      <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
-                        {adminsList.map((a) => (
-                          <div key={a.clerk_id} className="flex items-center justify-between px-4 py-2.5 gap-4">
-                            <div>
-                              <p className="text-sm text-gray-900">{a.email ?? a.clerk_id}</p>
-                              {a.name && <p className="text-xs text-gray-400">{a.name}</p>}
+                  {/* Unified access list */}
+                  {(adminsList.length > 0 || invites.filter((i) => !i.is_expired && !i.claimed_by).length > 0) && (
+                    <div className="border border-gray-100 rounded-xl overflow-visible divide-y divide-gray-50">
+                      {adminsList.map((a) => (
+                        <div key={a.clerk_id} className="flex items-center gap-3 px-4 py-3">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold shrink-0 select-none">
+                            {adminInitials(a)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm text-gray-900 font-medium truncate">{a.email ?? a.clerk_id}</span>
+                              {a.is_self && <span className="text-xs text-gray-400 shrink-0">You</span>}
                             </div>
+                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                              {a.granted_at && (
+                                <span className="text-xs text-gray-400">Admin since {new Date(a.granted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                              )}
+                              {a.granted_by_email && (
+                                <span className="text-xs text-gray-300">· Added by {a.granted_by_email}</span>
+                              )}
+                            </div>
+                          </div>
+                          {a.activity_count > 0 && (
                             <button
                               type="button"
-                              onClick={() => revokeAdmin(a.clerk_id)}
-                              disabled={revokingAdmin === a.clerk_id}
-                              className="text-xs text-rose-400 hover:text-rose-600 disabled:opacity-40 shrink-0"
+                              onClick={() => { setAuditAdminFilter(a.clerk_id); setAuditAdminFilterEmail(a.email); setAuditExpanded(true); }}
+                              className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 hover:bg-indigo-100 hover:text-indigo-700 transition-colors shrink-0"
+                              title="View activity"
                             >
-                              {revokingAdmin === a.clerk_id ? "Revoking…" : "Revoke"}
+                              {a.activity_count} actions
                             </button>
+                          )}
+                          <div className="relative shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setAdminMenuOpen(adminMenuOpen === a.clerk_id ? null : a.clerk_id)}
+                              className="text-gray-400 hover:text-gray-700 px-1 py-0.5 text-lg leading-none"
+                            >
+                              ⋯
+                            </button>
+                            {adminMenuOpen === a.clerk_id && (
+                              <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => { setAuditAdminFilter(a.clerk_id); setAuditAdminFilterEmail(a.email); setAuditExpanded(true); setAdminMenuOpen(null); }}
+                                  className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50 text-gray-700"
+                                >
+                                  View activity
+                                </button>
+                                {!a.is_self && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { if (!confirm(`Revoke admin access for ${a.email ?? a.clerk_id}?`)) return; revokeAdmin(a.clerk_id); setAdminMenuOpen(null); }}
+                                    disabled={revokingAdmin === a.clerk_id}
+                                    className="w-full text-left text-xs px-3 py-2 hover:bg-rose-50 text-rose-600 disabled:opacity-40"
+                                  >
+                                    {revokingAdmin === a.clerk_id ? "Revoking…" : "Revoke access"}
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
+
+                      {invites.filter((i) => !i.is_expired && !i.claimed_by).map((inv) => (
+                        <div key={inv.id} className="flex items-center gap-3 px-4 py-3">
+                          <div className="w-8 h-8 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-400 shrink-0 text-xs">✉</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-500">Pending invite</p>
+                            <p className="text-xs text-gray-400">Expires {relativeTime(inv.expires_at)}{inv.created_by_email ? ` · from ${inv.created_by_email}` : ""}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => revokeInvite(inv.id)}
+                            disabled={revokingInvite === inv.id}
+                            className="text-xs text-gray-400 hover:text-rose-500 disabled:opacity-40 shrink-0"
+                          >
+                            {revokingInvite === inv.id ? "Revoking…" : "Revoke"}
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                  {/* Email lookup */}
+                  {/* Invite history */}
+                  {invites.filter((i) => i.is_expired || i.claimed_by).length > 0 && (
+                    <div>
+                      <button type="button" onClick={() => setInviteHistoryOpen((v) => !v)} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                        {inviteHistoryOpen ? "Hide" : "Show"} invite history ({invites.filter((i) => i.is_expired || i.claimed_by).length})
+                      </button>
+                      {inviteHistoryOpen && (
+                        <div className="mt-2 border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
+                          {invites.filter((i) => i.is_expired || i.claimed_by).map((inv) => (
+                            <div key={inv.id} className="flex items-center gap-3 px-4 py-2.5">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <code className="text-xs font-mono text-gray-400">{inv.code.slice(0, 8)}…</code>
+                                  <span className={`text-xs rounded-full px-2 py-0.5 ${inv.claimed_by ? "bg-teal-50 text-teal-600" : "bg-gray-50 text-gray-400"}`}>
+                                    {inv.claimed_by ? "Claimed" : "Expired"}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {inv.claimed_by_email ? `by ${inv.claimed_by_email}` : ""}
+                                  {inv.claimed_at ? ` · ${relativeTime(inv.claimed_at)}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Add by email */}
                   <div>
                     <p className="text-xs text-gray-400 mb-2 font-medium">Add by email</p>
                     <div className="flex gap-2">
-                      <input
-                        type="email"
-                        value={lookupEmail}
-                        onChange={(e) => { setLookupEmail(e.target.value); setLookupResult(null); }}
-                        onKeyDown={(e) => { if (e.key === "Enter") lookupUser(); }}
-                        placeholder="Email address…"
-                        className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 min-w-0"
-                      />
-                      <button
-                        type="button"
-                        onClick={lookupUser}
-                        disabled={lookupLoading || !lookupEmail.trim()}
-                        className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors disabled:opacity-40"
-                      >
+                      <input type="email" value={lookupEmail} onChange={(e) => { setLookupEmail(e.target.value); setLookupResult(null); }} onKeyDown={(e) => { if (e.key === "Enter") lookupUser(); }} placeholder="Email address…" className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 min-w-0" />
+                      <button type="button" onClick={lookupUser} disabled={lookupLoading || !lookupEmail.trim()} className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors disabled:opacity-40">
                         {lookupLoading ? "Looking…" : "Look up"}
                       </button>
                     </div>
-                    {lookupResult && !lookupResult.found && (
-                      <p className="text-xs text-gray-400 mt-2">No account found for that email.</p>
-                    )}
+                    {lookupResult && !lookupResult.found && <p className="text-xs text-gray-400 mt-2">No account found for that email.</p>}
                     {lookupResult?.found && (
                       <div className="mt-2 flex items-center justify-between gap-4 border border-gray-100 rounded-lg px-3 py-2">
                         <div>
@@ -2229,22 +2387,10 @@ export default function AdminPage() {
                         {lookupResult.role === "admin" ? (
                           <div className="flex items-center gap-3">
                             <span className="text-xs text-teal-600">Already admin</span>
-                            <button
-                              type="button"
-                              onClick={() => revokeAdmin(lookupResult.clerk_id!)}
-                              disabled={revokingAdmin === lookupResult.clerk_id}
-                              className="text-xs text-rose-400 hover:text-rose-600 disabled:opacity-40"
-                            >
-                              Revoke
-                            </button>
+                            <button type="button" onClick={() => { if (!confirm(`Revoke admin access for ${lookupResult.email}?`)) return; revokeAdmin(lookupResult.clerk_id!); }} disabled={revokingAdmin === lookupResult.clerk_id} className="text-xs text-rose-400 hover:text-rose-600 disabled:opacity-40">Revoke</button>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => grantAdmin(lookupResult.clerk_id!, lookupResult.email ?? null)}
-                            disabled={grantingAdmin}
-                            className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition-colors"
-                          >
+                          <button type="button" onClick={() => grantAdmin(lookupResult.clerk_id!, lookupResult.email ?? null, lookupResult.name ?? null)} disabled={grantingAdmin} className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition-colors">
                             {grantingAdmin ? "Granting…" : "Make admin"}
                           </button>
                         )}
@@ -2252,74 +2398,24 @@ export default function AdminPage() {
                     )}
                   </div>
 
-                  {/* Invite links */}
+                  {/* Invite link */}
                   <div>
-                    <p className="text-xs text-gray-400 mb-2 font-medium">Invite link</p>
+                    <p className="text-xs text-gray-400 mb-2 font-medium">Generate invite link</p>
                     <div className="flex flex-wrap gap-2 items-center">
                       {(["24h", "7d", "30d", "custom"] as const).map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setInviteExpiry(preset)}
-                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                            inviteExpiry === preset ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 text-gray-500 hover:border-gray-400"
-                          }`}
-                        >
+                        <button key={preset} type="button" onClick={() => setInviteExpiry(preset)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${inviteExpiry === preset ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}>
                           {preset === "24h" ? "24 hours" : preset === "7d" ? "7 days" : preset === "30d" ? "30 days" : "Custom"}
                         </button>
                       ))}
-                      {inviteExpiry === "custom" && (
-                        <input
-                          type="datetime-local"
-                          value={inviteCustomDate}
-                          onChange={(e) => setInviteCustomDate(e.target.value)}
-                          className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400"
-                        />
-                      )}
-                      <button
-                        type="button"
-                        onClick={createInvite}
-                        disabled={creatingInvite || (inviteExpiry === "custom" && !inviteCustomDate)}
-                        className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-40 transition-colors"
-                      >
+                      {inviteExpiry === "custom" && <input type="datetime-local" value={inviteCustomDate} onChange={(e) => setInviteCustomDate(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400" />}
+                      <button type="button" onClick={createInvite} disabled={creatingInvite || (inviteExpiry === "custom" && !inviteCustomDate)} className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-40 transition-colors">
                         {creatingInvite ? "Creating…" : "Generate link"}
                       </button>
                     </div>
-
                     {newInviteCode && (
                       <div className="mt-2 flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-                        <code className="text-xs text-indigo-800 font-mono flex-1 break-all">{newInviteCode}</code>
-                        <button
-                          type="button"
-                          onClick={() => navigator.clipboard.writeText(newInviteCode)}
-                          className="text-xs text-indigo-500 hover:text-indigo-700 shrink-0"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    )}
-
-                    {invites.filter((i) => !i.claimed_by && new Date(i.expires_at) > new Date()).length > 0 && (
-                      <div className="mt-3 space-y-1">
-                        <p className="text-xs text-gray-300 mb-1">Active invites</p>
-                        {invites.filter((i) => !i.claimed_by && new Date(i.expires_at) > new Date()).map((inv) => (
-                          <div key={inv.id} className="flex items-center justify-between gap-4 px-3 py-1.5 border border-gray-100 rounded-lg">
-                            <code className="text-xs font-mono text-gray-500">{inv.code}</code>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <span className="text-xs text-gray-400">
-                                exp. {new Date(inv.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => revokeInvite(inv.id)}
-                                disabled={revokingInvite === inv.id}
-                                className="text-xs text-gray-400 hover:text-rose-500 disabled:opacity-40"
-                              >
-                                {revokingInvite === inv.id ? "Revoking…" : "Revoke"}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                        <code className="text-xs text-indigo-800 flex-1 break-all">{newInviteCode}</code>
+                        <button type="button" onClick={() => navigator.clipboard.writeText(newInviteCode)} className="text-xs text-indigo-500 hover:text-indigo-700 shrink-0">Copy</button>
                       </div>
                     )}
                   </div>
@@ -2337,98 +2433,104 @@ export default function AdminPage() {
             className="flex items-center gap-3 mb-4 group"
           >
             <h2 className="text-xl font-semibold tracking-tight text-gray-900">Activity</h2>
-            {!auditLoading && auditLog.length > 0 && (
-              <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
-                {auditLog.length}
-              </span>
-            )}
-            <svg className={`w-4 h-4 text-gray-400 transition-transform ${auditExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+            {!auditLoading && auditLog.length > 0 && <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">{auditLog.length}</span>}
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${auditExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
           </button>
 
           {auditExpanded && (
             <>
-              {/* Controls */}
-              <div className="flex flex-wrap gap-2 mb-4">
+              {/* Range + action filters */}
+              <div className="flex flex-wrap gap-2 mb-3">
                 {(["7d", "30d", "all"] as const).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => {
-                      setAuditRange(r);
-                      loadAuditLog(r);
-                    }}
-                    className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                      auditRange === r
-                        ? "bg-gray-900 text-white border-gray-900"
-                        : "border-gray-200 text-gray-500 hover:border-gray-400"
-                    }`}
-                  >
+                  <button key={r} type="button" onClick={() => { setAuditRange(r); loadAuditLog(r); }} className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${auditRange === r ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}>
                     {r === "7d" ? "Last 7 days" : r === "30d" ? "Last 30 days" : "All time"}
                   </button>
                 ))}
                 <div className="w-px bg-gray-100 self-stretch mx-1" />
-                <button
-                  type="button"
-                  onClick={() => setAuditActionFilter(null)}
-                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                    !auditActionFilter
-                      ? "bg-gray-100 text-gray-800 border-gray-200"
-                      : "border-gray-200 text-gray-400 hover:border-gray-400"
-                  }`}
-                >
-                  All
-                </button>
+                <button type="button" onClick={() => setAuditActionFilter(null)} className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${!auditActionFilter ? "bg-gray-100 text-gray-800 border-gray-200" : "border-gray-200 text-gray-400 hover:border-gray-400"}`}>All</button>
                 {Object.keys(ACTION_GROUPS).map((group) => (
-                  <button
-                    key={group}
-                    type="button"
-                    onClick={() => setAuditActionFilter(auditActionFilter === group ? null : group)}
-                    className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                      auditActionFilter === group
-                        ? "bg-gray-100 text-gray-800 border-gray-200"
-                        : "border-gray-200 text-gray-400 hover:border-gray-400"
-                    }`}
-                  >
-                    {group}
-                  </button>
+                  <button key={group} type="button" onClick={() => setAuditActionFilter(auditActionFilter === group ? null : group)} className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${auditActionFilter === group ? "bg-gray-100 text-gray-800 border-gray-200" : "border-gray-200 text-gray-400 hover:border-gray-400"}`}>{group}</button>
                 ))}
               </div>
 
+              {/* Active filters + search */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                <input type="text" value={auditSearch} onChange={(e) => setAuditSearch(e.target.value)} placeholder="Search…" className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 w-44" />
+                {auditAdminFilter && (
+                  <span className="flex items-center gap-1.5 text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-2.5 py-1">
+                    {auditAdminFilterEmail ?? auditAdminFilter}
+                    <button type="button" onClick={() => { setAuditAdminFilter(null); setAuditAdminFilterEmail(null); }} className="text-indigo-400 hover:text-indigo-700 leading-none">×</button>
+                  </span>
+                )}
+                {auditEntityFilter && (
+                  <span className="flex items-center gap-1.5 text-xs bg-gray-100 text-gray-700 border border-gray-200 rounded-full px-2.5 py-1">
+                    {auditEntityFilterName ?? auditEntityFilter}
+                    <button type="button" onClick={() => { setAuditEntityFilter(null); setAuditEntityFilterName(null); }} className="text-gray-400 hover:text-gray-700 leading-none">×</button>
+                  </span>
+                )}
+              </div>
+
               {auditLoading && <p className="text-sm text-gray-400">Loading…</p>}
-              {!auditLoading && (() => {
-                const filtered = auditActionFilter
-                  ? auditLog.filter((e) => ACTION_GROUPS[auditActionFilter]?.includes(e.action))
-                  : auditLog;
-                if (filtered.length === 0) return <p className="text-sm text-gray-400">No activity in this range.</p>;
-                return (
-                  <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
-                    {filtered.map((entry) => {
-                      const isProduct = entry.action === "update_product" && entry.entity_id;
-                      return (
-                        <div key={entry.id} className="flex items-baseline justify-between px-4 py-2.5 gap-4">
-                          <span className={`text-sm ${actionColor(entry.action)} min-w-0`}>
-                            {describeAction(entry)}
-                            {isProduct && (
-                              <Link
-                                href={`/?scan=${entry.entity_id}`}
-                                target="_blank"
-                                className="ml-2 text-xs text-indigo-400 hover:text-indigo-600 underline underline-offset-2 shrink-0"
+              {!auditLoading && filteredAuditLog.length === 0 && <p className="text-sm text-gray-400">No activity in this range.</p>}
+              {!auditLoading && filteredAuditLog.length > 0 && (
+                <div className="border border-gray-100 rounded-xl overflow-hidden">
+                  {groupedAuditLog.map(({ label, entries }) => (
+                    <div key={label}>
+                      <p className="text-xs text-gray-400 font-medium px-4 py-1.5 bg-gray-50 border-b border-gray-100">{label}</p>
+                      <div className="divide-y divide-gray-50">
+                        {entries.map((entry) => {
+                          const isExpanded = expandedEntryId === entry.id;
+                          const detail = renderEntryDetail(entry);
+                          const entryName = (entry.detail.name as string | undefined) ?? null;
+                          return (
+                            <div key={entry.id}>
+                              <div
+                                className={`flex items-start gap-2.5 px-4 py-2.5 ${detail ? "cursor-pointer hover:bg-gray-50" : ""} transition-colors`}
+                                onClick={() => detail && setExpandedEntryId(isExpanded ? null : entry.id)}
                               >
-                                Scan ↗
-                              </Link>
-                            )}
-                          </span>
-                          <span className="text-xs text-gray-400 shrink-0">
-                            {relativeTime(entry.created_at)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+                                {/* Admin chip */}
+                                <button
+                                  type="button"
+                                  title={entry.admin_email ?? entry.admin_clerk_id}
+                                  onClick={(e) => { e.stopPropagation(); setAuditAdminFilter(entry.admin_clerk_id); setAuditAdminFilterEmail(entry.admin_email); }}
+                                  className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-semibold flex items-center justify-center shrink-0 mt-0.5 hover:bg-indigo-200 transition-colors"
+                                >
+                                  {adminInitials({ email: entry.admin_email, name: entry.admin_name })}
+                                </button>
+                                <span className={`text-sm ${actionColor(entry.action)} flex-1 min-w-0`}>
+                                  {describeAction(entry)}
+                                  {entry.action === "update_product" && entry.entity_id && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); setAuditEntityFilter(entry.entity_id); setAuditEntityFilterName(entryName); }}
+                                      className="ml-1.5 text-xs text-gray-300 hover:text-indigo-500 transition-colors"
+                                      title="Filter to this product"
+                                    >
+                                      ⊙
+                                    </button>
+                                  )}
+                                  {entry.action === "update_product" && entry.entity_id && (
+                                    <Link href={`/?scan=${entry.entity_id}`} target="_blank" onClick={(e) => e.stopPropagation()} className="ml-1.5 text-xs text-indigo-400 hover:text-indigo-600">↗</Link>
+                                  )}
+                                </span>
+                                <span title={new Date(entry.created_at).toLocaleString()} className="text-xs text-gray-400 shrink-0 mt-0.5">
+                                  {relativeTime(entry.created_at)}
+                                </span>
+                                {detail && <span className="text-gray-300 text-xs mt-0.5 shrink-0">{isExpanded ? "▲" : "▼"}</span>}
+                              </div>
+                              {isExpanded && detail && (
+                                <div className="px-4 pb-3 ml-9 border-t border-gray-50">
+                                  {detail}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </section>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
 
   let query = supabaseAdmin
     .from("admin_audit_log")
-    .select("id, action, entity_type, entity_id, detail, created_at")
+    .select("id, action, entity_type, entity_id, detail, created_at, admin_clerk_id")
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -30,5 +30,29 @@ export async function GET(req: Request) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ entries: data ?? [] });
+
+  const entries = data ?? [];
+  const uniqueAdminIds = [...new Set(entries.map((e) => e.admin_clerk_id).filter(Boolean))];
+
+  let adminMap: Record<string, { email: string | null; name: string | null }> = {};
+  if (uniqueAdminIds.length > 0) {
+    try {
+      const client = await clerkClient();
+      const clerkUsers = await client.users.getUserList({ userId: uniqueAdminIds, limit: 100 });
+      for (const u of clerkUsers.data) {
+        adminMap[u.id] = {
+          email: u.emailAddresses?.[0]?.emailAddress ?? null,
+          name: [u.firstName, u.lastName].filter(Boolean).join(" ") || null,
+        };
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  const enriched = entries.map((e) => ({
+    ...e,
+    admin_email: adminMap[e.admin_clerk_id]?.email ?? null,
+    admin_name: adminMap[e.admin_clerk_id]?.name ?? null,
+  }));
+
+  return NextResponse.json({ entries: enriched });
 }
