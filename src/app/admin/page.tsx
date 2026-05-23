@@ -182,6 +182,10 @@ function describeAction(entry: AuditEntry): string {
       return `Deleted product "${d.name}"`;
     case "archive_submission":
       return `Archived submission "${d.name}"`;
+    case "archive_product":
+      return `Archived product "${d.name}"`;
+    case "restore_product":
+      return `Restored product "${d.name}"`;
     default:
       return entry.action;
   }
@@ -189,10 +193,18 @@ function describeAction(entry: AuditEntry): string {
 
 function actionColor(action: string): string {
   if (action.startsWith("delete")) return "text-rose-500";
+  if (action.startsWith("archive")) return "text-gray-400";
+  if (action.startsWith("restore")) return "text-teal-600";
   if (action === "merge_types") return "text-indigo-600";
   if (action === "add_type") return "text-teal-600";
   return "text-gray-700";
 }
+
+const ACTION_GROUPS: Record<string, string[]> = {
+  Products: ["update_product", "delete_product", "restore_product"],
+  Types: ["add_type", "edit_type", "delete_type", "merge_types"],
+  Archive: ["archive_product", "archive_submission"],
+};
 
 function BodyAreaPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const isKnown = BODY_AREAS.includes(value);
@@ -314,6 +326,8 @@ export default function AdminPage() {
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditExpanded, setAuditExpanded] = useState(false);
+  const [auditRange, setAuditRange] = useState<"7d" | "30d" | "all">("7d");
+  const [auditActionFilter, setAuditActionFilter] = useState<string | null>(null);
   const [submissionsOpen, setSubmissionsOpen] = useState(true);
   const [allProductsOpen, setAllProductsOpen] = useState(false);
   const [typesOpen, setTypesOpen] = useState(false);
@@ -411,10 +425,10 @@ export default function AdminPage() {
     }
   }
 
-  async function loadAuditLog() {
+  async function loadAuditLog(range: "7d" | "30d" | "all" = "7d") {
     setAuditLoading(true);
     try {
-      const res = await fetch("/api/admin/audit-log");
+      const res = await fetch(`/api/admin/audit-log?range=${range}`);
       if (res.ok) {
         const data = await res.json();
         setAuditLog(data.entries ?? []);
@@ -1550,24 +1564,86 @@ export default function AdminPage() {
 
           {auditExpanded && (
             <>
+              {/* Controls */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {(["7d", "30d", "all"] as const).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => {
+                      setAuditRange(r);
+                      loadAuditLog(r);
+                    }}
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                      auditRange === r
+                        ? "bg-gray-900 text-white border-gray-900"
+                        : "border-gray-200 text-gray-500 hover:border-gray-400"
+                    }`}
+                  >
+                    {r === "7d" ? "Last 7 days" : r === "30d" ? "Last 30 days" : "All time"}
+                  </button>
+                ))}
+                <div className="w-px bg-gray-100 self-stretch mx-1" />
+                <button
+                  type="button"
+                  onClick={() => setAuditActionFilter(null)}
+                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                    !auditActionFilter
+                      ? "bg-gray-100 text-gray-800 border-gray-200"
+                      : "border-gray-200 text-gray-400 hover:border-gray-400"
+                  }`}
+                >
+                  All
+                </button>
+                {Object.keys(ACTION_GROUPS).map((group) => (
+                  <button
+                    key={group}
+                    type="button"
+                    onClick={() => setAuditActionFilter(auditActionFilter === group ? null : group)}
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                      auditActionFilter === group
+                        ? "bg-gray-100 text-gray-800 border-gray-200"
+                        : "border-gray-200 text-gray-400 hover:border-gray-400"
+                    }`}
+                  >
+                    {group}
+                  </button>
+                ))}
+              </div>
+
               {auditLoading && <p className="text-sm text-gray-400">Loading…</p>}
-              {!auditLoading && auditLog.length === 0 && (
-                <p className="text-sm text-gray-400">No activity yet.</p>
-              )}
-              {!auditLoading && auditLog.length > 0 && (
-                <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
-                  {auditLog.map((entry) => (
-                    <div key={entry.id} className="flex items-baseline justify-between px-4 py-2.5 gap-4">
-                      <span className={`text-sm ${actionColor(entry.action)}`}>
-                        {describeAction(entry)}
-                      </span>
-                      <span className="text-xs text-gray-400 shrink-0">
-                        {relativeTime(entry.created_at)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {!auditLoading && (() => {
+                const filtered = auditActionFilter
+                  ? auditLog.filter((e) => ACTION_GROUPS[auditActionFilter]?.includes(e.action))
+                  : auditLog;
+                if (filtered.length === 0) return <p className="text-sm text-gray-400">No activity in this range.</p>;
+                return (
+                  <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
+                    {filtered.map((entry) => {
+                      const isProduct = entry.action === "update_product" && entry.entity_id;
+                      return (
+                        <div key={entry.id} className="flex items-baseline justify-between px-4 py-2.5 gap-4">
+                          <span className={`text-sm ${actionColor(entry.action)} min-w-0`}>
+                            {describeAction(entry)}
+                            {isProduct && (
+                              <Link
+                                href={`/?scan=${entry.entity_id}`}
+                                target="_blank"
+                                className="ml-2 text-xs text-indigo-400 hover:text-indigo-600 underline underline-offset-2 shrink-0"
+                              >
+                                Scan ↗
+                              </Link>
+                            )}
+                          </span>
+                          <span className="text-xs text-gray-400 shrink-0">
+                            {relativeTime(entry.created_at)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </>
           )}
         </section>
