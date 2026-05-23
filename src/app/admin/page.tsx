@@ -55,6 +55,10 @@ type AllEditState = {
 
 type ProductType = { id: string; name: string; body_area: string };
 
+type AdminUser = { clerk_id: string; email: string | null; name: string | null };
+type AdminInvite = { id: string; code: string; expires_at: string; claimed_by: string | null; claimed_at: string | null; created_at: string };
+type LookupResult = { found: boolean; clerk_id?: string; email?: string; name?: string | null; role?: string | null };
+
 type Banner = {
   id: string;
   message: string;
@@ -356,6 +360,21 @@ export default function AdminPage() {
   const [bannerUpdating, setBannerUpdating] = useState<string | null>(null);
   const [bannerDeleting, setBannerDeleting] = useState<string | null>(null);
 
+  const [adminsOpen, setAdminsOpen] = useState(false);
+  const [adminsList, setAdminsList] = useState<AdminUser[]>([]);
+  const [adminsLoading, setAdminsLoading] = useState(false);
+  const [lookupEmail, setLookupEmail] = useState("");
+  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [grantingAdmin, setGrantingAdmin] = useState(false);
+  const [revokingAdmin, setRevokingAdmin] = useState<string | null>(null);
+  const [invites, setInvites] = useState<AdminInvite[]>([]);
+  const [inviteExpiry, setInviteExpiry] = useState("7d");
+  const [inviteCustomDate, setInviteCustomDate] = useState("");
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [newInviteCode, setNewInviteCode] = useState<string | null>(null);
+  const [revokingInvite, setRevokingInvite] = useState<string | null>(null);
+
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [typesLoading, setTypesLoading] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
@@ -574,6 +593,122 @@ export default function AdminPage() {
       setBanners((prev) => prev.filter((b) => b.id !== id));
     } catch { }
     setBannerDeleting(null);
+  }
+
+  async function loadAdmins() {
+    setAdminsLoading(true);
+    try {
+      const res = await fetch("/api/admin/admins");
+      if (res.ok) {
+        const data = await res.json();
+        setAdminsList(data.admins ?? []);
+      }
+    } catch { }
+    setAdminsLoading(false);
+    loadAdminInvites();
+  }
+
+  async function loadAdminInvites() {
+    try {
+      const res = await fetch("/api/admin/admins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list-invites" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setInvites(data.invites ?? []);
+      }
+    } catch { }
+  }
+
+  async function lookupUser() {
+    if (!lookupEmail.trim()) return;
+    setLookupLoading(true);
+    setLookupResult(null);
+    try {
+      const res = await fetch("/api/admin/admins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "lookup", email: lookupEmail.trim() }),
+      });
+      const data = await res.json();
+      setLookupResult(data);
+    } catch { }
+    setLookupLoading(false);
+  }
+
+  async function grantAdmin(clerkId: string, email: string | null) {
+    setGrantingAdmin(true);
+    try {
+      await fetch("/api/admin/admins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "grant", clerk_id: clerkId }),
+      });
+      setAdminsList((prev) => prev.some((a) => a.clerk_id === clerkId) ? prev : [...prev, { clerk_id: clerkId, email, name: null }]);
+      setLookupResult((prev) => prev ? { ...prev, role: "admin" } : null);
+    } catch { }
+    setGrantingAdmin(false);
+  }
+
+  async function revokeAdmin(clerkId: string) {
+    setRevokingAdmin(clerkId);
+    try {
+      const res = await fetch("/api/admin/admins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "revoke", clerk_id: clerkId }),
+      });
+      if (res.ok) {
+        setAdminsList((prev) => prev.filter((a) => a.clerk_id !== clerkId));
+        setLookupResult((prev) => prev?.clerk_id === clerkId ? { ...prev, role: null } : prev);
+      }
+    } catch { }
+    setRevokingAdmin(null);
+  }
+
+  async function createInvite() {
+    const expiresAt = inviteExpiry === "custom"
+      ? new Date(inviteCustomDate).toISOString()
+      : new Date(Date.now() + (
+          inviteExpiry === "24h" ? 24 * 3600 * 1000 :
+          inviteExpiry === "7d" ? 7 * 24 * 3600 * 1000 :
+          30 * 24 * 3600 * 1000
+        )).toISOString();
+
+    setCreatingInvite(true);
+    setNewInviteCode(null);
+    try {
+      const res = await fetch("/api/admin/admins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create-invite", expires_at: expiresAt }),
+      });
+      const data = await res.json();
+      if (data.invite) {
+        setNewInviteCode(data.invite.code);
+        setInvites((prev) => [data.invite, ...prev]);
+      }
+    } catch { }
+    setCreatingInvite(false);
+  }
+
+  async function revokeInvite(id: string) {
+    setRevokingInvite(id);
+    try {
+      await fetch("/api/admin/admins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "revoke-invite", inviteId: id }),
+      });
+      setInvites((prev) => prev.filter((i) => i.id !== id));
+      if (newInviteCode) {
+        const removed = invites.find((i) => i.id === id);
+        if (removed?.code === newInviteCode) setNewInviteCode(null);
+      }
+    } catch { }
+    setRevokingInvite(null);
   }
 
   async function loadAllProducts() {
@@ -2004,6 +2139,191 @@ export default function AdminPage() {
                     </div>
                   )}
                 </>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* Admin Management */}
+        <section>
+          <button
+            type="button"
+            onClick={() => {
+              const opening = !adminsOpen;
+              setAdminsOpen(opening);
+              if (opening && adminsList.length === 0) loadAdmins();
+            }}
+            className="flex items-center gap-3 mb-4 group"
+          >
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">Admin Management</h2>
+            {adminsList.length > 0 && (
+              <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
+                {adminsList.length}
+              </span>
+            )}
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${adminsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {adminsOpen && (
+            <>
+              {adminsLoading && <p className="text-sm text-gray-400">Loading…</p>}
+              {!adminsLoading && (
+                <div className="space-y-6">
+                  {/* Current admins */}
+                  {adminsList.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-2 font-medium">Current admins</p>
+                      <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
+                        {adminsList.map((a) => (
+                          <div key={a.clerk_id} className="flex items-center justify-between px-4 py-2.5 gap-4">
+                            <div>
+                              <p className="text-sm text-gray-900">{a.email ?? a.clerk_id}</p>
+                              {a.name && <p className="text-xs text-gray-400">{a.name}</p>}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => revokeAdmin(a.clerk_id)}
+                              disabled={revokingAdmin === a.clerk_id}
+                              className="text-xs text-rose-400 hover:text-rose-600 disabled:opacity-40 shrink-0"
+                            >
+                              {revokingAdmin === a.clerk_id ? "Revoking…" : "Revoke"}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Email lookup */}
+                  <div>
+                    <p className="text-xs text-gray-400 mb-2 font-medium">Add by email</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        value={lookupEmail}
+                        onChange={(e) => { setLookupEmail(e.target.value); setLookupResult(null); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") lookupUser(); }}
+                        placeholder="Email address…"
+                        className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 min-w-0"
+                      />
+                      <button
+                        type="button"
+                        onClick={lookupUser}
+                        disabled={lookupLoading || !lookupEmail.trim()}
+                        className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors disabled:opacity-40"
+                      >
+                        {lookupLoading ? "Looking…" : "Look up"}
+                      </button>
+                    </div>
+                    {lookupResult && !lookupResult.found && (
+                      <p className="text-xs text-gray-400 mt-2">No account found for that email.</p>
+                    )}
+                    {lookupResult?.found && (
+                      <div className="mt-2 flex items-center justify-between gap-4 border border-gray-100 rounded-lg px-3 py-2">
+                        <div>
+                          <p className="text-sm text-gray-900">{lookupResult.email}</p>
+                          {lookupResult.name && <p className="text-xs text-gray-400">{lookupResult.name}</p>}
+                        </div>
+                        {lookupResult.role === "admin" ? (
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-teal-600">Already admin</span>
+                            <button
+                              type="button"
+                              onClick={() => revokeAdmin(lookupResult.clerk_id!)}
+                              disabled={revokingAdmin === lookupResult.clerk_id}
+                              className="text-xs text-rose-400 hover:text-rose-600 disabled:opacity-40"
+                            >
+                              Revoke
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => grantAdmin(lookupResult.clerk_id!, lookupResult.email ?? null)}
+                            disabled={grantingAdmin}
+                            className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                          >
+                            {grantingAdmin ? "Granting…" : "Make admin"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Invite links */}
+                  <div>
+                    <p className="text-xs text-gray-400 mb-2 font-medium">Invite link</p>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {(["24h", "7d", "30d", "custom"] as const).map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setInviteExpiry(preset)}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            inviteExpiry === preset ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 text-gray-500 hover:border-gray-400"
+                          }`}
+                        >
+                          {preset === "24h" ? "24 hours" : preset === "7d" ? "7 days" : preset === "30d" ? "30 days" : "Custom"}
+                        </button>
+                      ))}
+                      {inviteExpiry === "custom" && (
+                        <input
+                          type="datetime-local"
+                          value={inviteCustomDate}
+                          onChange={(e) => setInviteCustomDate(e.target.value)}
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={createInvite}
+                        disabled={creatingInvite || (inviteExpiry === "custom" && !inviteCustomDate)}
+                        className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-40 transition-colors"
+                      >
+                        {creatingInvite ? "Creating…" : "Generate link"}
+                      </button>
+                    </div>
+
+                    {newInviteCode && (
+                      <div className="mt-2 flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                        <code className="text-xs text-indigo-800 font-mono flex-1 break-all">{newInviteCode}</code>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(newInviteCode)}
+                          className="text-xs text-indigo-500 hover:text-indigo-700 shrink-0"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    )}
+
+                    {invites.filter((i) => !i.claimed_by && new Date(i.expires_at) > new Date()).length > 0 && (
+                      <div className="mt-3 space-y-1">
+                        <p className="text-xs text-gray-300 mb-1">Active invites</p>
+                        {invites.filter((i) => !i.claimed_by && new Date(i.expires_at) > new Date()).map((inv) => (
+                          <div key={inv.id} className="flex items-center justify-between gap-4 px-3 py-1.5 border border-gray-100 rounded-lg">
+                            <code className="text-xs font-mono text-gray-500">{inv.code}</code>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-xs text-gray-400">
+                                exp. {new Date(inv.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => revokeInvite(inv.id)}
+                                disabled={revokingInvite === inv.id}
+                                className="text-xs text-gray-400 hover:text-rose-500 disabled:opacity-40"
+                              >
+                                {revokingInvite === inv.id ? "Revoking…" : "Revoke"}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </>
           )}
