@@ -128,6 +128,7 @@ export async function generateCuratedExplanation(ctx: IngredientContext): Promis
   skin_climate_notes: SkinClimateNotes;
   explanation_source: "ai";
 } | null> {
+  // Throws on API error — callers should catch and handle
   const sensoryCategories = getSensoryCategories(ctx.name);
   const notes = computeSkinClimateNotes(ctx, sensoryCategories);
 
@@ -147,16 +148,12 @@ export async function generateCuratedExplanation(ctx: IngredientContext): Promis
     ? `You are a skincare ingredient expert writing for someone with reactive or sensitive skin. Explain why "${ctx.name}" is a concern in skincare.${contextBlock}\n\nWrite exactly 2 sentences. Start with the ingredient name (e.g. "${ctx.name} is..."). Cover: (1) what it does in the formula, (2) why it is a concern — mention specific affected skin types if applicable. Be precise. No filler.`
     : `You are a skincare ingredient expert. Explain what "${ctx.name}" does in skincare.${contextBlock}\n\nWrite exactly 2 sentences. Start with the ingredient name (e.g. "${ctx.name} is..."). Cover: (1) its formula role and mechanism, (2) how it benefits or interacts with reactive, oily, or dry skin. Be precise. No filler.`;
 
-  try {
-    const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 200,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : null;
-    if (!text) return null;
-    return { explanation: text, skin_climate_notes: notes, explanation_source: "ai" };
-  } catch {
-    return null;
-  }
+  const msg = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 200,
+    messages: [{ role: "user", content: prompt }],
+  });
+  const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : null;
+  if (!text) return null;
+  return { explanation: text, skin_climate_notes: notes, explanation_source: "ai" };
 }

@@ -349,7 +349,7 @@ export default function AdminPage() {
   const [removingFromQueue, setRemovingFromQueue] = useState<string | null>(null);
   const [classifyAllResult, setClassifyAllResult] = useState<{ classified: number; skipped: number; held: number } | null>(null);
   const [upgradingExplanations, setUpgradingExplanations] = useState(false);
-  const [upgradeResult, setUpgradeResult] = useState<{ upgraded: number; remaining: number } | null>(null);
+  const [upgradeResult, setUpgradeResult] = useState<{ upgraded: number; remaining: number; ai_error?: string } | null>(null);
   const [upgradeStats, setUpgradeStats] = useState<{ weak: number; total: number } | null>(null);
 
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -550,7 +550,7 @@ export default function AdminPage() {
         body: JSON.stringify({ mode: "weak" }),
       });
       const data = await res.json();
-      setUpgradeResult({ upgraded: data.upgraded ?? 0, remaining: data.remaining ?? 0 });
+      setUpgradeResult({ upgraded: data.upgraded ?? 0, remaining: data.remaining ?? 0, ai_error: data.ai_error ?? undefined });
       if (data.remaining > 0) setUpgradeStats((prev) => prev ? { ...prev, weak: data.remaining } : prev);
     } catch { }
     setUpgradingExplanations(false);
@@ -1891,8 +1891,10 @@ export default function AdminPage() {
                       </button>
                     )}
                     {upgradeResult && (
-                      <span className="text-xs text-teal-600">
-                        {upgradeResult.upgraded} upgraded{upgradeResult.remaining > 0 ? ` — ${upgradeResult.remaining} remaining` : " — all done"}
+                      <span className={`text-xs ${upgradeResult.ai_error ? "text-rose-600" : "text-teal-600"}`}>
+                        {upgradeResult.ai_error
+                          ? `AI error: ${upgradeResult.ai_error}`
+                          : `${upgradeResult.upgraded} upgraded${upgradeResult.remaining > 0 ? ` — ${upgradeResult.remaining} remaining` : " — all done"}`}
                       </span>
                     )}
                   </div>

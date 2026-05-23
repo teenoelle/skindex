@@ -42,7 +42,12 @@ async function classifyOne(queueId: string): Promise<{ classified: boolean; alre
 
   const cl = classifyIngredient(item.name);
   const ctx = { name: item.name, status: cl.status, structural_category: cl.structural_category, category: cl.category, flagged_category: cl.flagged_category };
-  const aiResult = await generateCuratedExplanation(ctx);
+  let aiResult;
+  try {
+    aiResult = await generateCuratedExplanation(ctx);
+  } catch {
+    return { classified: false, alreadyExists: false, aiUnavailable: true };
+  }
 
   if (!aiResult) return { classified: false, alreadyExists: false, aiUnavailable: true };
 

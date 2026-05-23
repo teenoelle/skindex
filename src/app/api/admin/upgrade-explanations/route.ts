@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { generateCuratedExplanation, computeSkinClimateNotes } from "@/lib/curated-explanation";
+import { generateCuratedExplanation } from "@/lib/curated-explanation";
 
 const BATCH_SIZE = 20;
+const CONCURRENCY = 5;
 
 async function guard() {
   const { userId } = await auth();
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
   if (err) return NextResponse.json({ error: err.error }, { status: err.status });
 
   const body = await req.json().catch(() => ({}));
-  const mode = body.mode ?? "weak"; // "weak" = template-only; "all" = all without ai source
+  const mode = body.mode ?? "weak";
 
   let query = supabaseAdmin
     .from("ingredients")
@@ -46,29 +47,36 @@ export async function POST(req: NextRequest) {
   if (!batch?.length) return NextResponse.json({ upgraded: 0, remaining: 0 });
 
   let upgraded = 0;
-  const CONCURRENCY = 5;
+  let firstError: string | null = null;
+
   for (let i = 0; i < batch.length; i += CONCURRENCY) {
     const chunk = (batch as Row[]).slice(i, i + CONCURRENCY);
-    await Promise.allSettled(chunk.map(async (row) => {
-      const ctx = { name: row.name, status: row.status, structural_category: row.structural_category, category: row.category, flagged_category: row.flagged_category };
+    const results = await Promise.allSettled(chunk.map(async (row) => {
+      const ctx = {
+        name: row.name,
+        status: row.status,
+        structural_category: row.structural_category,
+        category: row.category,
+        flagged_category: row.flagged_category,
+      };
       const aiResult = await generateCuratedExplanation(ctx);
-      if (aiResult) {
-        await supabaseAdmin.from("ingredients").update({
-          explanation: aiResult.explanation,
-          explanation_source: "ai",
-          skin_climate_notes: aiResult.skin_climate_notes,
-        }).eq("id", row.id);
-        upgraded++;
-      } else {
-        // Still compute and save skin_climate_notes even if AI explanation fails
-        const sensoryCategories: string[] = [];
-        const notes = computeSkinClimateNotes(ctx, sensoryCategories);
-        await supabaseAdmin.from("ingredients").update({
-          explanation_source: "template",
-          skin_climate_notes: notes,
-        }).eq("id", row.id);
-      }
+      if (!aiResult) return;
+      await supabaseAdmin.from("ingredients").update({
+        explanation: aiResult.explanation,
+        explanation_source: "ai",
+        skin_climate_notes: aiResult.skin_climate_notes,
+      }).eq("id", row.id);
+      upgraded++;
     }));
+
+    for (const r of results) {
+      if (r.status === "rejected" && !firstError) {
+        firstError = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      }
+    }
+
+    // Stop batching if AI is erroring — no point continuing
+    if (firstError) break;
   }
 
   const { count: remaining } = await supabaseAdmin
@@ -76,7 +84,12 @@ export async function POST(req: NextRequest) {
     .select("id", { count: "exact", head: true })
     .or("explanation_source.is.null,explanation_source.eq.template");
 
-  return NextResponse.json({ upgraded, total: batch.length, remaining: remaining ?? 0 });
+  return NextResponse.json({
+    upgraded,
+    total: batch.length,
+    remaining: remaining ?? 0,
+    ...(firstError ? { ai_error: firstError } : {}),
+  });
 }
 
 export async function GET(req: NextRequest) {
