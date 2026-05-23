@@ -55,6 +55,18 @@ type AllEditState = {
 
 type ProductType = { id: string; name: string; body_area: string };
 
+type Banner = {
+  id: string;
+  message: string;
+  status: "draft" | "scheduled" | "active" | "expired";
+  dismissible: boolean;
+  expiry_mode: "none" | "datetime" | "on_next";
+  expires_at: string | null;
+  scheduled_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 type QueueItem = {
   id: string;
   name: string;
@@ -327,6 +339,23 @@ export default function AdminPage() {
   const [removingFromQueue, setRemovingFromQueue] = useState<string | null>(null);
   const [classifyAllResult, setClassifyAllResult] = useState<{ classified: number; skipped: number } | null>(null);
 
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [bannersLoading, setBannersLoading] = useState(false);
+  const [bannersOpen, setBannersOpen] = useState(false);
+  const [bannerForm, setBannerForm] = useState<{
+    message: string;
+    status: "draft" | "scheduled" | "active";
+    dismissible: boolean;
+    expiry_mode: "none" | "datetime" | "on_next";
+    expires_at: string;
+    scheduled_at: string;
+  }>({ message: "", status: "draft", dismissible: true, expiry_mode: "none", expires_at: "", scheduled_at: "" });
+  const [bannerFormOpen, setBannerFormOpen] = useState(false);
+  const [bannerSaving, setBannerSaving] = useState(false);
+  const [bannerSaveError, setBannerSaveError] = useState<string | null>(null);
+  const [bannerUpdating, setBannerUpdating] = useState<string | null>(null);
+  const [bannerDeleting, setBannerDeleting] = useState<string | null>(null);
+
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [typesLoading, setTypesLoading] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
@@ -478,6 +507,73 @@ export default function AdminPage() {
       setSiteStats((prev) => prev ? { ...prev, queueLength: Math.max(0, prev.queueLength - 1) } : prev);
     } catch { }
     setRemovingFromQueue(null);
+  }
+
+  async function loadBanners() {
+    setBannersLoading(true);
+    try {
+      const res = await fetch("/api/admin/banners");
+      if (res.ok) {
+        const data = await res.json();
+        setBanners(data.banners ?? []);
+      }
+    } catch { }
+    setBannersLoading(false);
+  }
+
+  async function saveBanner() {
+    if (!bannerForm.message.trim()) return;
+    setBannerSaving(true);
+    setBannerSaveError(null);
+    try {
+      const res = await fetch("/api/admin/banners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bannerForm),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      setBanners((prev) => [data.banner, ...prev.filter((b) => b.status !== "active" || data.banner.status !== "active" ? true : b.id !== data.banner.id)]);
+      setBannerForm({ message: "", status: "draft", dismissible: true, expiry_mode: "none", expires_at: "", scheduled_at: "" });
+      setBannerFormOpen(false);
+      // Refresh to get updated statuses after activation
+      if (bannerForm.status === "active") loadBanners();
+    } catch (e) {
+      setBannerSaveError((e as Error).message);
+    }
+    setBannerSaving(false);
+  }
+
+  async function updateBannerStatus(banner: Banner, newStatus: "draft" | "active" | "expired") {
+    setBannerUpdating(banner.id);
+    try {
+      const res = await fetch(`/api/admin/banners/${banner.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        if (newStatus === "active") {
+          // Expire other active banners in local state
+          setBanners((prev) => prev.map((b) =>
+            b.id === banner.id ? { ...b, status: "active" } :
+            b.status === "active" ? { ...b, status: "expired" } : b
+          ));
+        } else {
+          setBanners((prev) => prev.map((b) => b.id === banner.id ? { ...b, status: newStatus } : b));
+        }
+      }
+    } catch { }
+    setBannerUpdating(null);
+  }
+
+  async function deleteBanner(id: string) {
+    setBannerDeleting(id);
+    try {
+      await fetch(`/api/admin/banners/${id}`, { method: "DELETE" });
+      setBanners((prev) => prev.filter((b) => b.id !== id));
+    } catch { }
+    setBannerDeleting(null);
   }
 
   async function loadAllProducts() {
@@ -1706,6 +1802,211 @@ export default function AdminPage() {
             </>
           )}
           </>)}
+        </section>
+
+        {/* Site Banner */}
+        <section>
+          <button
+            type="button"
+            onClick={() => {
+              const opening = !bannersOpen;
+              setBannersOpen(opening);
+              if (opening && banners.length === 0) loadBanners();
+            }}
+            className="flex items-center gap-3 mb-4 group"
+          >
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">Site Banner</h2>
+            {banners.some((b) => b.status === "active") && (
+              <span className="text-xs font-medium bg-teal-100 text-teal-700 rounded-full px-2.5 py-0.5">Live</span>
+            )}
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${bannersOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {bannersOpen && (
+            <>
+              {bannersLoading && <p className="text-sm text-gray-400">Loading…</p>}
+              {!bannersLoading && (
+                <>
+                  {!bannerFormOpen ? (
+                    <button
+                      type="button"
+                      onClick={() => setBannerFormOpen(true)}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mb-4"
+                    >
+                      + New banner
+                    </button>
+                  ) : (
+                    <div className="border border-gray-200 rounded-xl p-4 space-y-3 mb-4">
+                      <textarea
+                        value={bannerForm.message}
+                        onChange={(e) => setBannerForm((f) => ({ ...f, message: e.target.value }))}
+                        placeholder="Banner message…"
+                        rows={2}
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-400 resize-none"
+                      />
+                      <div className="flex flex-wrap gap-3 items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Status:</span>
+                          {(["draft", "scheduled", "active"] as const).map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => setBannerForm((f) => ({ ...f, status: s }))}
+                              className={`text-xs px-2.5 py-1 rounded-full border transition-colors capitalize ${
+                                bannerForm.status === s ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 text-gray-500 hover:border-gray-400"
+                              }`}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                        <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={bannerForm.dismissible}
+                            onChange={(e) => setBannerForm((f) => ({ ...f, dismissible: e.target.checked }))}
+                            className="rounded border-gray-300 text-indigo-600"
+                          />
+                          Dismissible
+                        </label>
+                      </div>
+                      <div className="flex flex-wrap gap-3 items-center">
+                        <span className="text-xs text-gray-500">Expires:</span>
+                        {(["none", "datetime", "on_next"] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setBannerForm((f) => ({ ...f, expiry_mode: m }))}
+                            className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                              bannerForm.expiry_mode === m ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 text-gray-500 hover:border-gray-400"
+                            }`}
+                          >
+                            {m === "none" ? "Never" : m === "datetime" ? "At date" : "When next goes live"}
+                          </button>
+                        ))}
+                      </div>
+                      {bannerForm.expiry_mode === "datetime" && (
+                        <input
+                          type="datetime-local"
+                          value={bannerForm.expires_at}
+                          onChange={(e) => setBannerForm((f) => ({ ...f, expires_at: e.target.value }))}
+                          className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-400"
+                        />
+                      )}
+                      {bannerForm.status === "scheduled" && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Go live at:</span>
+                          <input
+                            type="datetime-local"
+                            value={bannerForm.scheduled_at}
+                            onChange={(e) => setBannerForm((f) => ({ ...f, scheduled_at: e.target.value }))}
+                            className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-400"
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={saveBanner}
+                          disabled={bannerSaving || !bannerForm.message.trim()}
+                          className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 hover:bg-indigo-700 transition-colors"
+                        >
+                          {bannerSaving ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setBannerFormOpen(false); setBannerSaveError(null); }}
+                          className="text-xs text-gray-400 hover:text-gray-700"
+                        >
+                          Cancel
+                        </button>
+                        {bannerSaveError && <span className="text-xs text-rose-600">{bannerSaveError}</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {banners.length === 0 && <p className="text-sm text-gray-400">No banners yet.</p>}
+                  {banners.length > 0 && (
+                    <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
+                      {banners.map((b) => (
+                        <div key={b.id} className="px-4 py-3 space-y-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm text-gray-900 flex-1">{b.message}</p>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`text-xs rounded-full px-2 py-0.5 ${
+                                b.status === "active" ? "bg-teal-100 text-teal-700" :
+                                b.status === "scheduled" ? "bg-indigo-100 text-indigo-600" :
+                                b.status === "draft" ? "bg-gray-100 text-gray-500" :
+                                "bg-gray-50 text-gray-300"
+                              }`}>
+                                {b.status}
+                              </span>
+                              {!b.dismissible && <span className="text-xs text-gray-400">persistent</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            {b.status !== "active" && b.status !== "expired" && (
+                              <button
+                                type="button"
+                                onClick={() => updateBannerStatus(b, "active")}
+                                disabled={bannerUpdating === b.id}
+                                className="text-xs text-teal-600 hover:text-teal-800 disabled:opacity-40"
+                              >
+                                {bannerUpdating === b.id ? "Activating…" : "Go live"}
+                              </button>
+                            )}
+                            {b.status === "active" && (
+                              <button
+                                type="button"
+                                onClick={() => updateBannerStatus(b, "expired")}
+                                disabled={bannerUpdating === b.id}
+                                className="text-xs text-gray-400 hover:text-gray-700 disabled:opacity-40"
+                              >
+                                {bannerUpdating === b.id ? "Deactivating…" : "Deactivate"}
+                              </button>
+                            )}
+                            {b.status === "expired" && (
+                              <button
+                                type="button"
+                                onClick={() => updateBannerStatus(b, "active")}
+                                disabled={bannerUpdating === b.id}
+                                className="text-xs text-indigo-500 hover:text-indigo-700 disabled:opacity-40"
+                              >
+                                {bannerUpdating === b.id ? "Activating…" : "Reactivate"}
+                              </button>
+                            )}
+                            {b.expiry_mode === "datetime" && b.expires_at && (
+                              <span className="text-xs text-gray-400">
+                                Expires {new Date(b.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            )}
+                            {b.expiry_mode === "on_next" && (
+                              <span className="text-xs text-gray-400">Expires when next goes live</span>
+                            )}
+                            {b.scheduled_at && b.status === "scheduled" && (
+                              <span className="text-xs text-gray-400">
+                                Scheduled {new Date(b.scheduled_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => deleteBanner(b.id)}
+                              disabled={bannerDeleting === b.id}
+                              className="text-xs text-rose-400 hover:text-rose-600 disabled:opacity-40 ml-auto"
+                            >
+                              {bannerDeleting === b.id ? "Deleting…" : "Delete"}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
         </section>
 
         {/* Activity */}

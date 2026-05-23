@@ -1,6 +1,7 @@
 import LogoButton from "@/components/LogoButton";
 import NavAuth from "@/components/NavAuth";
 import Scanner from "@/components/Scanner";
+import SiteBanner from "@/components/SiteBanner";
 
 type Props = { searchParams: Promise<{ scan?: string }> };
 
@@ -14,6 +15,7 @@ export default async function Home({ searchParams }: Props) {
           <NavAuth />
         </div>
       </header>
+      <SiteBanner />
 
       <main className="max-w-2xl mx-auto px-6 py-6">
         <Scanner initialProductId={scan ?? null} />
