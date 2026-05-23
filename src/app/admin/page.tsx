@@ -347,7 +347,7 @@ export default function AdminPage() {
   const [classifyingOne, setClassifyingOne] = useState<string | null>(null);
   const [classifyingAll, setClassifyingAll] = useState(false);
   const [removingFromQueue, setRemovingFromQueue] = useState<string | null>(null);
-  const [classifyAllResult, setClassifyAllResult] = useState<{ classified: number; skipped: number } | null>(null);
+  const [classifyAllResult, setClassifyAllResult] = useState<{ classified: number; skipped: number; held: number } | null>(null);
   const [upgradingExplanations, setUpgradingExplanations] = useState(false);
   const [upgradeResult, setUpgradeResult] = useState<{ upgraded: number; remaining: number } | null>(null);
   const [upgradeStats, setUpgradeStats] = useState<{ weak: number; total: number } | null>(null);
@@ -521,7 +521,7 @@ export default function AdminPage() {
         body: JSON.stringify({ action: "classify-all" }),
       });
       const data = await res.json();
-      setClassifyAllResult({ classified: data.classified ?? 0, skipped: data.skipped ?? 0 });
+      setClassifyAllResult({ classified: data.classified ?? 0, skipped: data.skipped ?? 0, held: data.held ?? 0 });
       setQueueItems([]);
       setSiteStats((prev) => prev ? {
         ...prev,
@@ -1813,9 +1813,10 @@ export default function AdminPage() {
                 <p className="text-sm text-gray-400">Queue is empty — all ingredients classified.</p>
               )}
               {!queueLoading && classifyAllResult && (
-                <p className="text-sm text-teal-600 mb-4">
+                <p className={`text-sm mb-4 ${classifyAllResult.held > 0 ? "text-amber-600" : "text-teal-600"}`}>
                   Done — {classifyAllResult.classified} classified
-                  {classifyAllResult.skipped > 0 ? `, ${classifyAllResult.skipped} already in DB` : ""}.
+                  {classifyAllResult.skipped > 0 ? `, ${classifyAllResult.skipped} already in DB` : ""}
+                  {classifyAllResult.held > 0 ? ` — ${classifyAllResult.held} held (Claude unavailable, retry later)` : ""}.
                 </p>
               )}
               {!queueLoading && queueItems.length > 0 && (

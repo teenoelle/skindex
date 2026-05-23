@@ -3,7 +3,6 @@ import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { classifyIngredient } from "@/lib/ingredient-classifier";
-import { generateExplanation } from "@/lib/generate-explanation";
 import { generateCuratedExplanation } from "@/lib/curated-explanation";
 
 async function guard() {
@@ -28,7 +27,7 @@ export async function GET() {
   return NextResponse.json({ items: data ?? [] });
 }
 
-async function classifyOne(queueId: string): Promise<{ classified: boolean; alreadyExists: boolean }> {
+async function classifyOne(queueId: string): Promise<{ classified: boolean; alreadyExists: boolean; aiUnavailable?: boolean }> {
   const { data: item } = await supabaseAdmin
     .from("ingredient_queue").select("id, name").eq("id", queueId).maybeSingle();
   if (!item) return { classified: false, alreadyExists: false };
@@ -36,25 +35,29 @@ async function classifyOne(queueId: string): Promise<{ classified: boolean; alre
   const { data: existing } = await supabaseAdmin
     .from("ingredients").select("id").ilike("name", item.name).maybeSingle();
 
-  if (!existing) {
-    const cl = classifyIngredient(item.name);
-    const ctx = { name: item.name, status: cl.status, structural_category: cl.structural_category, category: cl.category, flagged_category: cl.flagged_category };
-    const aiResult = await generateCuratedExplanation(ctx);
-    const explanation = aiResult?.explanation ?? generateExplanation(item.name, cl.status, cl.structural_category, cl.category, cl.flagged_category);
-    await supabaseAdmin.from("ingredients").insert({
-      name: item.name,
-      status: cl.status,
-      structural_category: cl.structural_category,
-      category: cl.category,
-      flagged_category: cl.flagged_category,
-      explanation,
-      explanation_source: aiResult ? "ai" : "template",
-      skin_climate_notes: aiResult?.skin_climate_notes ?? null,
-    });
+  if (existing) {
+    await supabaseAdmin.from("ingredient_queue").delete().eq("id", queueId);
+    return { classified: false, alreadyExists: true };
   }
 
+  const cl = classifyIngredient(item.name);
+  const ctx = { name: item.name, status: cl.status, structural_category: cl.structural_category, category: cl.category, flagged_category: cl.flagged_category };
+  const aiResult = await generateCuratedExplanation(ctx);
+
+  if (!aiResult) return { classified: false, alreadyExists: false, aiUnavailable: true };
+
+  await supabaseAdmin.from("ingredients").insert({
+    name: item.name,
+    status: cl.status,
+    structural_category: cl.structural_category,
+    category: cl.category,
+    flagged_category: cl.flagged_category,
+    explanation: aiResult.explanation,
+    explanation_source: "ai",
+    skin_climate_notes: aiResult.skin_climate_notes,
+  });
   await supabaseAdmin.from("ingredient_queue").delete().eq("id", queueId);
-  return { classified: !existing, alreadyExists: !!existing };
+  return { classified: true, alreadyExists: false };
 }
 
 export async function POST(req: NextRequest) {
@@ -80,15 +83,22 @@ export async function POST(req: NextRequest) {
       .from("ingredient_queue").select("id").order("times_seen", { ascending: false }).limit(500);
     if (!allItems?.length) return NextResponse.json({ classified: 0, skipped: 0 });
 
-    let classified = 0, skipped = 0;
+    let classified = 0, skipped = 0, held = 0;
     const BATCH = 5;
     for (let i = 0; i < allItems.length; i += BATCH) {
       const chunk = allItems.slice(i, i + BATCH);
       const results = await Promise.allSettled(chunk.map((item) => classifyOne(item.id)));
-      classified += results.filter((r) => r.status === "fulfilled" && (r.value as { classified: boolean }).classified).length;
-      skipped += results.filter((r) => r.status === "fulfilled" && !(r.value as { classified: boolean }).classified).length;
+      for (const r of results) {
+        if (r.status !== "fulfilled") continue;
+        const v = r.value as { classified: boolean; alreadyExists: boolean; aiUnavailable?: boolean };
+        if (v.classified) classified++;
+        else if (v.aiUnavailable) held++;
+        else skipped++;
+      }
+      // Stop batching if AI is unavailable — no point continuing
+      if (held > 0) break;
     }
-    return NextResponse.json({ classified, skipped });
+    return NextResponse.json({ classified, skipped, held });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
