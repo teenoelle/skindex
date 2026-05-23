@@ -55,6 +55,14 @@ type AllEditState = {
 
 type ProductType = { id: string; name: string; body_area: string };
 
+type SiteStats = {
+  totalProducts: number;
+  archivedCount: number;
+  classifiedIngredients: number;
+  queueLength: number;
+  pendingSubmissions: number;
+};
+
 type AuditEntry = {
   id: string;
   action: string;
@@ -289,6 +297,8 @@ export default function AdminPage() {
   const [archivedDeleteNameInput, setArchivedDeleteNameInput] = useState<Record<string, string>>({});
   const [archivedDeleting, setArchivedDeleting] = useState<string | null>(null);
 
+  const [siteStats, setSiteStats] = useState<SiteStats | null>(null);
+
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [typesLoading, setTypesLoading] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
@@ -358,9 +368,22 @@ export default function AdminPage() {
         loadBrands();
         loadTypes();
         loadAuditLog();
+        loadStats();
       })
       .catch(() => setLoading(false));
   }, [isLoaded, isSignedIn]);
+
+  async function loadStats() {
+    try {
+      const res = await fetch("/api/admin/stats");
+      if (res.ok) {
+        const data = await res.json();
+        setSiteStats(data);
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   async function loadAllProducts() {
     setAllProductsLoading(true);
@@ -756,6 +779,26 @@ export default function AdminPage() {
     <div className="min-h-screen bg-white">
       {header}
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-8">
+
+        {/* Stats */}
+        {siteStats && (
+          <section>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {([
+                ["Products", siteStats.totalProducts, "text-gray-900"],
+                ["Ingredients", siteStats.classifiedIngredients, "text-gray-900"],
+                ["Queue", siteStats.queueLength, siteStats.queueLength > 0 ? "text-amber-600" : "text-gray-900"],
+                ["Archived", siteStats.archivedCount, "text-gray-400"],
+                ["Pending review", siteStats.pendingSubmissions, siteStats.pendingSubmissions > 0 ? "text-indigo-600" : "text-gray-400"],
+              ] as [string, number, string][]).map(([label, value, color]) => (
+                <div key={label} className="border border-gray-100 rounded-xl px-4 py-3">
+                  <p className={`text-2xl font-semibold tabular-nums ${color}`}>{value.toLocaleString()}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{label}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Submissions */}
         <section>
