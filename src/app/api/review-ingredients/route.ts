@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { classifyIngredient } from "@/lib/ingredient-classifier";
 import { generateExplanation } from "@/lib/generate-explanation";
+import { generateNotes } from "@/lib/curated-explanation";
 
 const BATCH_SIZE = 20;
 
@@ -33,6 +34,7 @@ async function processQueue(): Promise<NextResponse> {
       classification.category,
       classification.flagged_category,
     );
+    const notes = generateNotes(classification);
     await supabaseAdmin.from("ingredients").insert({
       name: item.name,
       status: classification.status,
@@ -40,6 +42,8 @@ async function processQueue(): Promise<NextResponse> {
       category: classification.category,
       flagged_category: classification.flagged_category,
       explanation,
+      explanation_source: "template",
+      skin_climate_notes: notes.length > 0 ? notes : null,
     });
     return true;
   });

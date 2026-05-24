@@ -397,6 +397,10 @@ export default function AdminPage() {
   const [forbidden, setForbidden] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<string | null>(null);
+  const [editingSubmission, setEditingSubmission] = useState<string | null>(null);
+  const [submissionEdits, setSubmissionEdits] = useState<Record<string, { name: string; brand: string; type: string; ingredient_list: string }>>({});
+  const [submissionSaving, setSubmissionSaving] = useState<string | null>(null);
+  const [submissionSaved, setSubmissionSaved] = useState<Set<string>>(new Set());
 
   const [allProducts, setAllProducts] = useState<AllProduct[]>([]);
   const [allProductsLoading, setAllProductsLoading] = useState(false);
@@ -1051,6 +1055,36 @@ export default function AdminPage() {
     setArchiving(null);
   }
 
+  async function handleSaveSubmission(id: string) {
+    const edits = submissionEdits[id];
+    if (!edits) return;
+    setSubmissionSaving(id);
+    const res = await fetch("/api/admin/update-product", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        productId: id,
+        name: edits.name,
+        brand: edits.brand,
+        type: edits.type,
+        ingredient_list: edits.ingredient_list,
+      }),
+    });
+    if (res.ok) {
+      setSubmissions((prev) => prev.map((s) => s.id === id ? {
+        ...s,
+        name: edits.name || s.name,
+        brand: edits.brand || null,
+        type: edits.type || null,
+        ingredient_count: edits.ingredient_list ? edits.ingredient_list.split(",").filter((x) => x.trim()).length : s.ingredient_count,
+      } : s));
+      setSubmissionSaved((prev) => new Set([...prev, id]));
+      setTimeout(() => setSubmissionSaved((prev) => { const n = new Set(prev); n.delete(id); return n; }), 2000);
+      setEditingSubmission(null);
+    }
+    setSubmissionSaving(null);
+  }
+
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     setDeleting(id);
@@ -1375,49 +1409,124 @@ export default function AdminPage() {
           ) : (
             <div className="divide-y divide-gray-100">
               {submissions.map((s) => (
-                <div key={s.id} className="py-4 flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-gray-900 truncate">{s.name}</span>
-                      {s.brand && <span className="text-xs text-gray-400 shrink-0">{s.brand}</span>}
-                      {s.type && (
-                        <span className="text-xs text-gray-400 border border-gray-200 rounded-full px-2 py-0.5 shrink-0">
-                          {s.type}
+                <div key={s.id} className="py-4 border-b border-gray-100 last:border-0">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-gray-900 truncate">{s.name}</span>
+                        {s.brand && <span className="text-xs text-gray-400 shrink-0">{s.brand}</span>}
+                        {s.type && (
+                          <span className="text-xs text-gray-400 border border-gray-200 rounded-full px-2 py-0.5 shrink-0">
+                            {s.type}
+                          </span>
+                        )}
+                        {submissionSaved.has(s.id) && <span className="text-xs text-teal-600 shrink-0">Saved</span>}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-gray-400">
+                          {s.ingredient_count > 0 ? `${s.ingredient_count} ingredients` : "No ingredients"}
                         </span>
-                      )}
+                        <span className="text-gray-200 text-xs">·</span>
+                        <span className="text-xs text-gray-400">{relativeTime(s.submitted_at)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-gray-400">
-                        {s.ingredient_count > 0 ? `${s.ingredient_count} ingredients` : "No ingredients"}
-                      </span>
-                      <span className="text-gray-200 text-xs">·</span>
-                      <span className="text-xs text-gray-400">{relativeTime(s.submitted_at)}</span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <Link
+                        href={`/?scan=${s.id}`}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
+                      >
+                        Scan
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (editingSubmission === s.id) {
+                            setEditingSubmission(null);
+                          } else {
+                            setEditingSubmission(s.id);
+                            setSubmissionEdits((prev) => ({
+                              ...prev,
+                              [s.id]: { name: s.name, brand: s.brand ?? "", type: s.type ?? "", ingredient_list: "" },
+                            }));
+                          }
+                        }}
+                        className="text-xs text-gray-500 hover:text-gray-800"
+                      >
+                        {editingSubmission === s.id ? "Cancel" : "Edit"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleArchive(s.id)}
+                        disabled={archiving === s.id}
+                        className="text-xs text-gray-400 hover:text-gray-700 disabled:opacity-40"
+                      >
+                        {archiving === s.id ? "Archiving…" : "Archive"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(s.id, s.name)}
+                        disabled={deleting === s.id}
+                        className="text-xs text-rose-500 hover:text-rose-700 disabled:opacity-40"
+                      >
+                        {deleting === s.id ? "Deleting…" : "Delete"}
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <Link
-                      href={`/?scan=${s.id}`}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
-                    >
-                      Scan
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleArchive(s.id)}
-                      disabled={archiving === s.id}
-                      className="text-xs text-gray-400 hover:text-gray-700 disabled:opacity-40"
-                    >
-                      {archiving === s.id ? "Archiving…" : "Archive"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(s.id, s.name)}
-                      disabled={deleting === s.id}
-                      className="text-xs text-rose-500 hover:text-rose-700 disabled:opacity-40"
-                    >
-                      {deleting === s.id ? "Deleting…" : "Delete"}
-                    </button>
-                  </div>
+                  {editingSubmission === s.id && submissionEdits[s.id] && (
+                    <div className="mt-3 space-y-2 pl-0">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-0.5">Name</label>
+                          <input
+                            type="text"
+                            value={submissionEdits[s.id].name}
+                            onChange={(e) => setSubmissionEdits((prev) => ({ ...prev, [s.id]: { ...prev[s.id], name: e.target.value } }))}
+                            className="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-0.5">Brand</label>
+                          <input
+                            type="text"
+                            value={submissionEdits[s.id].brand}
+                            onChange={(e) => setSubmissionEdits((prev) => ({ ...prev, [s.id]: { ...prev[s.id], brand: e.target.value } }))}
+                            className="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-0.5">Type</label>
+                        <select
+                          value={submissionEdits[s.id].type}
+                          onChange={(e) => setSubmissionEdits((prev) => ({ ...prev, [s.id]: { ...prev[s.id], type: e.target.value } }))}
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm bg-white"
+                        >
+                          <option value="">— select type —</option>
+                          {productTypes.map((pt) => (
+                            <option key={pt.id} value={pt.name}>{pt.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-0.5">Ingredients (leave blank to keep existing)</label>
+                        <textarea
+                          value={submissionEdits[s.id].ingredient_list}
+                          onChange={(e) => setSubmissionEdits((prev) => ({ ...prev, [s.id]: { ...prev[s.id], ingredient_list: e.target.value } }))}
+                          placeholder="Paste ingredient list…"
+                          rows={3}
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm resize-y"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveSubmission(s.id)}
+                        disabled={submissionSaving === s.id}
+                        className="text-xs bg-gray-800 text-white rounded-lg px-3 py-1.5 disabled:opacity-40"
+                      >
+                        {submissionSaving === s.id ? "Saving…" : "Save changes"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

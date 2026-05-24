@@ -440,6 +440,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not load user" }, { status: 500 });
     }
 
+    // Check community DB by source_url before running AI extraction
+    {
+      const { data: cached } = await supabase
+        .from("products")
+        .select("id, name, brand, type, ingredient_list, image_url, iherb_url, source_url")
+        .eq("source_url", url)
+        .not("ingredient_list", "is", null)
+        .eq("is_archived", false)
+        .maybeSingle();
+
+      if (cached?.ingredient_list) {
+        rawIngredients = cached.ingredient_list;
+        product = {
+          id: cached.id,
+          name: cached.name,
+          brand: cached.brand ?? null,
+          source: "community",
+          type: cached.type ?? null,
+          image_url: cached.image_url ?? null,
+          iherb_url: cached.iherb_url ?? null,
+          source_url: cached.source_url ?? url,
+        };
+        // Skip extraction — jump straight to ingredient matching below
+        // (fall through by leaving the else block unentered)
+      }
+    }
+
+    if (!rawIngredients) {
     const extracted = await extractIngredientsFromUrl(url);
     if (!extracted) {
       const isIHerb = url.toLowerCase().includes("iherb.com");
@@ -530,6 +558,7 @@ export async function POST(req: NextRequest) {
         }
       }
     } catch { /* don't fail the scan if DB save fails */ }
+    } // end if (!rawIngredients)
   } else {
     return NextResponse.json({ error: "Unknown scan type" }, { status: 400 });
   }
@@ -657,12 +686,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Fire-and-forget: push unreviewed ingredients into the queue for future classification
+  // Push unreviewed ingredients into the queue — awaited so the client-side auto-review
+  // fires after items are actually in the queue (avoids the "nothing new" race condition).
   if (unreviewed.length > 0) {
     const productName = product?.name ?? null;
-    Promise.all(
+    await Promise.all(
       unreviewed.map(async (name) => {
-        // Upsert: increment times_seen if already queued, otherwise insert
         const { data: existing } = await supabase
           .from("ingredient_queue")
           .select("id, times_seen")
@@ -680,7 +709,7 @@ export async function POST(req: NextRequest) {
             .insert({ name, found_in: productName, times_seen: 1 });
         }
       })
-    ).catch(() => { /* never block the scan response */ });
+    ).catch(() => {});
   }
 
   return NextResponse.json({ product, safe: safeFiltered, flagged, unreviewed, photosensitive, sensoryTrigger, communityVariants, obfVariants, originalItems, isIncomplete });

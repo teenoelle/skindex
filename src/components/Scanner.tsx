@@ -204,7 +204,13 @@ const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
   { label: "Hair", types: ["Conditioner", "Hair Styler", "Hair Treatment", "Scalp Treatment", "Shampoo"].sort() },
 ];
 
-const RINSE_OFF_TYPES = new Set(["Face Wash", "Body Wash", "Shampoo", "Makeup Remover"]);
+const RINSE_OFF_TYPES = new Set([
+  "Face Wash", "Cleanser", "Micellar Cleanser", "Micellar Water",
+  "Body Wash", "Hand Wash", "Makeup Remover",
+  "Shampoo", "Conditioner", "Hair Mask",
+  "Scalp Scrub", "Exfoliating Scrub", "Facial Scrub", "Body Scrub",
+  "Clay Mask", "Rinse-Off Mask",
+]);
 
 type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone";
 type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv";
@@ -291,6 +297,23 @@ const CONGESTION_VECTOR_DEFS: { label: string; bumps: string; description: strin
     description: "Sensitizing or allergenic ingredients can trigger an immune response in the skin, producing red, inflamed papules — bumps that look like acne but are caused by irritation or allergy, not by pore-clogging.",
   },
 ];
+
+const UNIVERSAL_CONCERN_CATEGORIES = new Set([
+  "formaldehyde releaser",
+  "sensitizing preservative",
+  "biocide",
+]);
+
+const SENSORY_PROFILE_MAP: Partial<Record<string, SkinType[]>> = {
+  "Stinging": ["reactive", "damaged_barrier"],
+  "chemical-itch": ["reactive", "damaged_barrier"],
+  "Film-forming": ["oily", "acne_prone"],
+  "Occlusive": ["oily", "acne_prone"],
+  "occlusive-itch": ["oily", "acne_prone"],
+  "comedogenic-itch": ["oily", "acne_prone"],
+  "Cooling": ["reactive"],
+  "Warming": ["reactive"],
+};
 
 function smartCase(str: string): string {
   const alpha = str.replace(/[^a-zA-Z]/g, "");
@@ -561,10 +584,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   }, [result]);
 
   // Auto-trigger review when scan finds unreviewed ingredients.
-  // Delay gives the scan's fire-and-forget queue push time to complete.
   useEffect(() => {
     if (!result?.unreviewed?.length || reviewLoading || reviewResult !== null) return;
-    const t = setTimeout(() => handleReview(), 2000);
+    const t = setTimeout(() => handleReview(), 500);
     return () => clearTimeout(t);
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1477,7 +1499,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         <p className="text-xs text-gray-400 pt-0.5">Flags: {watches.join(" · ")}.</p>
                       ) : null;
                     })()}
-                    <p className="text-xs text-gray-400">Ingredient-level notes appear when you expand each one after scanning.</p>
+                    <p className="text-xs text-gray-400">Matching profile notes replace the generic explanation when you expand each ingredient.</p>
                   </div>
                 )}
               </div>
@@ -2435,7 +2457,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         <p className="text-xs text-gray-400 pt-0.5">Flags: {watches.join(" · ")}.</p>
                       ) : null;
                     })()}
-                    <p className="text-xs text-gray-400">Ingredient-level notes appear when you expand each ingredient below.</p>
+                    <p className="text-xs text-gray-400">Matching profile notes replace the generic explanation when you expand each ingredient.</p>
                   </div>
                 )}
               </div>
@@ -2611,280 +2633,382 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             );
           })()}
 
-          {/* Flagged ingredients */}
-          {result.flagged.length > 0 && (
-            <section id="section-flagged">
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                <p className="text-xs font-semibold text-rose-700 uppercase tracking-widest">
-                  Flagged Ingredients — {result.flagged.length}
-                </p>
-                {!isRinseOff && result.flagged.some((f) => f.ingredient.flagged_category === "pore-clogger") && (
-                  <span className="text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">pore-clogging</span>
-                )}
-                {result.flagged.some((f) => ["sensitizer","fragrance-allergen","preservative-allergen"].includes(f.ingredient.flagged_category ?? "")) && (
-                  <span className="text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">inflammatory</span>
-                )}
-              </div>
-              <div className="divide-y divide-gray-100">
-                {result.flagged.map((item) => {
-                  const { id, explanation: dbExplanation, flagged_category, category: ingCat, structural_category } = item.ingredient;
-                  const isOpen = expanded.has(id);
-                  const explanation = dbExplanation ?? explanations[id];
-                  const isLoading = isOpen && !dbExplanation && !(id in explanations);
-                  const catKey = flagged_category ?? ingCat;
-                  const catLabel = catKey ? CATEGORY_LABELS[catKey] : null;
+          {/* Flagged, Sensory, and Photosensitive — rendered in profile-match order */}
+          {(() => {
+            type SectionId = "flagged" | "sensory" | "photo";
+            const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
 
-                  return (
-                    <div key={id} id={`ingredient-${id}`} className="border-l-4 border-l-gray-200 overflow-hidden">
-                      <button
-                        className="w-full flex items-center justify-between px-3 py-1 text-left"
-                        onClick={() => toggleExpand(id, dbExplanation)}
-                      >
-                        <span className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <span className={`text-sm font-medium truncate ${isOpen ? "text-rose-700" : "text-gray-800"}`}>
-                            {smartCase(item.displayName)}
-                          </span>
-                          {structural_category && (
-                            <>
-                              <span className="text-gray-300 text-xs shrink-0">·</span>
-                              <span className="text-xs text-gray-400 shrink-0">{structural_category}</span>
-                            </>
-                          )}
-                          {catLabel && (
-                            <>
-                              <span className="text-gray-300 text-xs shrink-0">·</span>
-                              <span className="text-xs text-rose-700 shrink-0">{catLabel}</span>
-                            </>
-                          )}
-                          {item.comedogenicRating && (
-                            <>
-                              <span className="text-gray-200 text-xs shrink-0">·</span>
-                              <span className="text-xs text-gray-400 shrink-0">{item.comedogenicRating}</span>
-                            </>
-                          )}
-                        </span>
-                        <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
-                      </button>
-                      {isOpen && (
-                        <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
-                          {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
-                            <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
-                          )}
-                          {item.comedogenicRating && (
-                            <p className="text-xs text-gray-500"><span className="font-medium">{item.comedogenicRating}</span>{item.comedogenicRating !== "oxid." ? " on the 0–5 scale" : " (oxidation-dependent, not a fixed scale rating)"}</p>
-                          )}
-                          {isLoading ? (
-                            <span className="italic text-gray-400">Generating explanation…</span>
-                          ) : explanation ? explanation : (
-                            <span className="italic text-gray-400">No explanation yet.</span>
-                          )}
-                          {item.benefit_note && (
-                            <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">{item.benefit_note}</p>
-                          )}
-                          {(() => {
-                            const notes = filterNotes(item.ingredient.skin_climate_notes);
-                            if (!notes.length) return null;
-                            return (
-                              <div className="space-y-1 pt-1 border-t border-gray-100">
-                                {notes.map((note, i) => (
-                                  <p key={i} className={`text-xs leading-relaxed ${
-                                    note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
-                                    note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
-                                  }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
-                                ))}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Sensory trigger ingredients */}
-          {(result.sensoryTrigger ?? []).length > 0 && (() => {
             const RINSE_OFF_SUPPRESS_SENSORY = ["Pilling", "Film-forming"];
             const visibleSensory = isRinseOff
-              ? result.sensoryTrigger.filter((s) => !s.sensory_category || !RINSE_OFF_SUPPRESS_SENSORY.includes(s.sensory_category))
-              : result.sensoryTrigger;
-            const suppressedSensory = result.sensoryTrigger.length - visibleSensory.length;
-            if (visibleSensory.length === 0) return null;
-            return (
-            <section id="section-sensory">
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">
-                  Sensory Trigger Ingredients — {visibleSensory.length}
-                </p>
-                {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Film-forming") && (
-                  <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">milia risk</span>
-                )}
-                {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Occlusive") && (
-                  <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">traps congestion</span>
-                )}
-              </div>
-              {isRinseOff && suppressedSensory > 0 && (
-                <p className="text-xs text-gray-400 mb-2">{suppressedSensory} ingredient{suppressedSensory !== 1 ? "s" : ""} (pilling, film-forming) suppressed — these require prolonged skin contact to cause problems and are not a concern in rinse-off products.</p>
-              )}
-              <div className="divide-y divide-gray-100">
-                {visibleSensory.map((item) => {
-                  const key = `sensory-${item.rawName}`;
-                  const isOpen = expanded.has(key);
-                  const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
-                  const flaggedMatch = result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned);
-                  const safeMatch = result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned);
-                  const match = flaggedMatch ?? safeMatch;
-                  const structCat = match?.ingredient.structural_category ?? null;
-                  return (
-                    <div key={item.rawName} id={`sensory-row-${item.rawName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`} className="border-l-4 border-l-gray-200 overflow-hidden">
-                      <button
-                        className="w-full flex items-center justify-between px-3 py-1 text-left"
-                        onClick={() => setExpanded((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(key)) next.delete(key); else next.add(key);
-                          return next;
-                        })}
-                      >
-                        <span className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <span className={`text-sm font-medium truncate ${isOpen ? "text-amber-700" : "text-gray-800"}`}>
-                            {smartCase(item.rawName)}
-                          </span>
-                          {structCat && (
-                            <>
-                              <span className="text-gray-300 text-xs shrink-0">·</span>
-                              <span className="text-xs text-gray-400 shrink-0">{structCat}</span>
-                            </>
-                          )}
-                          {item.sensory_category && (
-                            <>
-                              <span className="text-gray-300 text-xs shrink-0">·</span>
-                              <span className="text-xs text-amber-700 shrink-0">{item.sensory_category}</span>
-                            </>
-                          )}
-                          {item.sensory_category === "Film-forming" && (
-                            <>
-                              <span className="text-gray-200 text-xs shrink-0">·</span>
-                              <span className="text-xs text-gray-400 shrink-0">milia risk</span>
-                            </>
-                          )}
-                          {item.sensory_category === "Occlusive" && (
-                            <>
-                              <span className="text-gray-200 text-xs shrink-0">·</span>
-                              <span className="text-xs text-gray-400 shrink-0">traps congestion</span>
-                            </>
-                          )}
-                        </span>
-                        <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
-                      </button>
-                      {isOpen && (
-                        <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
-                          {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
-                            <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
-                          )}
-                          {item.sensory_note && <p>{item.sensory_note}</p>}
-                          {item.sensory_category === "Film-forming" && (
-                            <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
-                          )}
-                          {item.sensory_category === "Occlusive" && (
-                            <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: worsens existing congestion by sealing the skin surface and locking in sebum and dead cells underneath.</p>
-                          )}
-                          {(() => {
-                            const notes = filterNotes(match?.ingredient.skin_climate_notes);
-                            if (!notes.length) return null;
-                            return (
-                              <div className="space-y-1 pt-1 border-t border-gray-100">
-                                {notes.map((note, i) => (
-                                  <p key={i} className={`text-xs leading-relaxed ${
-                                    note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
-                                    note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
-                                  }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
-                                ))}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-            );
-          })()}
+              ? (result.sensoryTrigger ?? []).filter((s) => !s.sensory_category || !RINSE_OFF_SUPPRESS_SENSORY.includes(s.sensory_category))
+              : (result.sensoryTrigger ?? []);
+            const suppressedSensory = (result.sensoryTrigger ?? []).length - visibleSensory.length;
 
-          {/* Photosensitive ingredients */}
-          {(result.photosensitive ?? []).length > 0 && (() => {
-            const RINSE_OFF_SUPPRESS: string[] = ["photo-retinoid", "photo-BHA", "photo-brightening"];
+            const RINSE_OFF_SUPPRESS_PHOTO: string[] = ["photo-retinoid", "photo-BHA", "photo-brightening"];
             const visiblePhoto = isRinseOff
-              ? result.photosensitive.filter((p) => !p.photoCategory || !RINSE_OFF_SUPPRESS.includes(p.photoCategory))
-              : result.photosensitive;
-            const suppressed = result.photosensitive.length - visiblePhoto.length;
-            if (visiblePhoto.length === 0) return null;
-            return (
-            <section id="section-photosensitive">
-              <p className="text-xs font-semibold text-yellow-700 uppercase tracking-widest mb-2">
-                Photosensitive Ingredients — {visiblePhoto.length}
-              </p>
-              {isRinseOff && suppressed > 0 && (
-                <p className="text-xs text-gray-400 mb-2">{suppressed} ingredient{suppressed !== 1 ? "s" : ""} (retinoids, BHA, brightening) suppressed — negligible risk when rinsed off. AHAs and botanicals remain flagged as they cause reactions even with brief contact.</p>
-              )}
-              <div className="divide-y divide-gray-100">
-                {visiblePhoto.map((item) => {
-                  const key = `photo-${item.rawName}`;
-                  const isOpen = expanded.has(key);
-                  const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
-                  const flaggedMatch = result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned);
-                  const safeMatch = result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned);
-                  const match = flaggedMatch ?? safeMatch;
-                  const structCat = match?.ingredient.structural_category ?? null;
-                  const catLabel = item.photoCategory ? CATEGORY_LABELS[item.photoCategory] : null;
-                  return (
-                    <div key={item.rawName} className="border-l-4 border-l-gray-200 overflow-hidden">
-                      <button
-                        className="w-full flex items-center justify-between px-3 py-1 text-left"
-                        onClick={() => setExpanded((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(key)) next.delete(key); else next.add(key);
-                          return next;
-                        })}
-                      >
-                        <span className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <span className={`text-sm font-medium truncate ${isOpen ? "text-yellow-700" : "text-gray-800"}`}>
-                            {smartCase(item.rawName)}
-                          </span>
-                          {structCat && (
-                            <>
-                              <span className="text-gray-300 text-xs shrink-0">·</span>
-                              <span className="text-xs text-gray-400 shrink-0">{structCat}</span>
-                            </>
+              ? (result.photosensitive ?? []).filter((p) => !p.photoCategory || !RINSE_OFF_SUPPRESS_PHOTO.includes(p.photoCategory))
+              : (result.photosensitive ?? []);
+            const suppressedPhoto = (result.photosensitive ?? []).length - visiblePhoto.length;
+
+            const flaggedScore = hasProfile
+              ? result.flagged.filter((item) => filterNotes(item.ingredient.skin_climate_notes).length > 0).length
+              : 0;
+            const sensoryScore = hasProfile
+              ? visibleSensory.filter((item) => {
+                  const cats = item.sensory_category ? SENSORY_PROFILE_MAP[item.sensory_category] : null;
+                  return cats ? cats.some((t) => activeSkinTypes.has(t)) : false;
+                }).length
+              : 0;
+            const photoScore = hasProfile && activeSkinTypes.has("reactive") ? visiblePhoto.length : 0;
+
+            const defaultOrder: SectionId[] = ["flagged", "sensory", "photo"];
+            const sectionOrder: SectionId[] = hasProfile
+              ? [...defaultOrder].sort((a, b) => {
+                  const scores: Record<SectionId, number> = { flagged: flaggedScore, sensory: sensoryScore, photo: photoScore };
+                  return scores[b] - scores[a];
+                })
+              : defaultOrder;
+
+            const sortedFlagged = hasProfile
+              ? [...result.flagged].sort((a, b) => {
+                  const tier = (item: IngredientMatch) => {
+                    if (UNIVERSAL_CONCERN_CATEGORIES.has(item.ingredient.flagged_category ?? "")) return 0;
+                    if (filterNotes(item.ingredient.skin_climate_notes).length > 0) return 1;
+                    return 2;
+                  };
+                  return tier(a) - tier(b);
+                })
+              : result.flagged;
+
+            const renderFlagged = (): React.ReactNode => {
+              if (result.flagged.length === 0) return null;
+              return (
+                <section id="section-flagged">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <p className="text-xs font-semibold text-rose-700 uppercase tracking-widest">
+                      Flagged Ingredients — {result.flagged.length}
+                    </p>
+                    {!isRinseOff && result.flagged.some((f) => f.ingredient.flagged_category === "pore-clogger") && (
+                      <span className="text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">pore-clogging</span>
+                    )}
+                    {result.flagged.some((f) => ["sensitizer","fragrance-allergen","preservative-allergen"].includes(f.ingredient.flagged_category ?? "")) && (
+                      <span className="text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">inflammatory</span>
+                    )}
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {sortedFlagged.map((item) => {
+                      const { id, explanation: dbExplanation, flagged_category, category: ingCat, structural_category } = item.ingredient;
+                      const isOpen = expanded.has(id);
+                      const explanation = dbExplanation ?? explanations[id];
+                      const isLoading = isOpen && !dbExplanation && !(id in explanations);
+                      const catKey = flagged_category ?? ingCat;
+                      const catLabel = catKey ? CATEGORY_LABELS[catKey] : null;
+                      const isUniversal = UNIVERSAL_CONCERN_CATEGORIES.has(flagged_category ?? "");
+                      const matchedNotes = filterNotes(item.ingredient.skin_climate_notes);
+                      const showPersonalized = hasProfile && !isUniversal && matchedNotes.length > 0;
+
+                      return (
+                        <div key={id} id={`ingredient-${id}`} className="border-l-4 border-l-gray-200 overflow-hidden">
+                          <button
+                            className="w-full flex items-center justify-between px-3 py-1 text-left"
+                            onClick={() => toggleExpand(id, dbExplanation)}
+                          >
+                            <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className={`text-sm font-medium truncate ${isOpen ? "text-rose-700" : "text-gray-800"}`}>
+                                {smartCase(item.displayName)}
+                              </span>
+                              {structural_category && (
+                                <>
+                                  <span className="text-gray-300 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-gray-400 shrink-0">{structural_category}</span>
+                                </>
+                              )}
+                              {catLabel && (
+                                <>
+                                  <span className="text-gray-300 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-rose-700 shrink-0">{catLabel}</span>
+                                </>
+                              )}
+                              {isUniversal && (
+                                <>
+                                  <span className="text-gray-300 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-gray-400 shrink-0">universal concern</span>
+                                </>
+                              )}
+                              {item.comedogenicRating && (
+                                <>
+                                  <span className="text-gray-200 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-gray-400 shrink-0">{item.comedogenicRating}</span>
+                                </>
+                              )}
+                            </span>
+                            <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
+                          </button>
+                          {isOpen && (
+                            <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
+                              {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
+                                <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
+                              )}
+                              {item.comedogenicRating && (
+                                <p className="text-xs text-gray-500"><span className="font-medium">{item.comedogenicRating}</span>{item.comedogenicRating !== "oxid." ? " on the 0–5 scale" : " (oxidation-dependent, not a fixed scale rating)"}</p>
+                              )}
+                              {showPersonalized ? (
+                                <div className="space-y-1">
+                                  {matchedNotes.map((note, i) => (
+                                    <p key={i} className={`text-xs leading-relaxed ${
+                                      note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
+                                      note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
+                                    }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
+                                  ))}
+                                </div>
+                              ) : (
+                                <>
+                                  {isLoading ? (
+                                    <span className="italic text-gray-400">Generating explanation…</span>
+                                  ) : explanation ? explanation : (
+                                    <span className="italic text-gray-400">No explanation yet.</span>
+                                  )}
+                                  {item.benefit_note && (
+                                    <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">{item.benefit_note}</p>
+                                  )}
+                                  {isUniversal && matchedNotes.length > 0 && (
+                                    <div className="space-y-1 pt-1 border-t border-gray-100">
+                                      {matchedNotes.map((note, i) => (
+                                        <p key={i} className={`text-xs leading-relaxed ${
+                                          note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
+                                          note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
+                                        }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
                           )}
-                          {catLabel && (
-                            <>
-                              <span className="text-gray-300 text-xs shrink-0">·</span>
-                              <span className="text-xs text-yellow-700 shrink-0">{catLabel}</span>
-                            </>
-                          )}
-                        </span>
-                        <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
-                      </button>
-                      {isOpen && (
-                        <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
-                          {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
-                            <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
-                          )}
-                          {/* Only show ingredient explanation for safe+photosensitive; flagged ingredients show it in their own section */}
-                          {!flaggedMatch && !item.isPositionBased && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
-                          {item.photo_note && <p>{item.photo_note}</p>}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-            );
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            };
+
+            const renderSensory = (): React.ReactNode => {
+              if (visibleSensory.length === 0) return null;
+              return (
+                <section id="section-sensory">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">
+                      Sensory Trigger Ingredients — {visibleSensory.length}
+                    </p>
+                    {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Film-forming") && (
+                      <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">milia risk</span>
+                    )}
+                    {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Occlusive") && (
+                      <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">traps congestion</span>
+                    )}
+                  </div>
+                  {isRinseOff && suppressedSensory > 0 && (
+                    <p className="text-xs text-gray-400 mb-2">{suppressedSensory} ingredient{suppressedSensory !== 1 ? "s" : ""} (pilling, film-forming) suppressed — these require prolonged skin contact to cause problems and are not a concern in rinse-off products.</p>
+                  )}
+                  <div className="divide-y divide-gray-100">
+                    {visibleSensory.map((item) => {
+                      const key = `sensory-${item.rawName}`;
+                      const isOpen = expanded.has(key);
+                      const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
+                      const flaggedMatch = result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned);
+                      const safeMatch = result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned);
+                      const match = flaggedMatch ?? safeMatch;
+                      const structCat = match?.ingredient.structural_category ?? null;
+                      const rowId = `sensory-row-${item.rawName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+
+                      if (flaggedMatch) {
+                        return (
+                          <div key={item.rawName} id={rowId} className="flex items-center gap-1.5 px-3 py-1 border-l-4 border-l-gray-200">
+                            <span className="text-sm text-gray-500 truncate">{smartCase(item.rawName)}</span>
+                            {item.sensory_category && (
+                              <>
+                                <span className="text-gray-300 text-xs shrink-0">·</span>
+                                <span className="text-xs text-amber-700 shrink-0">{item.sensory_category}</span>
+                              </>
+                            )}
+                            <a href={`#ingredient-${flaggedMatch.ingredient.id}`} className="ml-auto text-xs text-rose-600 shrink-0">
+                              see Flagged ↑
+                            </a>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={item.rawName} id={rowId} className="border-l-4 border-l-gray-200 overflow-hidden">
+                          <button
+                            className="w-full flex items-center justify-between px-3 py-1 text-left"
+                            onClick={() => setExpanded((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(key)) next.delete(key); else next.add(key);
+                              return next;
+                            })}
+                          >
+                            <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className={`text-sm font-medium truncate ${isOpen ? "text-amber-700" : "text-gray-800"}`}>
+                                {smartCase(item.rawName)}
+                              </span>
+                              {structCat && (
+                                <>
+                                  <span className="text-gray-300 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-gray-400 shrink-0">{structCat}</span>
+                                </>
+                              )}
+                              {item.sensory_category && (
+                                <>
+                                  <span className="text-gray-300 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-amber-700 shrink-0">{item.sensory_category}</span>
+                                </>
+                              )}
+                              {item.sensory_category === "Film-forming" && (
+                                <>
+                                  <span className="text-gray-200 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-gray-400 shrink-0">milia risk</span>
+                                </>
+                              )}
+                              {item.sensory_category === "Occlusive" && (
+                                <>
+                                  <span className="text-gray-200 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-gray-400 shrink-0">traps congestion</span>
+                                </>
+                              )}
+                            </span>
+                            <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
+                          </button>
+                          {isOpen && (
+                            <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
+                              {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
+                                <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
+                              )}
+                              {item.sensory_note && <p>{item.sensory_note}</p>}
+                              {item.sensory_category === "Film-forming" && (
+                                <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
+                              )}
+                              {item.sensory_category === "Occlusive" && (
+                                <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: worsens existing congestion by sealing the skin surface and locking in sebum and dead cells underneath.</p>
+                              )}
+                              {(() => {
+                                const notes = filterNotes(match?.ingredient.skin_climate_notes);
+                                if (!notes.length) return null;
+                                return (
+                                  <div className="space-y-1 pt-1 border-t border-gray-100">
+                                    {notes.map((note, i) => (
+                                      <p key={i} className={`text-xs leading-relaxed ${
+                                        note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
+                                        note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
+                                      }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            };
+
+            const renderPhoto = (): React.ReactNode => {
+              if (visiblePhoto.length === 0) return null;
+              return (
+                <section id="section-photosensitive">
+                  <p className="text-xs font-semibold text-yellow-700 uppercase tracking-widest mb-2">
+                    Photosensitive Ingredients — {visiblePhoto.length}
+                  </p>
+                  {isRinseOff && suppressedPhoto > 0 && (
+                    <p className="text-xs text-gray-400 mb-2">{suppressedPhoto} ingredient{suppressedPhoto !== 1 ? "s" : ""} (retinoids, BHA, brightening) suppressed — negligible risk when rinsed off. AHAs and botanicals remain flagged as they cause reactions even with brief contact.</p>
+                  )}
+                  <div className="divide-y divide-gray-100">
+                    {visiblePhoto.map((item) => {
+                      const key = `photo-${item.rawName}`;
+                      const isOpen = expanded.has(key);
+                      const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
+                      const flaggedMatch = result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned);
+                      const safeMatch = result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned);
+                      const structCat = (flaggedMatch ?? safeMatch)?.ingredient.structural_category ?? null;
+                      const catLabel = item.photoCategory ? CATEGORY_LABELS[item.photoCategory] : null;
+
+                      if (flaggedMatch) {
+                        return (
+                          <div key={item.rawName} className="flex items-center gap-1.5 px-3 py-1 border-l-4 border-l-gray-200">
+                            <span className="text-sm text-gray-500 truncate">{smartCase(item.rawName)}</span>
+                            {catLabel && (
+                              <>
+                                <span className="text-gray-300 text-xs shrink-0">·</span>
+                                <span className="text-xs text-yellow-700 shrink-0">{catLabel}</span>
+                              </>
+                            )}
+                            {item.photo_note && (
+                              <span className="text-xs text-gray-400 hidden sm:inline shrink-0">{item.photo_note}</span>
+                            )}
+                            <a href={`#ingredient-${flaggedMatch.ingredient.id}`} className="ml-auto text-xs text-rose-600 shrink-0">
+                              see Flagged ↑
+                            </a>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={item.rawName} className="border-l-4 border-l-gray-200 overflow-hidden">
+                          <button
+                            className="w-full flex items-center justify-between px-3 py-1 text-left"
+                            onClick={() => setExpanded((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(key)) next.delete(key); else next.add(key);
+                              return next;
+                            })}
+                          >
+                            <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className={`text-sm font-medium truncate ${isOpen ? "text-yellow-700" : "text-gray-800"}`}>
+                                {smartCase(item.rawName)}
+                              </span>
+                              {structCat && (
+                                <>
+                                  <span className="text-gray-300 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-gray-400 shrink-0">{structCat}</span>
+                                </>
+                              )}
+                              {catLabel && (
+                                <>
+                                  <span className="text-gray-300 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-yellow-700 shrink-0">{catLabel}</span>
+                                </>
+                              )}
+                            </span>
+                            <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
+                          </button>
+                          {isOpen && (
+                            <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
+                              {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
+                                <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
+                              )}
+                              {!item.isPositionBased && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
+                              {item.photo_note && <p>{item.photo_note}</p>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            };
+
+            const renderers: Record<SectionId, () => React.ReactNode> = {
+              flagged: renderFlagged,
+              sensory: renderSensory,
+              photo: renderPhoto,
+            };
+
+            return <>{sectionOrder.map((sid) => <Fragment key={sid}>{renderers[sid]()}</Fragment>)}</>;
           })()}
 
           {/* Safe ingredients */}
@@ -2931,23 +3055,25 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
                             <p className="text-xs text-gray-400 mb-1">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
                           )}
-                          {isLoading ? (
-                            <span className="italic text-gray-400">Generating explanation…</span>
-                          ) : explanation ? explanation : (
-                            <span className="italic text-gray-400">No explanation yet.</span>
-                          )}
                           {(() => {
                             const notes = filterNotes(item.ingredient.skin_climate_notes);
-                            if (!notes.length) return null;
-                            return (
-                              <div className="space-y-1 pt-1 border-t border-gray-100">
-                                {notes.map((note, i) => (
-                                  <p key={i} className={`text-xs leading-relaxed ${
-                                    note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
-                                    note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
-                                  }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
-                                ))}
-                              </div>
+                            const hasActiveProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
+                            if (hasActiveProfile && notes.length > 0) {
+                              return (
+                                <div className="space-y-1">
+                                  {notes.map((note, i) => (
+                                    <p key={i} className={`text-xs leading-relaxed ${
+                                      note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
+                                      note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
+                                    }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return isLoading ? (
+                              <span className="italic text-gray-400">Generating explanation…</span>
+                            ) : explanation ? explanation : (
+                              <span className="italic text-gray-400">No explanation yet.</span>
                             );
                           })()}
                         </div>

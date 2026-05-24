@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { classifyIngredient } from "@/lib/ingredient-classifier";
 import { generateExplanation } from "@/lib/generate-explanation";
-import { getSensoryCategories, computeSkinClimateNotes } from "@/lib/curated-explanation";
+import { getSensoryCategories, generateNotes } from "@/lib/curated-explanation";
 
 async function guard() {
   const { userId } = await auth();
@@ -42,9 +42,9 @@ async function classifyOne(queueId: string): Promise<{ classified: boolean; alre
   }
 
   const cl = classifyIngredient(item.name);
-  const ctx = { name: item.name, status: cl.status, structural_category: cl.structural_category, category: cl.category, flagged_category: cl.flagged_category };
   const sensoryCategories = getSensoryCategories(item.name);
-  const skin_climate_notes = computeSkinClimateNotes(ctx, sensoryCategories);
+  const notes = generateNotes(cl);
+  const skin_climate_notes = notes.length > 0 ? notes : null;
   const explanation = generateExplanation(item.name, cl.status, cl.structural_category, cl.category, cl.flagged_category);
 
   await supabaseAdmin.from("ingredients").insert({
