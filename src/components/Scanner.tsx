@@ -1466,7 +1466,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
                   <div className="space-y-1.5 pt-1">
                     {[...activeSkinTypes].map((t) => (
-                      <p key={t} className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 leading-relaxed">{SKIN_TYPE_NOTES[t]}</p>
+                      <p key={t} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{SKIN_TYPE_NOTES[t]}</p>
                     ))}
                     {[...activeClimates].map((c) => (
                       <p key={c} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{CLIMATE_NOTES[c]}</p>
@@ -2424,7 +2424,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
                   <div className="space-y-1.5 pt-1">
                     {[...activeSkinTypes].map((t) => (
-                      <p key={t} className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 leading-relaxed">{SKIN_TYPE_NOTES[t]}</p>
+                      <p key={t} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{SKIN_TYPE_NOTES[t]}</p>
                     ))}
                     {[...activeClimates].map((c) => (
                       <p key={c} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{CLIMATE_NOTES[c]}</p>
