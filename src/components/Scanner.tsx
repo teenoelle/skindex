@@ -1368,6 +1368,74 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       {!result && !loading && !notFound && !limitReached && (
         <div className="mt-4">
           <p className="text-sm text-gray-400 text-center mb-5">Know what&apos;s in your skincare before it touches your skin.</p>
+
+          {/* Skin profile — idle state */}
+          <section className="mb-6">
+            <button
+              type="button"
+              onClick={() => setProfileOpen((v) => !v)}
+              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full"
+            >
+              Skin profile
+              {(activeSkinTypes.size + activeClimates.size) > 0 && (
+                <span className="text-teal-600 font-medium normal-case tracking-normal">
+                  {activeSkinTypes.size + activeClimates.size} active
+                </span>
+              )}
+              <span className="text-gray-300 ml-auto">{profileOpen ? "▲" : "▼"}</span>
+            </button>
+            {profileOpen && (
+              <div className="mt-2 space-y-2 border border-gray-100 rounded-xl p-3">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Skin type</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SKIN_TYPES.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleSkinType(value)}
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                          activeSkinTypes.has(value)
+                            ? "bg-teal-700 text-white border-teal-700"
+                            : "text-gray-500 border-gray-200 hover:border-gray-400"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Climate</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CLIMATE_TYPES.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleClimate(value)}
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                          activeClimates.has(value)
+                            ? "bg-teal-700 text-white border-teal-700"
+                            : "text-gray-500 border-gray-200 hover:border-gray-400"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {(activeSkinTypes.size + activeClimates.size) > 0 && (
+                  <p className="text-xs text-gray-400">Skin-specific notes will appear inside each ingredient when you scan a product.</p>
+                )}
+                {activeSkinTypes.has("oily") && (
+                  <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 leading-relaxed">
+                    Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+
           {browseLoading && !browseSelectedType && (
             <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
           )}
