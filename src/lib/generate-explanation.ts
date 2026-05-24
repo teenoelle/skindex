@@ -88,7 +88,7 @@ const CURATED: Record<string, string> = {
   "titanium dioxide": "Titanium dioxide is a mineral UV filter that reflects UV radiation from the skin's surface. It is particularly effective against UVB rays, is non-sensitizing, and is often preferred for reactive skin over chemical sunscreen alternatives.",
 
   // ── Thickeners ────────────────────────────────────────────────────────
-  "carbomer": "Carbomer is a synthetic thickening polymer that creates the smooth gel-like texture in many serums and moisturizers. It is inert, non-reactive, and has no known skin effects beyond improving the formula's feel and stability.",
+  "carbomer": "Carbomer is a synthetic polymer thickener that creates gel-like textures in serums and moisturizers. As a film-former it lays a continuous surface film that can trap dead skin cells and contribute to milia — small, hard keratin bumps just under the skin surface — with repeated leave-on use. It is non-sensitizing and non-comedogenic.",
   "xanthan gum": "Xanthan gum is a natural thickener produced by bacterial fermentation that creates smooth, stable gel textures. It is completely inert and non-irritating, safe for all skin types including reactive and sensitive skin.",
 
   // ── Surfactants (mild) ────────────────────────────────────────────────

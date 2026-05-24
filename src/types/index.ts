@@ -1,9 +1,17 @@
+export type SkinClimateNote = {
+  dimensions: string[];
+  climate: string[];
+  sentiment: "strong_caution" | "caution" | "benefit" | "neutral";
+  text: string;
+};
+
 export type DbIngredient = {
   id: string;
   name: string;
   inci_name: string | null;
   status: "safe" | "flagged";
   explanation: string | null;
+  skin_climate_notes: SkinClimateNote[] | null;
   category: string | null;
   flagged_category: string | null;
   structural_category: string | null;

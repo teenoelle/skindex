@@ -57,7 +57,17 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
   {
     pattern: /sodium lauryl sulfate|\bsls\b(?!es)/i,
     sensory_category: "Stripping",
-    note: "Leaves skin with an immediate tight, stripped feeling after rinsing that prompts touching and rubbing — compounding barrier damage already caused by the detergent.",
+    note: "Sodium lauryl sulfate is the same detergent class as dish soap and many hand soaps. If your skin reacts to foaming household cleaners, SLS in skincare will produce the same response — a tight, stripped feeling after rinsing. That feeling signals the skin's surface film is temporarily gone; apply your next product promptly to close the window before itch sets in.",
+  },
+  {
+    pattern: /sodium laureth sulfate|\bsles\b|sodium lauryl ether sulfate/i,
+    sensory_category: "Stripping",
+    note: "Sodium laureth sulfate (SLES) is in the same anionic surfactant family as SLS and dish soap, but is milder due to ethoxylation. On sensitive or barrier-compromised skin it can still produce a tight, stripped feeling after rinsing — apply your next product promptly to avoid the post-wash itch window.",
+  },
+  {
+    pattern: /sodium c14-16 olefin sulfonate|sodium c12-14 olefin sulfonate|alpha olefin sulfonate/i,
+    sensory_category: "Stripping",
+    note: "An anionic surfactant in the same chemical class as dish soap detergents, common in body washes and shampoos. Can produce a stripped, tight sensation after rinsing on reactive or sensitive skin.",
   },
   {
     pattern: /salicylic acid/i,
@@ -139,7 +149,7 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
   {
     pattern: /acryloyldimethyltaurate|\/vp copolymer|vp\/va copolymer|carbomer|carbopol|polyacrylate/i,
     sensory_category: "Film-forming",
-    note: "A synthetic film-forming polymer used to create gel or serum textures. It lays a continuous surface film that can trap dead skin cells underneath, preventing normal shedding and contributing to milia — small, hard, keratin-filled bumps just under the skin surface that are distinct from comedones.",
+    note: "A synthetic film-forming polymer used to create gel or serum textures. It lays a continuous surface film that slows the natural shedding of dead skin cells — first producing a subtle itch as cells accumulate underneath, and with extended leave-on use, contributing to milia (small, hard keratin bumps just under the skin surface, distinct from comedones).",
   },
 
   // ── Chemical-itch ────────────────────────────────────────────────────────
@@ -163,6 +173,16 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
     pattern: /iodopropynyl butylcarbamate|\bipbc\b/i,
     sensory_category: "chemical-itch",
     note: "IPBC is a biocide preservative and recognized skin sensitizer. It can cause allergic contact dermatitis, particularly in leave-on products or when applied to skin with a compromised barrier.",
+  },
+  {
+    pattern: /cocamidopropyl betaine|\bcapb\b/i,
+    sensory_category: "chemical-itch",
+    note: "Cocamidopropyl betaine (CAPB) is a mild amphoteric surfactant but a documented contact allergen — sensitization comes from amidoamine impurities in the ingredient, not from stripping action. Can cause itching, redness, and allergic contact dermatitis on reactive or sensitized skin independently of barrier condition.",
+  },
+  {
+    pattern: /\bchlorhexidine\b/i,
+    sensory_category: "chemical-itch",
+    note: "Chlorhexidine is an antiseptic disinfectant used in some body washes and skin prep products. A recognized sensitizer that can cause itching and contact dermatitis; people with sensitivity to strong disinfectants or bleach-based cleaners may cross-react.",
   },
 
   // ── Occlusive-itch ───────────────────────────────────────────────────────

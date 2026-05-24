@@ -93,6 +93,15 @@ type QueueItem = {
   last_seen: string | null;
 };
 
+type SearchMiss = {
+  id: string;
+  query: string;
+  kind: "search" | "url";
+  failure: string;
+  times_seen: number;
+  last_seen: string | null;
+};
+
 type SiteStats = {
   totalProducts: number;
   archivedCount: number;
@@ -236,6 +245,85 @@ const ACTION_GROUPS: Record<string, string[]> = {
   Archive: ["archive_product", "archive_submission"],
 };
 
+const JUNK_KEYWORDS = /\b(directions?|warnings?|contains|apply|rinse|massage|avoid|consult|keep out|active ingredient|inactive ingredient|drug facts|other information|flush|store at|tamper|expir|for external use|do not|if swallowed|see package|serving|amount per|calories|sodium|total fat)\b/i;
+
+function isJunkIngredient(item: string): boolean {
+  if (item.length > 80) return true;
+  if (JUNK_KEYWORDS.test(item)) return true;
+  if (/\.\s+[A-Z]/.test(item)) return true;
+  if (/\d{5,}/.test(item)) return true;
+  return false;
+}
+
+function hasSuspiciousIngredients(ingredientList: string | null): boolean {
+  if (!ingredientList) return false;
+  return ingredientList.split(",").some((item) => isJunkIngredient(item.trim()));
+}
+
+function IngredientChipEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const items = value.split(",").map((s) => s.trim()).filter(Boolean);
+  const [addInput, setAddInput] = useState("");
+
+  function removeItem(idx: number) {
+    const next = items.filter((_, i) => i !== idx);
+    onChange(next.join(", "));
+  }
+
+  function addItem() {
+    const trimmed = addInput.trim();
+    if (!trimmed) return;
+    onChange([...items, trimmed].join(", "));
+    setAddInput("");
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-1">
+        {items.map((item, i) => {
+          const junk = isJunkIngredient(item);
+          return (
+            <span
+              key={i}
+              title={item}
+              className={`inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 border ${
+                junk ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-gray-50 border-gray-200 text-gray-700"
+              }`}
+            >
+              {item.length > 40 ? item.slice(0, 40) + "…" : item}
+              <button
+                type="button"
+                onClick={() => removeItem(i)}
+                className="text-gray-400 hover:text-rose-500 leading-none ml-0.5 shrink-0"
+              >
+                ×
+              </button>
+            </span>
+          );
+        })}
+        {items.length === 0 && <span className="text-xs text-gray-400 italic">No ingredients</span>}
+      </div>
+      <div className="flex gap-1.5">
+        <input
+          type="text"
+          value={addInput}
+          onChange={(e) => setAddInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }}
+          placeholder="Add ingredient…"
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400 flex-1"
+        />
+        <button
+          type="button"
+          onClick={addItem}
+          disabled={!addInput.trim()}
+          className="text-xs px-2.5 py-1 border border-gray-200 rounded-lg text-gray-500 hover:border-gray-400 disabled:opacity-40"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function BodyAreaPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const isKnown = BODY_AREAS.includes(value);
   const [showCustom, setShowCustom] = useState(!isKnown && value !== "");
@@ -344,6 +432,10 @@ export default function AdminPage() {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [queueLoading, setQueueLoading] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [searchMisses, setSearchMisses] = useState<SearchMiss[]>([]);
+  const [searchMissesLoading, setSearchMissesLoading] = useState(false);
+  const [searchMissesOpen, setSearchMissesOpen] = useState(false);
+  const [filterSuspicious, setFilterSuspicious] = useState(false);
   const [classifyingOne, setClassifyingOne] = useState<string | null>(null);
   const [classifyingAll, setClassifyingAll] = useState(false);
   const [removingFromQueue, setRemovingFromQueue] = useState<string | null>(null);
@@ -489,6 +581,36 @@ export default function AdminPage() {
       }
     } catch { }
     setQueueLoading(false);
+  }
+
+  async function loadSearchMisses() {
+    setSearchMissesLoading(true);
+    try {
+      const res = await fetch("/api/admin/search-misses");
+      if (res.ok) {
+        const data = await res.json();
+        setSearchMisses(data.items ?? []);
+      }
+    } catch { }
+    setSearchMissesLoading(false);
+  }
+
+  async function dismissMiss(id: string) {
+    await fetch("/api/admin/search-misses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "dismiss", id }),
+    });
+    setSearchMisses((prev) => prev.filter((m) => m.id !== id));
+  }
+
+  async function dismissAllMisses() {
+    await fetch("/api/admin/search-misses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "dismiss-all" }),
+    });
+    setSearchMisses([]);
   }
 
   async function classifyQueueOne(item: QueueItem) {
@@ -1118,6 +1240,7 @@ export default function AdminPage() {
     missingImage: allProducts.filter((p) => !p.image_url).length,
     missingType: allProducts.filter((p) => !p.type || !activeTypesSet.has(p.type)).length,
     missingIngredients: allProducts.filter((p) => !p.ingredient_list).length,
+    suspicious: allProducts.filter((p) => hasSuspiciousIngredients(p.ingredient_list)).length,
   };
 
   const sortedAllProducts = useMemo(() => [...allProducts].sort((a, b) => {
@@ -1141,8 +1264,9 @@ export default function AdminPage() {
     .filter((p) => !filterMissingIherb || !p.iherb_url)
     .filter((p) => !filterMissingImage || !p.image_url)
     .filter((p) => !filterMissingType || !p.type || !activeTypesSet.has(p.type))
-    .filter((p) => !filterMissingIngredients || !p.ingredient_list),
-  [sortedAllProducts, allSearch, allBrandFilter, filterMissingSource, filterMissingIherb, filterMissingImage, filterMissingType, filterMissingIngredients, activeTypesSet]);
+    .filter((p) => !filterMissingIngredients || !p.ingredient_list)
+    .filter((p) => !filterSuspicious || hasSuspiciousIngredients(p.ingredient_list)),
+  [sortedAllProducts, allSearch, allBrandFilter, filterMissingSource, filterMissingIherb, filterMissingImage, filterMissingType, filterMissingIngredients, filterSuspicious, activeTypesSet]);
 
   const filteredAuditLog = useMemo(() => {
     const search = auditSearch.toLowerCase();
@@ -1392,6 +1516,7 @@ export default function AdminPage() {
                   ["Missing image", filterMissingImage, setFilterMissingImage, allStats.missingImage],
                   ["No type", filterMissingType, setFilterMissingType, allStats.missingType],
                   ["No ingredients", filterMissingIngredients, setFilterMissingIngredients, allStats.missingIngredients],
+                  ["Suspicious", filterSuspicious, setFilterSuspicious, allStats.suspicious],
                 ] as [string, boolean, (v: (p: boolean) => boolean) => void, number][]).map(([label, value, set, count]) => (
                   <button
                     key={label}
@@ -1606,12 +1731,9 @@ export default function AdminPage() {
                       <UrlField field="iherb_url" rowLabel="iHerb" placeholder="iHerb URL" href={iherbHref} alwaysEnabled={true} btnLabel="iHerb" />
                       <div>
                         <span className="text-xs text-gray-400 block mb-1">Ingredients</span>
-                        <textarea
+                        <IngredientChipEditor
                           value={edit.ingredient_list}
-                          onChange={(e) => updateAllEdit(p.id, "ingredient_list", e.target.value)}
-                          placeholder="Ingredient list…"
-                          rows={3}
-                          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 resize-none font-mono leading-relaxed"
+                          onChange={(v) => updateAllEdit(p.id, "ingredient_list", v)}
                         />
                       </div>
                     </div>
@@ -1864,6 +1986,69 @@ export default function AdminPage() {
                       </span>
                     )}
                   </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* Search Misses */}
+        <section>
+          <button
+            type="button"
+            onClick={() => {
+              const opening = !searchMissesOpen;
+              setSearchMissesOpen(opening);
+              if (opening && searchMisses.length === 0) loadSearchMisses();
+            }}
+            className="flex items-center gap-3 mb-4 group"
+          >
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">Search Misses</h2>
+            {searchMisses.length > 0 && (
+              <span className="text-xs font-medium bg-rose-100 text-rose-700 rounded-full px-2.5 py-0.5">
+                {searchMisses.length}
+              </span>
+            )}
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${searchMissesOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {searchMissesOpen && (
+            <>
+              {searchMissesLoading && <p className="text-sm text-gray-400">Loading…</p>}
+              {!searchMissesLoading && searchMisses.length === 0 && (
+                <p className="text-sm text-gray-400">No search misses recorded yet.</p>
+              )}
+              {!searchMissesLoading && searchMisses.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs text-gray-400">{searchMisses.length} unique {searchMisses.length === 1 ? "miss" : "misses"}</p>
+                    <button
+                      type="button"
+                      onClick={dismissAllMisses}
+                      className="text-xs text-rose-500 hover:text-rose-700"
+                    >
+                      Dismiss all
+                    </button>
+                  </div>
+                  {searchMisses.map((miss) => (
+                    <div key={miss.id} className="flex items-start justify-between gap-3 py-2 border-b border-gray-100 last:border-0">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{miss.query}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {miss.kind === "url" ? "URL import" : "Search"} · {miss.failure.replace(/_/g, " ")} · {miss.times_seen}× · {miss.last_seen ? new Date(miss.last_seen).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => dismissMiss(miss.id)}
+                        className="text-xs text-gray-400 hover:text-rose-600 shrink-0 pt-0.5"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </>

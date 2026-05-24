@@ -421,6 +421,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (!rawIngredients) {
+      // Fire-and-forget: log the missed search query for admin review
+      if (query) {
+        import("@/lib/supabase-admin").then(({ supabaseAdmin: sa }) => {
+          sa.rpc("upsert_search_miss", { p_query: query, p_kind: "search", p_failure: "no_match" }).then(() => {});
+        }).catch(() => {});
+      }
       return NextResponse.json({ notFound: true });
     }
   } else if (type === "url") {
@@ -437,6 +443,14 @@ export async function POST(req: NextRequest) {
     const extracted = await extractIngredientsFromUrl(url);
     if (!extracted) {
       const isIHerb = url.toLowerCase().includes("iherb.com");
+      // Fire-and-forget: log the failed URL import for admin review
+      import("@/lib/supabase-admin").then(({ supabaseAdmin: sa }) => {
+        sa.rpc("upsert_search_miss", {
+          p_query: url,
+          p_kind: "url",
+          p_failure: isIHerb ? "iherb_blocked" : "extraction_failed",
+        }).then(() => {});
+      }).catch(() => {});
       return NextResponse.json({ notFound: true, iHerbBlocked: isIHerb });
     }
 
@@ -555,6 +569,7 @@ export async function POST(req: NextRequest) {
             category: "pore-clogger",
             flagged_category: "pore-clogger",
             structural_category: null,
+            skin_climate_notes: null,
           },
           comedogenicRating: rule.rating,
         });

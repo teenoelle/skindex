@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X, Menu } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant } from "@/types";
+import type { IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -206,6 +206,27 @@ const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
 
 const RINSE_OFF_TYPES = new Set(["Face Wash", "Body Wash", "Shampoo", "Makeup Remover"]);
 
+type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone";
+type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv";
+
+const SKIN_TYPES: { value: SkinType; label: string }[] = [
+  { value: "oily", label: "Oily" },
+  { value: "dry", label: "Dry" },
+  { value: "reactive", label: "Reactive" },
+  { value: "damaged_barrier", label: "Damaged barrier" },
+  { value: "acne_prone", label: "Acne-prone" },
+  { value: "mature", label: "Mature" },
+  { value: "hyperpigmentation_prone", label: "Hyp-prone" },
+];
+
+const CLIMATE_TYPES: { value: ClimateType; label: string }[] = [
+  { value: "humid", label: "Humid" },
+  { value: "dry_climate", label: "Dry" },
+  { value: "cold", label: "Cold" },
+  { value: "hot", label: "Hot" },
+  { value: "high_uv", label: "High UV" },
+];
+
 
 function toTitleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -377,6 +398,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [pinnedTopProduct, setPinnedTopProduct] = useState<CommunityVariant | null>(null);
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
   const [typeBodyAreaMap, setTypeBodyAreaMap] = useState<Map<string, string>>(new Map());
+  const [activeSkinTypes, setActiveSkinTypes] = useState<Set<SkinType>>(new Set());
+  const [activeClimates, setActiveClimates] = useState<Set<ClimateType>>(new Set());
+  const [profileOpen, setProfileOpen] = useState(false);
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [showStickyProduct, setShowStickyProduct] = useState(false);
   const [stickySearchOpen, setStickySearchOpen] = useState(false);
@@ -400,6 +424,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         if (d.types) setTypeBodyAreaMap(new Map(d.types.map((t) => [t.name, t.body_area])));
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    try {
+      const st = localStorage.getItem("skindex:skinTypes");
+      const cl = localStorage.getItem("skindex:climates");
+      if (st) setActiveSkinTypes(new Set(JSON.parse(st) as SkinType[]));
+      if (cl) setActiveClimates(new Set(JSON.parse(cl) as ClimateType[]));
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -1020,6 +1053,32 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setNewListName("");
     setSavedTo(name.trim());
     setTimeout(() => { setSaveListOpen(false); setSavedTo(null); }, 1800);
+  }
+
+  function toggleSkinType(t: SkinType) {
+    setActiveSkinTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t); else next.add(t);
+      try { localStorage.setItem("skindex:skinTypes", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+
+  function toggleClimate(c: ClimateType) {
+    setActiveClimates((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c); else next.add(c);
+      try { localStorage.setItem("skindex:climates", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+
+  function filterNotes(notes: SkinClimateNote[] | null | undefined): SkinClimateNote[] {
+    if (!notes?.length) return [];
+    return notes.filter((n) =>
+      (n.dimensions.length === 0 || n.dimensions.some((d) => activeSkinTypes.has(d as SkinType)))
+      && (n.climate.length === 0 || n.climate.some((c) => activeClimates.has(c as ClimateType)))
+    );
   }
 
   function switchToPaste(prefill?: string) {
@@ -2191,6 +2250,73 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
           </div>{/* end summary + alternatives group */}
 
+          {/* Skin profile toggles */}
+          <section>
+            <button
+              type="button"
+              onClick={() => setProfileOpen((v) => !v)}
+              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest"
+            >
+              Skin profile
+              {(activeSkinTypes.size + activeClimates.size) > 0 && (
+                <span className="text-teal-600 font-medium normal-case tracking-normal">
+                  {activeSkinTypes.size + activeClimates.size} active
+                </span>
+              )}
+              <span className="text-gray-300">{profileOpen ? "▲" : "▼"}</span>
+            </button>
+            {profileOpen && (
+              <div className="mt-2 space-y-2 border border-gray-100 rounded-xl p-3">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Skin type</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SKIN_TYPES.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleSkinType(value)}
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                          activeSkinTypes.has(value)
+                            ? "bg-teal-700 text-white border-teal-700"
+                            : "text-gray-500 border-gray-200 hover:border-gray-400"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Climate</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CLIMATE_TYPES.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleClimate(value)}
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                          activeClimates.has(value)
+                            ? "bg-teal-700 text-white border-teal-700"
+                            : "text-gray-500 border-gray-200 hover:border-gray-400"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {(activeSkinTypes.size + activeClimates.size) > 0 && (
+                  <p className="text-xs text-gray-400">Skin-specific notes will appear inside each ingredient when you expand it.</p>
+                )}
+                {activeSkinTypes.has("oily") && (
+                  <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 leading-relaxed">
+                    Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Ingredients parent section */}
           <section className="space-y-8 mt-4">
           <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest">
@@ -2430,6 +2556,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           {item.benefit_note && (
                             <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">{item.benefit_note}</p>
                           )}
+                          {(() => {
+                            const notes = filterNotes(item.ingredient.skin_climate_notes);
+                            if (!notes.length) return null;
+                            return (
+                              <div className="space-y-1 pt-1 border-t border-gray-100">
+                                {notes.map((note, i) => (
+                                  <p key={i} className={`text-xs leading-relaxed ${
+                                    note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
+                                    note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
+                                  }`}>{note.text}</p>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
@@ -2518,7 +2658,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
                             <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
                           )}
-                          {!flaggedMatch && !item.isPositionBased && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
                           {item.sensory_note && <p>{item.sensory_note}</p>}
                           {item.sensory_category === "Film-forming" && (
                             <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
@@ -2526,6 +2665,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           {item.sensory_category === "Occlusive" && (
                             <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: worsens existing congestion by sealing the skin surface and locking in sebum and dead cells underneath.</p>
                           )}
+                          {(() => {
+                            const notes = filterNotes(match?.ingredient.skin_climate_notes);
+                            if (!notes.length) return null;
+                            return (
+                              <div className="space-y-1 pt-1 border-t border-gray-100">
+                                {notes.map((note, i) => (
+                                  <p key={i} className={`text-xs leading-relaxed ${
+                                    note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
+                                    note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
+                                  }`}>{note.text}</p>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
@@ -2658,6 +2811,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           ) : explanation ? explanation : (
                             <span className="italic text-gray-400">No explanation yet.</span>
                           )}
+                          {(() => {
+                            const notes = filterNotes(item.ingredient.skin_climate_notes);
+                            if (!notes.length) return null;
+                            return (
+                              <div className="space-y-1 pt-1 border-t border-gray-100">
+                                {notes.map((note, i) => (
+                                  <p key={i} className={`text-xs leading-relaxed ${
+                                    note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
+                                    note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
+                                  }`}>{note.text}</p>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
