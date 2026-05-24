@@ -245,6 +245,15 @@ const CLIMATE_NOTES: Record<ClimateType, string> = {
   high_uv: "In high-UV environments, daily broad-spectrum SPF is essential — AHAs, retinoids, and many brightening ingredients all increase UV sensitivity.",
 };
 
+function noteLabel(n: SkinClimateNote): string {
+  const skinLabels = n.dimensions.map((d) => SKIN_TYPES.find((s) => s.value === d)?.label ?? d);
+  const climateLabels = n.climate.map((c) => CLIMATE_TYPES.find((t) => t.value === c)?.label ?? c);
+  const parts: string[] = [];
+  if (skinLabels.length) parts.push(skinLabels.join(", "));
+  if (climateLabels.length) parts.push(climateLabels.join(", "));
+  return parts.join(" · ");
+}
+
 function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateType>): string[] {
   const cats: string[] = [];
   if (skinTypes.has("oily") || skinTypes.has("acne_prone")) cats.push("Occlusives", "Waxes", "Film-formers");
@@ -2681,7 +2690,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                   <p key={i} className={`text-xs leading-relaxed ${
                                     note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
                                     note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
-                                  }`}>{note.text}</p>
+                                  }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
                                 ))}
                               </div>
                             );
@@ -2790,7 +2799,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                   <p key={i} className={`text-xs leading-relaxed ${
                                     note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
                                     note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
-                                  }`}>{note.text}</p>
+                                  }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
                                 ))}
                               </div>
                             );
@@ -2936,7 +2945,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                   <p key={i} className={`text-xs leading-relaxed ${
                                     note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
                                     note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
-                                  }`}>{note.text}</p>
+                                  }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
                                 ))}
                               </div>
                             );
