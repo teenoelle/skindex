@@ -96,9 +96,9 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
     note: "Causes a pronounced burning and stinging sensation on contact, especially on reactive or broken skin. The drying effect compounds over time, creating a raw, sensitized surface that is difficult not to touch or pick at.",
   },
   {
-    pattern: /propylene glycol/i,
+    pattern: /^propylene glycol$/i,
     sensory_category: "Stinging",
-    note: "Can cause a stinging or burning sensation on sensitized skin and around areas where the barrier is broken or compromised.",
+    note: "Can cause a stinging or burning sensation on sensitized skin and around areas where the barrier is broken or compromised. As a penetration enhancer, it also drives co-applied ingredients deeper — amplifying the potency of any other irritants or sensitizers in the formula.",
   },
   {
     pattern: /^(butylene glycol|dipropylene glycol)$/i,
