@@ -216,7 +216,7 @@ const SKIN_TYPES: { value: SkinType; label: string }[] = [
   { value: "damaged_barrier", label: "Damaged barrier" },
   { value: "acne_prone", label: "Acne-prone" },
   { value: "mature", label: "Mature" },
-  { value: "hyperpigmentation_prone", label: "Hyp-prone" },
+  { value: "hyperpigmentation_prone", label: "Hyperpigmentation" },
 ];
 
 const CLIMATE_TYPES: { value: ClimateType; label: string }[] = [
@@ -227,6 +227,33 @@ const CLIMATE_TYPES: { value: ClimateType; label: string }[] = [
   { value: "high_uv", label: "High UV" },
 ];
 
+const SKIN_TYPE_NOTES: Record<SkinType, string> = {
+  oily: "Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.",
+  dry: "Dry skin has a thinner lipid layer and loses water fastest in cold or dry air — drying solvents, sulfate surfactants, and clay are worth watching closely.",
+  reactive: "Reactive skin has a lower tolerance threshold — sensitizers, fragrance allergens, and chemical sunscreens are worth watching closely, especially in warm weather.",
+  damaged_barrier: "A compromised barrier lets ingredients penetrate faster and deeper — irritants and sensitizers hit harder and recovery takes longer than it would on intact skin.",
+  acne_prone: "For acne-prone skin, pore-clogging ingredients and film-formers are the main risks — watch the Congestion section after scanning.",
+  mature: "Mature skin benefits most from peptides, ceramides, and emollients, and is more sensitive to the retinoid adjustment period — start at the lowest available concentration.",
+  hyperpigmentation_prone: "For hyperpigmentation-prone skin, UV exposure directly undoes progress — many brightening actives also increase UV sensitivity, making daily SPF essential.",
+};
+
+const CLIMATE_NOTES: Record<ClimateType, string> = {
+  humid: "In humid climates, film-forming and occlusive ingredients are more likely to trap heat and sebum against the skin — lighter formulations are preferable.",
+  dry_climate: "In dry climates, humectants need to be sealed in with an emollient or occlusive — without one, they can pull moisture from deeper skin layers instead of the air.",
+  cold: "Cold air depletes skin lipids fastest — barrier-repairing ingredients (ceramides, fatty acids, emollients) are most effective and most needed in this climate.",
+  hot: "In hot weather, skin permeability increases, making sensitizers and chemical UV filters absorb more readily and triggering stronger reactions.",
+  high_uv: "In high-UV environments, daily broad-spectrum SPF is essential — AHAs, retinoids, and many brightening ingredients all increase UV sensitivity.",
+};
+
+function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateType>): string[] {
+  const cats: string[] = [];
+  if (skinTypes.has("oily") || skinTypes.has("acne_prone")) cats.push("Occlusives", "Waxes", "Film-formers");
+  if (skinTypes.has("reactive") || skinTypes.has("damaged_barrier")) cats.push("Sensitizers", "Fragrance allergens", "Barrier-disrupting");
+  if (skinTypes.has("dry") || skinTypes.has("damaged_barrier") || climates.has("cold") || climates.has("dry_climate")) cats.push("Drying solvents", "Sulfate surfactants");
+  if (climates.has("high_uv") || skinTypes.has("hyperpigmentation_prone")) cats.push("AHA exfoliants", "Retinoids");
+  if (climates.has("hot") || climates.has("humid")) cats.push("Heavy occlusives", "Silicones");
+  return [...new Set(cats)];
+}
 
 function toTitleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -1075,10 +1102,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   function filterNotes(notes: SkinClimateNote[] | null | undefined): SkinClimateNote[] {
     if (!notes?.length) return [];
-    return notes.filter((n) =>
-      (n.dimensions.length === 0 || n.dimensions.some((d) => activeSkinTypes.has(d as SkinType)))
-      && (n.climate.length === 0 || n.climate.some((c) => activeClimates.has(c as ClimateType)))
-    );
+    return notes.filter((n) => {
+      const skinMatch = n.dimensions.length === 0 || n.dimensions.some((d) => activeSkinTypes.has(d as SkinType));
+      const climateMatch = n.climate.length === 0 || n.climate.some((c) => activeClimates.has(c as ClimateType));
+      // Notes constrained on both axes: show if either matches
+      if (n.dimensions.length > 0 && n.climate.length > 0) return skinMatch || climateMatch;
+      return skinMatch && climateMatch;
+    });
   }
 
   function switchToPaste(prefill?: string) {
@@ -1425,12 +1455,21 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </div>
                 </div>
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
-                  <p className="text-xs text-gray-400">Skin-specific notes will appear inside each ingredient when you scan a product.</p>
-                )}
-                {activeSkinTypes.has("oily") && (
-                  <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 leading-relaxed">
-                    Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.
-                  </p>
+                  <div className="space-y-1.5 pt-1">
+                    {[...activeSkinTypes].map((t) => (
+                      <p key={t} className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 leading-relaxed">{SKIN_TYPE_NOTES[t]}</p>
+                    ))}
+                    {[...activeClimates].map((c) => (
+                      <p key={c} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{CLIMATE_NOTES[c]}</p>
+                    ))}
+                    {(() => {
+                      const watches = profileWatchCategories(activeSkinTypes, activeClimates);
+                      return watches.length > 0 ? (
+                        <p className="text-xs text-gray-400 pt-0.5">Flags: {watches.join(" · ")}.</p>
+                      ) : null;
+                    })()}
+                    <p className="text-xs text-gray-400">Ingredient-level notes appear when you expand each one after scanning.</p>
+                  </div>
                 )}
               </div>
             )}
@@ -2374,12 +2413,21 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </div>
                 </div>
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
-                  <p className="text-xs text-gray-400">Skin-specific notes will appear inside each ingredient when you expand it.</p>
-                )}
-                {activeSkinTypes.has("oily") && (
-                  <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 leading-relaxed">
-                    Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.
-                  </p>
+                  <div className="space-y-1.5 pt-1">
+                    {[...activeSkinTypes].map((t) => (
+                      <p key={t} className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 leading-relaxed">{SKIN_TYPE_NOTES[t]}</p>
+                    ))}
+                    {[...activeClimates].map((c) => (
+                      <p key={c} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{CLIMATE_NOTES[c]}</p>
+                    ))}
+                    {(() => {
+                      const watches = profileWatchCategories(activeSkinTypes, activeClimates);
+                      return watches.length > 0 ? (
+                        <p className="text-xs text-gray-400 pt-0.5">Flags: {watches.join(" · ")}.</p>
+                      ) : null;
+                    })()}
+                    <p className="text-xs text-gray-400">Ingredient-level notes appear when you expand each ingredient below.</p>
+                  </div>
                 )}
               </div>
             )}
