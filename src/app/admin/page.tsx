@@ -445,6 +445,7 @@ export default function AdminPage() {
   const [removingFromQueue, setRemovingFromQueue] = useState<string | null>(null);
   const [classifyAllResult, setClassifyAllResult] = useState<{ classified: number; skipped: number } | null>(null);
   const [upgradeStats, setUpgradeStats] = useState<{ weak: number; total: number } | null>(null);
+  const [upgradeRunning, setUpgradeRunning] = useState(false);
 
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannersLoading, setBannersLoading] = useState(false);
@@ -662,6 +663,23 @@ export default function AdminPage() {
       const data = await res.json();
       setUpgradeStats({ weak: data.weak ?? 0, total: data.total ?? 0 });
     } catch { }
+  }
+
+  async function runUpgradeBatch() {
+    setUpgradeRunning(true);
+    try {
+      const res = await fetch("/api/admin/upgrade-explanations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchSize: 20 }),
+      });
+      const data = await res.json();
+      setUpgradeStats((prev) => prev
+        ? { ...prev, weak: data.remaining ?? prev.weak }
+        : null
+      );
+    } catch { }
+    setUpgradeRunning(false);
   }
 
   async function removeFromQueue(item: QueueItem) {
@@ -2088,11 +2106,23 @@ export default function AdminPage() {
                       Check explanation coverage
                     </button>
                     {upgradeStats && (
-                      <span className={`text-xs ${upgradeStats.weak > 0 ? "text-amber-600" : "text-teal-600"}`}>
-                        {upgradeStats.weak > 0
-                          ? `${upgradeStats.weak} of ${upgradeStats.total} need curated explanation`
-                          : `All ${upgradeStats.total} explanations are curated`}
-                      </span>
+                      <>
+                        <span className={`text-xs ${upgradeStats.weak > 0 ? "text-amber-600" : "text-teal-600"}`}>
+                          {upgradeStats.weak > 0
+                            ? `${upgradeStats.weak} of ${upgradeStats.total} need curated explanation`
+                            : `All ${upgradeStats.total} explanations are curated`}
+                        </span>
+                        {upgradeStats.weak > 0 && (
+                          <button
+                            type="button"
+                            onClick={runUpgradeBatch}
+                            disabled={upgradeRunning}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 disabled:opacity-40"
+                          >
+                            {upgradeRunning ? "Upgrading…" : "Upgrade batch (20)"}
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

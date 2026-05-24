@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { classifyIngredient } from "@/lib/ingredient-classifier";
 import { generateExplanation } from "@/lib/generate-explanation";
+import { generateCuratedExplanation } from "@/lib/ai-explanation";
 import { getSensoryCategories, generateNotes } from "@/lib/curated-explanation";
 
 async function guard() {
@@ -28,7 +29,10 @@ export async function GET() {
   return NextResponse.json({ items: data ?? [] });
 }
 
-async function classifyOne(queueId: string): Promise<{ classified: boolean; alreadyExists: boolean }> {
+async function classifyOne(
+  queueId: string,
+  { withAI = false } = {},
+): Promise<{ classified: boolean; alreadyExists: boolean }> {
   const { data: item } = await supabaseAdmin
     .from("ingredient_queue").select("id, name").eq("id", queueId).maybeSingle();
   if (!item) return { classified: false, alreadyExists: false };
@@ -42,10 +46,20 @@ async function classifyOne(queueId: string): Promise<{ classified: boolean; alre
   }
 
   const cl = classifyIngredient(item.name);
-  const sensoryCategories = getSensoryCategories(item.name);
   const notes = generateNotes(cl);
   const skin_climate_notes = notes.length > 0 ? notes : null;
-  const explanation = generateExplanation(item.name, cl.status, cl.structural_category, cl.category, cl.flagged_category);
+
+  let explanation: string;
+  let explanation_source: "curated" | "template";
+  if (withAI) {
+    const result = await generateCuratedExplanation({ name: item.name, ...cl });
+    explanation = result.explanation;
+    explanation_source = result.source;
+  } else {
+    explanation = generateExplanation(item.name, cl.status, cl.structural_category, cl.category, cl.flagged_category)
+      ?? `${item.name} is a skincare ingredient.`;
+    explanation_source = "template";
+  }
 
   await supabaseAdmin.from("ingredients").insert({
     name: item.name,
@@ -54,7 +68,7 @@ async function classifyOne(queueId: string): Promise<{ classified: boolean; alre
     category: cl.category,
     flagged_category: cl.flagged_category,
     explanation,
-    explanation_source: "template",
+    explanation_source,
     skin_climate_notes,
   });
   await supabaseAdmin.from("ingredient_queue").delete().eq("id", queueId);
@@ -75,16 +89,17 @@ export async function POST(req: NextRequest) {
 
   if (action === "classify-one") {
     if (!queueId) return NextResponse.json({ error: "Missing queueId" }, { status: 400 });
-    const result = await classifyOne(queueId);
+    const result = await classifyOne(queueId, { withAI: true });
     return NextResponse.json({ ok: true, ...result });
   }
 
   if (action === "classify-all") {
+    // Bulk classification uses template explanations (fast, upgradeable via upgrade-explanations)
     const { data: allItems } = await supabaseAdmin
       .from("ingredient_queue").select("id").order("times_seen", { ascending: false }).limit(500);
     if (!allItems?.length) return NextResponse.json({ classified: 0, skipped: 0 });
 
-    const results = await Promise.allSettled(allItems.map((item) => classifyOne(item.id)));
+    const results = await Promise.allSettled(allItems.map((item) => classifyOne(item.id, { withAI: false })));
     const classified = results.filter((r) => r.status === "fulfilled" && (r.value as { classified: boolean }).classified).length;
     const skipped = results.filter((r) => r.status === "fulfilled" && !(r.value as { classified: boolean }).classified).length;
     return NextResponse.json({ classified, skipped });
