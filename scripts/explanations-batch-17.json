@@ -1,0 +1,122 @@
+[
+  {
+    "id": "54afb724-6e75-4059-bdbb-bd29d269ff0a",
+    "explanation": "Hydroxyacetophenone is a phenolic compound used in skincare as a mild preservative booster and antioxidant synergist that enhances the efficacy of other preservatives while contributing free-radical-scavenging activity. It is well-tolerated, non-sensitizing, and valued in clean-formula cosmetics as a paraben-free preservation alternative."
+  },
+  {
+    "id": "e541d1ba-4894-4e19-a8f4-6f330e031b10",
+    "explanation": "Hydroxyapatite is a naturally occurring calcium phosphate mineral — the primary mineral component of bones and teeth — used in skincare for its ability to adsorb heavy metals and impurities from the skin surface and in some formulas as a physical UV-scattering adjunct. It is biocompatible, non-sensitizing, and well-tolerated across skin types."
+  },
+  {
+    "id": "16fa14bf-c7ac-4040-bffd-5507a2340f51",
+    "explanation": "Hydroxycitronellal is a synthetic lily-of-the-valley fragrance compound classified as one of 26 known fragrance allergens required to be disclosed by name on EU cosmetic labels. It can trigger allergic contact dermatitis and an itch-and-scratch cycle on reactive or fragrance-sensitive skin, particularly with repeated leave-on exposure."
+  },
+  {
+    "id": "4808997f-eb52-4ca2-8f33-e7d6f54a511c",
+    "explanation": "Hydroxycitronellal — the trailing period is a data artifact from ingredient label parsing — is a synthetic lily-of-the-valley fragrance compound classified as one of 26 known EU fragrance allergens. It is a documented contact sensitizer that can trigger allergic contact dermatitis on reactive or fragrance-sensitive skin, particularly with repeated leave-on exposure."
+  },
+  {
+    "id": "ac555a71-7e2b-47c6-93b8-0ded2280d0e2",
+    "explanation": "Hydroxyethyl acrylate/sodium acryloyldimethyl taurate copolymer is a synthetic acrylate/sulfonic acid copolymer used as a rheology modifier and thickener in water-based serums and emulsions, providing a lightweight gel texture without heavy or greasy residue. It is considered well-tolerated and non-sensitizing at typical cosmetic use concentrations."
+  },
+  {
+    "id": "4203b031-404c-4bd7-af8e-41688cf116b8",
+    "explanation": "Hydroxyethyl urea is a urea derivative humectant that draws and retains water in the upper skin layers while providing mild keratin-softening activity similar to urea but with a gentler irritation profile. It is well-tolerated, non-irritating, and used in hydrating and softening formulas for dry and sensitive skin types."
+  },
+  {
+    "id": "3ea0cc18-f876-4cf9-a106-f98752138590",
+    "explanation": "Hydroxyethylcellulose is a water-soluble cellulose derivative used as a thickener, film-former, and binder in skincare formulas, providing gel-like consistency and improved texture without forming a heavy or occlusive film. It is considered inert, non-sensitizing, and well-tolerated across all skin types."
+  },
+  {
+    "id": "11f87ced-6bb7-42ea-87a5-3072d6b1d2e8",
+    "explanation": "Hydroxyethylpiperazine ethane sulfonic acid (HEPES) is a zwitterionic biological buffer used in skincare formulas as a pH stabilizer that maintains optimal formula acidity across temperature and storage time. It is considered well-tolerated and non-sensitizing — its function is formula stability rather than a skin-active benefit."
+  },
+  {
+    "id": "056427eb-d586-448e-9588-d83a76efcc41",
+    "explanation": "Hydroxypropyl cyclodextrin is a modified cyclic oligosaccharide used in skincare as an encapsulation and solubilization agent that forms inclusion complexes with fragrance molecules and actives to improve their stability, controlled release, and skin delivery. It is well-tolerated, non-sensitizing, and used in delivery-optimized formulas."
+  },
+  {
+    "id": "ece705c8-ea8a-4d56-8e21-3cd2219714c4",
+    "explanation": "Hydroxypropyl methylcellulose (HPMC) is a semi-synthetic cellulose ether used as a thickener, film-former, and viscosity modifier in skincare and ophthalmic formulas, providing smooth, even texture and controlled spreading. It is considered inert, non-irritating, and exceptionally well-tolerated across all skin types."
+  },
+  {
+    "id": "0c10f9be-5d4d-4b01-ab2a-3ab434989423",
+    "explanation": "Hydroxypropyl starch phosphate is a modified plant starch used as a thickener and film-former in skincare and hair care formulas, providing improved viscosity stability compared to unmodified starch. It is considered well-tolerated and non-sensitizing, functioning as a texture modifier rather than a skin-active ingredient."
+  },
+  {
+    "id": "0f4bfd0e-54f4-40cd-a6cf-1094dd87f20e",
+    "explanation": "Hydroxypropyltrimonium hyaluronate is a cationic quaternary ammonium-modified hyaluronic acid that carries a positive charge, enabling it to deposit more effectively on negatively charged skin and hair surfaces for enhanced moisture retention and conditioning compared to standard HA. It is well-tolerated and used in advanced hydrating formulas for its substantive delivery advantage."
+  },
+  {
+    "id": "0699ac65-dbe1-419e-a92d-3e1e94bb3059",
+    "explanation": "Hydroxypropyltrimonium hydrolyzed wheat protein is a cationic quaternary ammonium-modified wheat protein that binds strongly to negatively charged skin and hair surfaces to deliver strengthening, conditioning, and film-forming benefits. Those with wheat or gluten sensitivity should note the protein source, though hydrolysis generally reduces the antigenic capacity of the protein fragments."
+  },
+  {
+    "id": "33d052ba-667d-4d2a-91d7-9c32b1ec78f9",
+    "explanation": "Hydroxypropyltrimonium hydrolyzed wheat starch is a cationic modified wheat starch used as a conditioning and film-forming agent that binds to negatively charged skin and hair surfaces for improved texture and moisture retention. It is considered well-tolerated and is used in conditioning and feel-enhancement formulas."
+  },
+  {
+    "id": "85451312-0f3b-4834-b131-4fb0f41c254b",
+    "explanation": "Hypochlorous acid (HOCl) is a naturally occurring molecule produced by the body's own immune cells to fight pathogens, used in skincare at very low concentrations as a gentle antimicrobial, anti-inflammatory, and wound-supportive active. It is exceptionally well-tolerated — even on post-procedure, compromised, and reactive skin — and is used in calming mists, barrier-repair formulas, and acne-targeting products for its ability to reduce bacteria and inflammation without disrupting barrier recovery."
+  },
+  {
+    "id": "8a943a19-3487-4aae-a405-c003db043e8d",
+    "explanation": "Illicium verum (star anise) fruit extract provides trans-anethole, flavonoid antioxidants, and phenolic compounds with antimicrobial and free-radical-scavenging properties. It is generally well-tolerated at extract concentrations used in cosmetics, though those with sensitivity to anise or fennel compounds may wish to patch-test."
+  },
+  {
+    "id": "af101984-57bd-46ed-886a-acb46bead045",
+    "explanation": "Illicium verum (star anise) fruit extract provides trans-anethole and polyphenol antioxidants with antimicrobial and free-radical-scavenging properties. It is generally well-tolerated at typical extract concentrations in cosmetics, though individuals with sensitivity to anise or fennel may wish to patch-test."
+  },
+  {
+    "id": "d6872089-c81b-4028-a78f-1788d5879dae",
+    "explanation": "Illite is a phyllosilicate clay mineral with absorptive properties used in face masks, cleansers, and powders to bind excess sebum, impurities, and heavy metals from the skin surface. It is generally well-tolerated, non-sensitizing, and used in purifying and oil-controlling formulas for combination and oily skin."
+  },
+  {
+    "id": "f1f197ed-7e46-46b2-9282-d18754dd7638",
+    "explanation": "Imidazolidinyl urea is a formaldehyde-releasing preservative that slowly releases formaldehyde in a formula to inhibit microbial growth. Formaldehyde is a well-documented contact allergen and sensitizer — imidazolidinyl urea can trigger allergic contact dermatitis and an itch-and-scratch cycle on reactive or sensitive skin with repeated exposure, and is increasingly avoided in clean-formula skincare."
+  },
+  {
+    "id": "2a7ff0df-3912-4dd7-800d-a68aae06af8d",
+    "explanation": "Inulin lauryl carbamate is a naturally derived film-former from inulin (a plant fructooligosaccharide) modified with a fatty chain to improve its compatibility in oil-phase and emulsion systems. It is considered well-tolerated and non-sensitizing, used in natural-positioned formulas as a texturizer and film-former."
+  },
+  {
+    "id": "831e39f2-258d-40bf-94ee-b006e1a4e116",
+    "explanation": "Iodopropynyl butylcarbamate (IPBC) is a synthetic broad-spectrum preservative with strong antifungal activity used at low concentrations in rinse-off and leave-on cosmetics to prevent mold and yeast contamination. It is generally well-tolerated at approved concentrations, though it can cause contact dermatitis in sensitized individuals and is restricted from use in products for children under 3 in the EU."
+  },
+  {
+    "id": "e7a02122-7c83-46a1-9909-ab5c861115ad",
+    "explanation": "Iron oxide black (CI 77499) is a synthetic mineral pigment used in cosmetics to provide dark black and grey tones in foundations, eyeliners, and mascaras. It is considered inert, non-sensitizing, and well-tolerated — one of the most safety-established mineral pigments used in cosmetics across all application areas."
+  },
+  {
+    "id": "1b7e9ab2-3e74-4e68-992d-89d5dee639b8",
+    "explanation": "Iron oxide red (CI 77491) is a synthetic mineral pigment used in cosmetics to provide red, rust, and warm brown tones in foundations and color cosmetics. It is considered inert, non-sensitizing, and well-tolerated — a foundational mineral pigment in cosmetic skin-tone matching."
+  },
+  {
+    "id": "56293cf6-a1f2-4f2f-8892-43fa38b33887",
+    "explanation": "Iron oxide yellow (CI 77492) is a synthetic mineral pigment used in cosmetics to provide yellow and warm beige tones in foundations and color cosmetics. It is considered inert, non-sensitizing, and well-tolerated — a foundational mineral pigment in cosmetic skin-tone matching."
+  },
+  {
+    "id": "610e388c-17a5-4dc3-aeef-d63f658a5df4",
+    "explanation": "Iron oxide/CI 77491 is a dual listing of iron oxide red — a synthetic mineral pigment providing red and warm brown tones in cosmetics. It is inert, non-sensitizing, and well-tolerated across all skin types."
+  },
+  {
+    "id": "7304bee1-5350-4d1d-b433-d7017855a5f6",
+    "explanation": "Iron oxides (CI 77491/77492/77499) are synthetic mineral pigments — red, yellow, and black — used in foundations, tinted moisturizers, and color cosmetics to match skin tones across the full shade range. They are inert, non-sensitizing, and well-tolerated, and are approved for all cosmetic applications including eye area products."
+  },
+  {
+    "id": "ba1bd081-2665-4e72-8995-549444548b1d",
+    "explanation": "Isoamyl laurate is a lightweight synthetic ester emollient derived from isoamyl alcohol and lauric acid, providing a dry, non-greasy skin feel with good spreadability. It is considered well-tolerated, non-comedogenic, and used in lightweight moisturizers and sunscreens as a comfortable skin-feel enhancer."
+  },
+  {
+    "id": "0c432d48-fd52-401d-bcd1-4d27503ac7ae",
+    "explanation": "Isobutane is a liquefied petroleum gas used as a propellant in aerosol cosmetics including dry shampoos, setting sprays, and body sprays to deliver product as a fine mist or foam. It is considered safe in finished cosmetic products at topical exposure levels; the raw gas is flammable but poses no skin safety concern in normal product use."
+  },
+  {
+    "id": "b88aea96-be1e-4d2a-a097-2c0e66bda26f",
+    "explanation": "Isobutylparaben is a branched-chain paraben preservative with scrutiny for potential weak estrogenic activity in laboratory studies and is a known contact sensitizer in individuals with paraben sensitivity. It is among the more commonly avoided parabens by reactive skin users, though regulatory bodies consider it safe at approved concentrations in finished products."
+  },
+  {
+    "id": "53f3f5e5-ce6d-412a-a491-e53ec309c0a7",
+    "explanation": "Isoceteth-10 is a PEG-modified cetyl alcohol derivative used as a mild emulsifier and solubilizer in skincare formulas, helping to create stable emulsions and incorporate oil-soluble ingredients into water-based systems. It is generally well-tolerated, though individuals with PEG sensitivity should note the polyethylene glycol modification."
+  }
+]

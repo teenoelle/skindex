@@ -1,0 +1,122 @@
+[
+  {
+    "id": "a46e3bb0-b9c6-45ca-b051-99b5e4ff28ff",
+    "explanation": "CI 15850 (Red 7 Lake) is a synthetic azo dye pigment used to impart red tones to lip products, blush, and other cosmetics. It is insoluble (a 'lake' form), non-migrating, and considered well-tolerated at typical cosmetic concentrations — though azo dyes as a class can occasionally cause contact reactions in highly sensitive individuals."
+  },
+  {
+    "id": "5b66ba29-37db-42b8-ac22-cb2203a93eb1",
+    "explanation": "CI 16035 (Red 40) is a synthetic azo dye used to impart bright red tones to cosmetics and personal care products. It is one of the most widely used synthetic colorants globally, considered well-tolerated in topical use at typical concentrations."
+  },
+  {
+    "id": "a63bdedb-b6ce-43d1-8378-d3da2354a66e",
+    "explanation": "CI 16035 / Red 40 is a synthetic azo dye used to impart bright red tones to cosmetics and personal care products. It is one of the most widely used synthetic colorants globally, considered well-tolerated in topical use at typical concentrations."
+  },
+  {
+    "id": "ef9fb75e-6a81-4154-8897-fdb12f0969f0",
+    "explanation": "CI 19140 (Yellow 5 / Tartrazine) is a synthetic azo dye used to impart yellow tones to cosmetics. It is widely used and considered well-tolerated in topical formulas, though a small subset of aspirin-sensitive individuals may also react to tartrazine — relevant mainly for ingested products."
+  },
+  {
+    "id": "b813e54b-0baf-45dc-b2fd-222d660207d5",
+    "explanation": "CI 19140 / Yellow 5 (tartrazine) is a synthetic azo dye used to impart yellow tones to cosmetics and personal care products. It is widely used and well-tolerated topically, though a small subset of aspirin-sensitive individuals may react — primarily a concern for ingested rather than applied products."
+  },
+  {
+    "id": "7c4ea8ba-0017-4747-b7e9-21ec07d53b98",
+    "explanation": "CI 42090 (Blue 1 / Brilliant Blue FCF) is a synthetic triphenylmethane dye used to impart blue tones to cosmetics and haircare products. It is considered well-tolerated in topical applications at typical use concentrations."
+  },
+  {
+    "id": "720f96af-80a1-468a-b3c5-427098cd0f20",
+    "explanation": "CI 77007 (ultramarines) is a mineral pigment — a complex sodium aluminum sulfosilicate — used to produce blue, violet, and pink tones in cosmetics. It is inert, well-tolerated, and non-sensitizing, making it a popular choice in mineral makeup and eyeshadows."
+  },
+  {
+    "id": "1b53971e-6a44-4d37-9b40-9cb636753122",
+    "explanation": "CI 77491 (iron oxide red) is a synthetic mineral pigment composed of ferric oxide (Fe₂O₃), used to produce red and brown tones in foundations, concealers, and lip products. It is inert, non-sensitizing, and exceptionally well-tolerated — one of the most skin-compatible colorant options available."
+  },
+  {
+    "id": "f62754c1-1848-437b-bcc8-bd0de4f01804",
+    "explanation": "CI 77492 (iron oxide yellow) is a synthetic mineral pigment composed of iron oxyhydroxide (FeO(OH)), used to produce yellow and golden tones in foundations and cosmetics. It is inert, non-sensitizing, and exceptionally well-tolerated — one of the most skin-compatible colorant options available."
+  },
+  {
+    "id": "973ecb50-d2b1-4f83-abf4-c42a25aae543",
+    "explanation": "CI 77499 (iron oxide black) is a synthetic mineral pigment composed of magnetite (Fe₃O₄), used to produce dark brown and black tones in eye makeup, foundations, and concealers. It is inert, non-sensitizing, and exceptionally well-tolerated — among the most skin-compatible colorants used in cosmetics."
+  },
+  {
+    "id": "f1620bd4-f030-40a4-8163-4538d498a82a",
+    "explanation": "CI 77499 / Iron Oxides (iron oxide black, Fe₃O₄) is a synthetic mineral pigment used to produce dark brown and black tones in foundations, concealers, and eye products. It is inert, non-sensitizing, and exceptionally well-tolerated — among the most skin-compatible colorants in cosmetics."
+  },
+  {
+    "id": "723b0221-3e0e-4b34-8a41-02086bc0f3ef",
+    "explanation": "CI 77499 / Iron Oxides (iron oxide black, Fe₃O₄) is a synthetic mineral pigment producing dark tones in foundations and eye makeup. It is inert, non-sensitizing, and exceptionally well-tolerated."
+  },
+  {
+    "id": "37458111-7fee-4968-8f5b-d6ccbb54a78f",
+    "explanation": "CI 77891 (titanium dioxide) is a mineral pigment and UV filter that provides bright white opacity in cosmetics and broad-spectrum UVB and short UVA protection in sunscreens. The pigment-grade form used for color is inert and exceptionally well-tolerated, making it a cornerstone of mineral makeup formulation."
+  },
+  {
+    "id": "f0e8d79c-4ed6-44bb-b094-9d916ef92fa7",
+    "explanation": "CI 77891 / Titanium Dioxide is a mineral UV filter and white pigment that provides broad-spectrum UVB and short-UVA sun protection as well as white opacity in cosmetics. It is non-sensitizing, photostable, and exceptionally well-tolerated — the mineral UV filter of choice for reactive and sensitive skin."
+  },
+  {
+    "id": "32a69fa6-10b7-4340-a95e-987f5241a627",
+    "explanation": "CI 77891 / Titanium Dioxide is a mineral UV filter and white pigment providing broad-spectrum UVB and short-UVA protection and white opacity in cosmetics. It is non-sensitizing, photostable, and exceptionally well-tolerated — the preferred mineral UV filter for reactive and sensitive skin."
+  },
+  {
+    "id": "cafa4c05-1617-4884-bdbc-e4e6276d1e70",
+    "explanation": "Cinnamomum camphora (camphor tree) bark oil is an essential oil with a high camphor content used in fragrances and cooling formulations, but is a known contact sensitizer and irritant. Camphor penetrates skin readily and can cause contact dermatitis, worsen itch, and in high concentrations is neurotoxic — it is particularly problematic on reactive, barrier-compromised, or sensitive skin."
+  },
+  {
+    "id": "3c4ff35f-00b5-4d75-91a4-4d29238ed9e8",
+    "explanation": "Cinnamomum cassia (cinnamon/cassia) bark extract is a botanical antioxidant rich in polyphenols, flavonoids, and cinnamaldehyde with free-radical-scavenging and mild antimicrobial properties. It is generally well-tolerated at low concentrations in rinse-off and leave-on formulas, though concentrated cinnamaldehyde can cause contact irritation on reactive skin — patch-testing is advisable."
+  },
+  {
+    "id": "02a91172-ce4f-40e6-9405-c069cfd56944",
+    "explanation": "Citral is a terpene aldehyde (a mixture of geranial and neral) found in many citrus and lemongrass essential oils, classified as one of 26 known fragrance allergens required to be disclosed by name on EU cosmetic labels. It can trigger allergic contact dermatitis and an itch-and-scratch cycle on reactive or fragrance-sensitive skin, and is particularly problematic in leave-on products at higher concentrations."
+  },
+  {
+    "id": "7df9ac12-3a4f-47d8-9909-375ecea4dc52",
+    "explanation": "Citric acid is a naturally occurring alpha-hydroxy acid (AHA) derived from citrus fruits, used primarily as a pH adjuster in skincare formulas and secondarily as a mild exfoliant at higher concentrations. At the low levels used for pH adjustment it is well-tolerated by all skin types; at higher exfoliant concentrations it can cause tingling or irritation on reactive or barrier-compromised skin."
+  },
+  {
+    "id": "04c62f2b-799a-4b28-9203-8a9c13daebb8",
+    "explanation": "Citric acid is a naturally occurring alpha-hydroxy acid derived from citrus fruits, used primarily as a pH adjuster in skincare formulas and secondarily as a mild exfoliant at higher concentrations. At the low levels used for pH adjustment it is well-tolerated by all skin types; at higher exfoliant concentrations it can cause tingling or irritation on reactive or barrier-compromised skin."
+  },
+  {
+    "id": "fc35d444-63f6-426e-bf89-a3231026282d",
+    "explanation": "Citronellol is a terpene alcohol found naturally in rose, geranium, and citronella essential oils, classified as one of 26 known fragrance allergens required to be disclosed by name on EU cosmetic labels. It can trigger allergic contact dermatitis and an itch-and-scratch cycle on reactive or fragrance-sensitive skin, particularly in leave-on products with repeated exposure."
+  },
+  {
+    "id": "1396601b-d436-4d98-a5e6-5f819868c3db",
+    "explanation": "Citrullus lanatus (watermelon) fruit extract is rich in lycopene, vitamin C, and citrulline with antioxidant and skin-conditioning properties that protect against free-radical damage and support hydration. It is well-tolerated and used in brightening and protective formulas for its antioxidant activity and refreshing quality."
+  },
+  {
+    "id": "80f0449d-dd70-4087-b901-2d34e7f047c9",
+    "explanation": "Citrullus lanatus (watermelon) seed oil is a lightweight plant oil pressed from watermelon seeds, high in linoleic and oleic fatty acids with a dry, fast-absorbing skin feel. It is well-tolerated, has low comedogenic potential, and is particularly suited to oily, combination, and acne-prone skin types for its barrier-supporting fatty acid profile."
+  },
+  {
+    "id": "e2c6f924-bd5e-4f53-9ce9-3630a0a416b6",
+    "explanation": "Citrus aurantifolia (lime) fruit extract is a botanical antioxidant providing vitamin C and flavonoids with free-radical-scavenging and brightening properties. Like other citrus fruit extracts, it may contain trace furanocoumarins that can cause phototoxic reactions on reactive or fair skin in leave-on formulas — it is safer in rinse-off products or when sun exposure is avoided after application."
+  },
+  {
+    "id": "48c11a8c-6a0b-430a-84f1-7e6a5b911039",
+    "explanation": "Citrus aurantifolia (lime) extract is a botanical antioxidant containing vitamin C and flavonoids with brightening and free-radical-scavenging properties. Like other citrus extracts, it may contain trace furanocoumarins with phototoxic potential on reactive or fair skin in leave-on formulas — rinse-off use or post-application sun avoidance reduces this risk."
+  },
+  {
+    "id": "98ecc86b-2d4f-4943-ad30-a0400e833deb",
+    "explanation": "Citrus aurantifolia (lime) fruit extract is a botanical antioxidant with vitamin C and flavonoids providing brightening and free-radical-scavenging benefits. Like other citrus fruit extracts, trace furanocoumarins may cause phototoxic reactions on reactive or fair skin in leave-on products — rinse-off use or sun avoidance after application reduces this risk."
+  },
+  {
+    "id": "1b3de7be-7c79-45fd-b0d6-23c2a9f4aa85",
+    "explanation": "Citrus aurantium bergamia (bergamot) fruit oil is a citrus essential oil used for its distinctive floral-citrus scent, but contains bergapten, a furanocoumarin that causes phototoxic reactions on skin exposed to sunlight — producing burns, hyperpigmentation, and lasting skin damage. It is also a contact sensitizer and should be avoided in leave-on products unless verified to be bergapten-free (FCF grade); even FCF bergamot oil carries sensitization risk from limonene and linalool content."
+  },
+  {
+    "id": "37c611d5-a592-4e54-9852-efa20b356dcf",
+    "explanation": "Citrus aurantium dulcis (sweet orange) oil is a cold-pressed citrus essential oil with a bright, fresh scent, but is a contact sensitizer — primarily due to its high limonene content (up to 97%), which oxidizes on skin to form sensitizing compounds. It can trigger allergic contact dermatitis and an itch-and-scratch cycle on reactive or fragrance-sensitive skin, particularly with repeated leave-on exposure."
+  },
+  {
+    "id": "d06ec533-cd62-4693-9bb6-82c755f235d4",
+    "explanation": "Citrus aurantium dulcis (sweet orange) fruit extract is a botanical antioxidant providing vitamin C, flavonoids, and hesperidin with brightening and free-radical-scavenging properties. Unlike the essential oil, the extract form does not typically contain high concentrations of sensitizing limonene and is considered well-tolerated by most skin types."
+  },
+  {
+    "id": "d412b0a3-2a0b-4834-ba78-d315eb06d631",
+    "explanation": "Citrus aurantium dulcis (sweet orange) oil is a cold-pressed citrus essential oil with a bright scent but high sensitization risk — primarily due to its limonene content (up to 97%), which oxidizes on skin to form allergenic compounds. It can trigger allergic contact dermatitis and an itch-and-scratch cycle on reactive or fragrance-sensitive skin, particularly with repeated leave-on exposure."
+  }
+]

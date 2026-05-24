@@ -1,0 +1,122 @@
+[
+  {
+    "id": "a9e1e452-17ae-4766-a405-8340418f1574",
+    "explanation": "Fragrance is a catch-all label for an undisclosed blend of scenting compounds — a formula can legally contain dozens of sensitizing chemicals under this single term without individually naming them. It is the leading cause of contact dermatitis in skincare, and can trigger allergic reactions and an itch-and-scratch cycle on reactive or fragrance-sensitive skin; fragrance-free formulas are consistently recommended for anyone with reactive, sensitive, or compromised skin."
+  },
+  {
+    "id": "c9a2f39d-c769-46e2-8d85-b7d3609d2fac",
+    "explanation": "Fragrance (parfum) is the dual English/French listing of an undisclosed scent blend — the same ingredient listed as either 'fragrance' or 'parfum' on international labels. A formula can legally contain dozens of sensitizing compounds under this single term, making it the leading cause of allergic contact dermatitis in skincare; fragrance-free products are the safest choice for reactive or sensitive skin."
+  },
+  {
+    "id": "9f749430-d0eb-430b-b671-f6ce1d5485f6",
+    "explanation": "This listing appears to indicate the presence of EU-regulated fragrance allergens disclosed collectively rather than by individual name — a data artifact from ingredient label parsing rather than a standard INCI ingredient. Products containing known fragrance allergens should be used with caution by anyone with reactive or fragrance-sensitive skin."
+  },
+  {
+    "id": "75bad4a1-c1fa-4e1e-9943-3d949b1b2aa3",
+    "explanation": "Fructooligosaccharides (FOS) are short-chain prebiotic sugars derived from plants including chicory and agave, used in skincare to selectively nourish beneficial skin microbiome bacteria and support skin barrier integrity. They are well-tolerated and used in microbiome-focused and calming formulas for their ability to promote a balanced skin environment and reduce irritation."
+  },
+  {
+    "id": "ed9ceed2-21aa-49cd-8db1-62d09fd8a72d",
+    "explanation": "Fructose is a simple plant-derived sugar used in skincare as a humectant that draws moisture to the skin surface and helps retain it in the upper skin layers. It is well-tolerated, non-irritating, and is included in hydrating formulas for its moisture-binding properties and gentle conditioning effects."
+  },
+  {
+    "id": "94136204-e7db-48a0-9557-55a6d2241d53",
+    "explanation": "Malus domestica fruit cell culture extract (apple stem cell extract) is derived from the callus cells of a rare Swiss apple variety, marketed for its purported ability to support skin stem cell longevity and delay signs of aging. The underlying stem cell research is in human hair follicles, not skin, and the extract in a finished formula contains no live cells — its actual benefits come from phytonutrients and antioxidants it delivers; it is well-tolerated and non-sensitizing."
+  },
+  {
+    "id": "c15aca09-5738-488e-b57f-775c6a672af7",
+    "explanation": "Ganoderma lucidum (reishi mushroom) extract is an adaptogenic fungal ingredient rich in beta-glucans, triterpenoids, and polysaccharides with antioxidant, anti-inflammatory, and immune-modulating properties. It is well-tolerated and used in anti-aging and calming formulas for its ability to protect skin from oxidative stress and support barrier function."
+  },
+  {
+    "id": "61b25f66-d8e2-4ae2-a745-66f18b179d9f",
+    "explanation": "Garcinia mangostana (mangosteen) peel extract is one of the richest botanical sources of xanthones — a class of polyphenol with potent antioxidant and anti-inflammatory activity. It is well-tolerated and used in brightening and protective formulas for its exceptional free-radical-scavenging capacity."
+  },
+  {
+    "id": "20b4b5ae-072c-49e2-87cb-17e3fa74c7c6",
+    "explanation": "Gardenia florida (gardenia) fruit extract contains genipin, iridoid glycosides, and antioxidant polyphenols with free-radical-scavenging and skin-conditioning properties. It is well-tolerated and used in brightening and protective formulas for its antioxidant content."
+  },
+  {
+    "id": "6e20e3d0-bd7e-4d0d-b759-84d923cca1f4",
+    "explanation": "Gaultheria procumbens (wintergreen) leaf extract provides methyl salicylate and polyphenol antioxidants with anti-inflammatory and mild exfoliating properties from its salicylate content. It is generally well-tolerated at extract concentrations, though the methyl salicylate component can cause irritation on reactive skin and cross-reacts with aspirin sensitivity in some individuals."
+  },
+  {
+    "id": "dc8636da-9129-441c-b2d1-e987462cee1f",
+    "explanation": "Gaultheria procumbens (wintergreen) leaf extract provides methyl salicylate and polyphenol antioxidants with anti-inflammatory and mild salicylate-type exfoliating activity. It is generally well-tolerated at typical extract concentrations, though individuals with aspirin or salicylate sensitivity should approach with caution."
+  },
+  {
+    "id": "c28e3a1b-8334-450a-938a-99a23122d368",
+    "explanation": "Geraniol is a terpene alcohol found in rose, geranium, and many other essential oils, classified as one of 26 known fragrance allergens required to be disclosed by name on EU cosmetic labels. It can trigger allergic contact dermatitis and an itch-and-scratch cycle on reactive or fragrance-sensitive skin, particularly with repeated leave-on exposure."
+  },
+  {
+    "id": "3c416cce-75b0-410e-a933-a7c02e86e9dd",
+    "explanation": "Ginkgo biloba extract is derived from the ginkgo tree's leaves and is rich in flavone glycosides (quercetin, kaempferol) and terpene trilactones (ginkgolides) with potent antioxidant and circulation-stimulating properties. It is well-tolerated and used in anti-aging and protective formulas for its broad-spectrum free-radical-scavenging activity."
+  },
+  {
+    "id": "b2400464-5e41-4edf-abe2-2bad2e216e83",
+    "explanation": "Ginkgo biloba leaf extract concentrates the tree's flavone glycosides and ginkgolide terpenes with potent antioxidant and vasodilatory properties. It is well-tolerated and used in anti-aging and brightening formulas for its ability to neutralize free radicals and support microcirculation."
+  },
+  {
+    "id": "e507aa75-f272-48e4-b561-2dea74c3b458",
+    "explanation": "Ginko biloba leaf extract is an alternate spelling of ginkgo biloba leaf extract — a well-studied antioxidant botanical rich in flavone glycosides and terpene trilactones that protect skin from oxidative stress and support microcirculation. It is well-tolerated and used in anti-aging and protective formulas."
+  },
+  {
+    "id": "3553d155-469c-47c3-9aae-d6cefff19d1e",
+    "explanation": "Gluconolactone is a polyhydroxy acid (PHA) exfoliant derived from gluconic acid that resurfaces and brightens skin similarly to AHAs but with significantly lower irritation potential due to its larger molecular size and slower penetration. It is exceptionally well-tolerated — even by reactive, sensitized, and rosacea-prone skin — and also acts as a mild chelating agent and antioxidant in formulas."
+  },
+  {
+    "id": "167b755b-4375-4b02-b7b9-9d61e3f55b2b",
+    "explanation": "Glucose is a simple sugar used in skincare as a humectant and substrate for fermentation-derived ingredients, drawing moisture to the skin surface and helping retain it in the upper skin layers. It is well-tolerated, non-irritating, and is included in hydrating formulas for its moisture-binding and gentle conditioning properties."
+  },
+  {
+    "id": "2e9d87b5-8443-49ab-8308-88c53d643d74",
+    "explanation": "Glutathione is the body's most abundant endogenous antioxidant — a tripeptide that neutralizes free radicals, recycles vitamins C and E, and inhibits melanin synthesis by interfering with tyrosinase activity, making it both an antioxidant and a brightening active. It is well-tolerated and non-irritating, used in brightening and protective serums for its dual antioxidant and pigment-reducing activity."
+  },
+  {
+    "id": "0b3db44a-8893-4573-a808-405157ca8c21",
+    "explanation": "Glycereth-26 is a PEG-modified polyglycerin derivative used as a humectant and emollient that provides moisture retention with a lighter, less tacky feel than pure glycerin. It is generally well-tolerated, though individuals with PEG sensitivity should note the polyethylene glycol modification."
+  },
+  {
+    "id": "a3517009-4cee-4323-b846-3c7074d18315",
+    "explanation": "Glycerin (glycerol) is the most widely used humectant in skincare — a naturally derived triol that draws water from the atmosphere and deeper skin layers to hydrate the stratum corneum while reinforcing the skin's own natural moisturizing factor. It is exceptionally well-tolerated by all skin types including sensitive and reactive, non-comedogenic, and considered a gold-standard moisturizing ingredient with decades of safety data."
+  },
+  {
+    "id": "b2b5770c-8f8e-4ffb-b008-e3e564f7e4eb",
+    "explanation": "Glycerine is an alternate spelling of glycerin (glycerol) — the same widely used humectant that draws water to the stratum corneum and reinforces the skin's natural moisturizing factor. It is exceptionally well-tolerated by all skin types and is a gold-standard moisturizing ingredient."
+  },
+  {
+    "id": "ea96c49b-f68c-4c63-81dd-fb6ee68ee0c5",
+    "explanation": "Glyceryl acrylate/acrylic acid copolymer is a synthetic polymer used as a thickener and moisture-binding film-former in skincare formulas, helping to retain water on the skin surface while contributing to formula texture. It is considered well-tolerated and non-sensitizing across skin types."
+  },
+  {
+    "id": "da17f8ef-234a-4b59-9a55-cc09806eada0",
+    "explanation": "Glyceryl behenate is a glyceryl ester of behenic acid (C22 fatty acid) used as an emollient and emulsifier in creams and anhydrous formulas, contributing a smooth texture and mild thickening effect. It is well-tolerated and non-irritating across skin types."
+  },
+  {
+    "id": "d927d9e7-fce3-40e2-98b8-c39d7d4d11c1",
+    "explanation": "Glyceryl caprylate is a glyceryl ester of caprylic acid (from coconut oil) used as a mild emulsifier and preservative booster with natural antimicrobial activity against bacteria and yeast. It is well-tolerated and is commonly used in preservative-sensitive and natural-positioned formulas as part of a multifunctional preservative system."
+  },
+  {
+    "id": "4f6a813d-7607-4b4e-bd34-af09b3e13a32",
+    "explanation": "Glyceryl cocoate is a glyceryl ester of coconut fatty acids used as a mild emulsifier and skin conditioner in cleansers and moisturizers. It is well-tolerated and contributes a soft, smooth skin feel while helping to stabilize emulsions."
+  },
+  {
+    "id": "5ac727f1-854b-44f6-9dae-f689a55228ad",
+    "explanation": "Glyceryl glucoside is a natural glucoside of glycerin found in desert resurrection plants, used in skincare as a humectant and aquaporin-3 activator — it helps upregulate the skin's own water channel proteins to improve long-term moisture retention. It is exceptionally well-tolerated and used in hydrating formulas for its dual moisture-drawing and cellular hydration-signaling properties."
+  },
+  {
+    "id": "e7f4747a-4004-4fd6-9d31-7a79b94f6aaf",
+    "explanation": "Glyceryl laurate is a glyceryl ester of lauric acid used as a mild emulsifier with documented antimicrobial activity against gram-positive bacteria and Candida species. It is well-tolerated and is used in both cleansing and leave-on formulas as an emulsifier and mild preservative component."
+  },
+  {
+    "id": "05f61322-fb20-4d91-a98d-e50ecd182736",
+    "explanation": "Glyceryl stearate is one of the most widely used emulsifiers in skincare, derived from glycerin and stearic acid, used to create stable oil-in-water emulsions with a smooth, creamy texture. It is non-sensitizing, non-comedogenic, and exceptionally well-tolerated across all skin types — a standard and extensively safety-tested emulsifier in moisturizers and lotions."
+  },
+  {
+    "id": "474fdc43-5c00-440f-8ac0-a104e077a85a",
+    "explanation": "Glycine is the simplest amino acid and a component of the skin's natural moisturizing factor (NMF), used in skincare as a humectant and skin-conditioning agent that supports water retention and barrier integrity. It is biocompatible, non-irritating, and well-tolerated across all skin types."
+  },
+  {
+    "id": "e9393d77-98c1-4f05-9ab5-ac9ca3f35f88",
+    "explanation": "Glycine max (soybean) seed extract is rich in isoflavones (genistein, daidzein), phospholipids, and vitamin E with antioxidant, brightening, and mild estrogenic skin-conditioning properties. It is generally well-tolerated and used in anti-aging and brightening formulas, though individuals with soy allergies should note the botanical source."
+  }
+]

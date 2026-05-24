@@ -1,0 +1,50 @@
+[
+  {
+    "id": "3e331169-72d0-469f-b706-03c6e2f163e9",
+    "explanation": "Yogurt powder is dried fermented dairy providing lactic acid, proteins, amino acids, and probiotic metabolites with mild exfoliating (AHA), conditioning, and barrier-supporting properties from Lactobacillus fermentation. It is generally well-tolerated at cosmetic concentrations and used in conditioning and brightening formulas for its natural lactic acid and nutrient content; individuals with dairy allergy should note its milk-protein origin."
+  },
+  {
+    "id": "41121ae2-ba81-49ad-ac2b-083cc9bad318",
+    "explanation": "The asterisk indicates organic certification; Yucca brevifolia (Joshua tree) root extract provides steroidal saponins with natural surfactant, anti-inflammatory, and skin-conditioning properties. It is generally well-tolerated at cosmetic extract concentrations and used in natural cleansing and soothing formulas for its saponin and antioxidant content."
+  },
+  {
+    "id": "e1bc95b3-b5cf-4579-b6bf-5703116569d8",
+    "explanation": "Zanthoxylum piperitum (Sichuan pepper) fruit extract provides hydroxy-alpha-sanshool alkaloids and polyphenol antioxidants with anti-inflammatory, circulation-stimulating, and free-radical-scavenging properties. It is generally well-tolerated at cosmetic extract concentrations and used in energizing and protective formulas for its bioactive alkaloid and antioxidant content."
+  },
+  {
+    "id": "7953b9a9-44eb-44d0-85d4-91ff9dcad581",
+    "explanation": "Zea mays (corn) kernel extract provides zeaxanthin, lutein, and polyphenol antioxidants with free-radical-scavenging and photoprotective properties. It is well-tolerated and used in protective and antioxidant formulas for its carotenoid and polyphenol content."
+  },
+  {
+    "id": "c506c306-af7d-4dcd-87bd-6e6bd162c45a",
+    "explanation": "Zea mays (corn) oil is a plant oil with a favorable linoleic acid (~55%) and oleic acid (~25%) balance providing emollient and barrier-supporting properties. It is well-tolerated by most skin types; its moderate oleic and saturated fatty acid content gives it some comedogenic potential at higher concentrations in acne-prone or congestion-prone skin."
+  },
+  {
+    "id": "ebe60b65-1566-4270-87b1-3540293f571d",
+    "explanation": "Zea mays (corn) starch is used in cosmetics as a natural thickener, absorbent, and skin-feel modifier that provides a soft, silky, talc-like texture in powders and color cosmetics. It is considered well-tolerated, biodegradable, and used in natural-positioned formulas as an eco-friendly texturizer and oil absorbent."
+  },
+  {
+    "id": "0e8a7b87-de4e-40b7-b977-bcf7208d0ee2",
+    "explanation": "This dual INCI/common name listing identifies the same ingredient — Zea Mays Starch (corn starch) — a natural thickener, absorbent, and skin-feel modifier that provides a soft, silky texture in powders and color cosmetics. It is well-tolerated, biodegradable, and used as an eco-friendly texturizer."
+  },
+  {
+    "id": "42c0d59e-8910-4588-bf32-5caff972bdf7",
+    "explanation": "Zinc (listed generically) refers to elemental zinc or an unspecified zinc compound used for its documented antimicrobial activity against Cutibacterium acnes, sebum-regulating, and anti-inflammatory properties relevant to acne-prone and oily skin. The specific bioavailability and tolerability depend on the exact zinc salt or compound used in the formula."
+  },
+  {
+    "id": "dba0c642-c9a3-4132-85f7-cb3bf9345653",
+    "explanation": "The soft hyphen in '­Gluconate' is a data artifact from ingredient label parsing; this is zinc gluconate — a water-soluble zinc salt used in skincare as a sebum-regulating, antimicrobial, and anti-inflammatory active with documented efficacy against Cutibacterium acnes and inflammatory blemishes. It is well-tolerated, non-irritating, and used in blemish-targeting and soothing formulas for its multifunctional zinc activity."
+  },
+  {
+    "id": "f982a265-52ae-4348-9b95-c78f76737772",
+    "explanation": "Zinc oxide is a physical/mineral UV filter that scatters and reflects both UVA and UVB radiation without systemic absorption, providing the broadest single-filter sun protection spectrum available and the only UV filter approved by the FDA for both UVA and UVB protection. It is exceptionally well-tolerated — the preferred UV filter for sensitive, reactive, acne-prone, and post-procedure skin — though the standard particle size can leave a white cast that nano-sized variants partially address."
+  },
+  {
+    "id": "6fd9dc05-252c-4e3c-a464-3e10d4d0007c",
+    "explanation": "Zinc stearate is the zinc salt of stearic acid used in cosmetics as a mild astringent, slip enhancer, and anticaking agent in powders and color cosmetics, providing a smooth application feel and mild antimicrobial properties from its zinc content. It is considered well-tolerated and non-sensitizing at typical cosmetic concentrations."
+  },
+  {
+    "id": "131cdb50-b81d-4559-8b40-29938c01e6a9",
+    "explanation": "Zingiber officinale (ginger) root extract provides gingerols, shogaols, and zingerone antioxidants with potent anti-inflammatory, circulation-stimulating, and free-radical-scavenging properties. It is generally well-tolerated at cosmetic extract concentrations and used in warming and protective formulas for its anti-inflammatory and antioxidant content; it does not share the sensitization risk of ginger essential oil."
+  }
+]
