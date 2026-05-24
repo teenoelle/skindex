@@ -304,6 +304,12 @@ const UNIVERSAL_CONCERN_CATEGORIES = new Set([
   "biocide",
 ]);
 
+const SENSORY_CATEGORY_LABEL: Record<string, string> = {
+  "chemical-itch": "Contact Allergen",
+  "occlusive-itch": "Heat Trap",
+  "comedogenic-itch": "Pore-blocking",
+};
+
 const SENSORY_PROFILE_MAP: Partial<Record<string, SkinType[]>> = {
   "Stinging": ["reactive", "damaged_barrier"],
   "chemical-itch": ["reactive", "damaged_barrier"],
@@ -2638,7 +2644,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             type SectionId = "flagged" | "sensory" | "photo";
             const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
 
-            const RINSE_OFF_SUPPRESS_SENSORY = ["Pilling", "Film-forming"];
+            const RINSE_OFF_SUPPRESS_SENSORY = ["Pilling", "Film-forming", "occlusive-itch", "comedogenic-itch"];
             const visibleSensory = isRinseOff
               ? (result.sensoryTrigger ?? []).filter((s) => !s.sensory_category || !RINSE_OFF_SUPPRESS_SENSORY.includes(s.sensory_category))
               : (result.sensoryTrigger ?? []);
@@ -2807,6 +2813,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Occlusive") && (
                       <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">traps congestion</span>
                     )}
+                    {visibleSensory.some((s) => s.sensory_category === "chemical-itch") && (
+                      <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">contact allergens</span>
+                    )}
                   </div>
                   {isRinseOff && suppressedSensory > 0 && (
                     <p className="text-xs text-gray-400 mb-2">{suppressedSensory} ingredient{suppressedSensory !== 1 ? "s" : ""} (pilling, film-forming) suppressed — these require prolonged skin contact to cause problems and are not a concern in rinse-off products.</p>
@@ -2862,7 +2871,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               {item.sensory_category && (
                                 <>
                                   <span className="text-gray-300 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-amber-700 shrink-0">{item.sensory_category}</span>
+                                  <span className="text-xs text-amber-700 shrink-0">{SENSORY_CATEGORY_LABEL[item.sensory_category] ?? item.sensory_category}</span>
                                 </>
                               )}
                               {item.sensory_category === "Film-forming" && (
@@ -2875,6 +2884,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                 <>
                                   <span className="text-gray-200 text-xs shrink-0">·</span>
                                   <span className="text-xs text-gray-400 shrink-0">traps congestion</span>
+                                </>
+                              )}
+                              {item.sensory_category === "comedogenic-itch" && (
+                                <>
+                                  <span className="text-gray-200 text-xs shrink-0">·</span>
+                                  <span className="text-xs text-gray-400 shrink-0">pore-blocking</span>
                                 </>
                               )}
                             </span>
