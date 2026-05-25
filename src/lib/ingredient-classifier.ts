@@ -50,6 +50,7 @@ const SULFATE_SURFACTANTS = new Set([
 const SENSITIZING_PRESERVATIVES = new Set([
   "methylisothiazolinone","methylchloroisothiazolinone","benzisothiazolinone","mit","cmit",
   "triclosan","triclocarban",
+  "iodopropynyl butylcarbamate","ipbc",
 ]);
 
 // ── Classify ────────────────────────────────────────────────────────────────
@@ -152,6 +153,29 @@ export function classifyIngredient(rawName: string): Classification {
 }
 
 function detectStructural(name: string): string | null {
+  // Iron oxides — cosmetic colorants
+  if (name.includes("iron oxide") || (name.startsWith("ci ") && /ci \d/.test(name)))
+    return "Colorant";
+  // Anti-Malassezia actives
+  if (["zinc pyrithione","pyrithione zinc","zinc pyridine thiol"].includes(name) || name.includes("zinc pyrithione") || name.includes("pyrithione zinc"))
+    return "Active";
+  if (["selenium sulfide","selenium disulfide"].includes(name))
+    return "Active";
+  if (name === "piroctone olamine" || name === "piroctone ethanolamine")
+    return "Active";
+  // Iodine antimicrobials
+  if (["povidone-iodine","pvp-iodine","polyvinylpyrrolidone iodine","potassium iodide","sodium iodide"].includes(name))
+    return "Active";
+  // Manganese compounds
+  if (["manganese gluconate","manganese sulfate","manganese pca"].includes(name))
+    return "Active";
+  // Additional selenium
+  if (name === "selenium" || name === "selenium methionine" || name === "selenomethionine")
+    return "Active";
+  // Zinc coceth sulfate — antimicrobial surfactant (anti-Malassezia), must check before generic surfactant rule
+  if (name === "zinc coceth sulfate")
+    return "Surfactant";
+
   if (["gluconolactone","lactobionic acid","galactose"].includes(name) || name.includes("gluconolactone"))
     return "Exfoliant";
   if (name === "azelaic acid")
@@ -187,7 +211,7 @@ function detectStructural(name: string): string | null {
     return "Emulsifier";
   if (name.includes("carbomer") || name.includes("xanthan") || name.includes("cellulose") || name.includes("starch") || (name.includes("gum") && !name.includes("guggul")) || (name.includes("acrylate") && name.includes("polymer")) || name === "silica" || name.includes("fumed silica") || name.includes("hydrated silica") || ["nylon-12","nylon-6","polymethyl methacrylate","arrowroot","lauroyl lysine","talc","boron nitride","polyethylene","hydrocolloid","alumina","perlite","pumice","charcoal powder","sapphire powder","calcite","amber powder","silk powder"].includes(name) || name.includes("seed powder") || name.includes("kernel powder") || name.includes("fruit powder"))
     return "Thickener";
-  if (["phenoxyethanol","potassium sorbate","ethylhexylglycerin","1,2-hexanediol","caprylyl glycol","chlorphenesin","sorbic acid","sodium benzoate","o-cymen-5-ol","iodopropynyl butylcarbamate","1,10-decanediol","10-decanediol","hydroxyacetophenone","bht","bha","sodium metabisulfite","undecylenoyl glycine"].includes(name))
+  if (["phenoxyethanol","potassium sorbate","ethylhexylglycerin","1,2-hexanediol","caprylyl glycol","chlorphenesin","sorbic acid","sodium benzoate","o-cymen-5-ol","1,10-decanediol","10-decanediol","hydroxyacetophenone","bht","bha","sodium metabisulfite","undecylenoyl glycine","capryloyl glycine"].includes(name))
     return "Preservative";
   if (["zinc oxide","titanium dioxide","zinc oxide (nano)","titanium dioxide (nano)"].includes(name) || name.includes("titanium dioxide") || name.includes("zinc oxide") || ["bis-ethylhexyloxyphenol methoxyphenyl triazine","ethylhexyl triazone","terephthalylidene dicamphor sulfonic acid"].includes(name))
     return "UV Filter";
@@ -207,7 +231,7 @@ function detectStructural(name: string): string | null {
     return "Protein";
   if (["arginine","lysine","serine","glycine","alanine","proline","threonine","histidine","valine","glutamine","asparagine","glutamic acid","aspartic acid","acetyl glucosamine","taurine","arginine hcl","citrulline"].includes(name) || name.includes("amino acid"))
     return "Amino Acid";
-  if (["niacinamide","nicotinamide","ascorbic acid","sodium ascorbyl phosphate","magnesium ascorbyl phosphate","ascorbyl glucoside","ascorbyl tetraisopalmitate","3-o-ethyl ascorbic acid","alpha-arbutin","arbutin","tranexamic acid","ferulic acid","resveratrol","coenzyme q10","ubiquinone","adenosine","allantoin","bisabolol","alpha-bisabolol","zinc gluconate","zinc sulfate","zinc pca","bakuchiol","retinol alternative","nrf2","caffeine","madecassoside","asiaticoside","madecassic acid","asiatic acid","melatonin","glutathione","thioctic acid","dimethyl sulfone","potassium azeloyl diglycinate","stearyl glycyrrhetinate","dipotassium glycyrrhizate","phytonadione","beta-carotene","hypochlorous acid","fructooligosaccharides","magnesium gluconate","copper gluconate","calcium gluconate","magnesium sulfate","magnesium","calamine","sulfur","nordihydroguaiaretic acid","hydroxyapatite"].includes(name) || name.includes("tocopherol") || name.includes("ascorbyl") || name.includes("arbutin") || name.includes("niacinamide") || name.includes("glycyrrhiz") || name.includes("madecass") || name.includes("phytonadione") || name.includes("lactobacillus"))
+  if (["niacinamide","nicotinamide","ascorbic acid","sodium ascorbyl phosphate","magnesium ascorbyl phosphate","ascorbyl glucoside","ascorbyl tetraisopalmitate","3-o-ethyl ascorbic acid","alpha-arbutin","arbutin","tranexamic acid","ferulic acid","resveratrol","coenzyme q10","ubiquinone","adenosine","allantoin","bisabolol","alpha-bisabolol","zinc gluconate","zinc sulfate","zinc pca","bakuchiol","retinol alternative","nrf2","caffeine","madecassoside","asiaticoside","madecassic acid","asiatic acid","melatonin","glutathione","thioctic acid","dimethyl sulfone","potassium azeloyl diglycinate","stearyl glycyrrhetinate","dipotassium glycyrrhizate","phytonadione","beta-carotene","hypochlorous acid","fructooligosaccharides","magnesium gluconate","copper gluconate","calcium gluconate","magnesium sulfate","magnesium","calamine","sulfur","nordihydroguaiaretic acid","hydroxyapatite","magnesium chloride","magnesium pca","magnesium aspartate","zinc ricinoleate","copper peptide","ghk-cu"].includes(name) || name.includes("tocopherol") || name.includes("ascorbyl") || name.includes("arbutin") || name.includes("niacinamide") || name.includes("glycyrrhiz") || name.includes("madecass") || name.includes("phytonadione") || name.includes("lactobacillus") || name.includes("copper tripeptide") || name.includes("copper peptide"))
     return "Active";
   return null;
 }
@@ -221,8 +245,7 @@ function detectCategory(name: string, sc: string | null): string | null {
     return null;
   }
   if (sc === "Preservative") {
-    // Preservatives with documented antimicrobial skin-active role
-    if (["caprylyl glycol","1,2-hexanediol","chlorphenesin","o-cymen-5-ol","undecylenoyl glycine"].includes(name)) return "antimicrobial";
+    if (["caprylyl glycol","1,2-hexanediol","chlorphenesin","o-cymen-5-ol","undecylenoyl glycine","capryloyl glycine"].includes(name)) return "antimicrobial";
     return null;
   }
   if (sc === "Solvent") {
@@ -243,8 +266,15 @@ function detectCategory(name: string, sc: string | null): string | null {
     return null;
 
   if (sc === "Ceramide") return "barrier-repairing";
-  if (sc === "Peptide") return "firming";
-  if (sc === "Surfactant") return "cleansing";
+  if (sc === "Peptide") {
+    if (name.includes("copper") || name.includes("ghk") || name.includes("cu-")) return "wound-healing";
+    return "firming";
+  }
+  if (sc === "Colorant") return null;
+  if (sc === "Surfactant") {
+    if (name === "zinc coceth sulfate") return "anti-malassezia";
+    return "cleansing";
+  }
   if (sc === "Preservative") return null;
   if (sc === "Exfoliant") {
     if (name === "gluconolactone" || name.includes("gluconolactone") || name === "lactobionic acid") return "PHA Exfoliant";
@@ -279,6 +309,17 @@ function detectCategory(name: string, sc: string | null): string | null {
     return "antioxidant"; // default for unrecognized plant extracts
   }
 
-  if (sc === "Active") return "soothing"; // safe fallback for unrecognized actives
+  if (sc === "Active") {
+    // Specific named actives with distinct functional categories
+    if (["zinc pyrithione","pyrithione zinc","zinc pyridine thiol","selenium sulfide","selenium disulfide","piroctone olamine","piroctone ethanolamine","zinc coceth sulfate"].some(n => name.includes(n))) return "anti-malassezia";
+    if (["povidone-iodine","pvp-iodine","potassium iodide","sodium iodide","hypochlorous acid"].includes(name)) return "antimicrobial";
+    if (name === "sulfur") return "antimicrobial";
+    if (name === "calamine") return "soothing";
+    if (["manganese gluconate","manganese sulfate","manganese pca","selenium","selenium methionine","selenomethionine"].includes(name)) return "antioxidant";
+    if (["magnesium chloride","magnesium pca","magnesium aspartate","magnesium gluconate","magnesium sulfate","magnesium"].includes(name)) return "soothing";
+    if (["copper gluconate","zinc ricinoleate"].includes(name)) return "antimicrobial";
+    if (name.includes("copper tripeptide") || name.includes("copper peptide") || name.includes("ghk")) return "wound-healing";
+    return "soothing"; // safe fallback for unrecognized actives
+  }
   return null;
 }

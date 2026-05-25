@@ -30,6 +30,7 @@ export function getSensoryCategories(name: string): string[] {
 }
 
 export function generateNotes(ing: {
+  name?: string;
   status: string;
   flagged_category: string | null;
   category: string | null;
@@ -39,6 +40,7 @@ export function generateNotes(ing: {
   const fc = (ing.flagged_category ?? "").toLowerCase();
   const cat = (ing.category ?? "").toLowerCase();
   const sc = ing.structural_category ?? "";
+  const ingName = (ing.name ?? "").toLowerCase();
 
   // ── FLAGGED CATEGORIES ─────────────────────────────────────────────────────
 
@@ -346,6 +348,134 @@ export function generateNotes(ing: {
       climate: ["dry_climate", "cold"],
       sentiment: "benefit",
       text: "Moisturizing ingredients provide the most noticeable benefit in dry or cold climates, where TEWL (water loss through skin) is highest.",
+    });
+  }
+
+  // ── NEW SKIN TYPE RULES ────────────────────────────────────────────────────
+
+  if (cat === "anti-malassezia") {
+    notes.push({
+      dimensions: ["fungal_acne", "seborrheic"],
+      climate: [],
+      sentiment: "benefit",
+      text: "This ingredient actively targets Malassezia yeast — one of the few skincare actives that directly benefits fungal acne and seborrheic dermatitis rather than just reducing symptoms.",
+    });
+  }
+
+  if (cat === "antimicrobial" || cat === "anti-malassezia") {
+    notes.push({
+      dimensions: ["acne_prone"],
+      climate: [],
+      sentiment: "benefit",
+      text: "Antimicrobial activity is directly relevant for acne — reducing the microbial load on skin reduces both active lesions and the inflammatory response around them.",
+    });
+  }
+
+  if (fc === "chemical sunscreen") {
+    notes.push({
+      dimensions: ["rosacea", "lupus_rash"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Chemical UV filters convert UV energy to heat within the skin — the resulting warmth is a known rosacea trigger, and can also provoke reactions in lupus-affected skin. Mineral sunscreens (zinc oxide, titanium dioxide) provide equivalent protection without this mechanism.",
+    });
+  }
+
+  if (sc === "Fragrance" || fc === "sensitizer" || fc === "fragrance-allergen") {
+    notes.push({
+      dimensions: ["rosacea"],
+      climate: ["hot"],
+      sentiment: "caution",
+      text: "Fragrance compounds are a common rosacea flush trigger — particularly in formulas applied to warm or sun-exposed skin when vascular reactivity is already elevated.",
+    });
+    notes.push({
+      dimensions: ["eczema"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Fragrance is the leading contact allergen in atopic eczema — even compounds not listed on EU allergen registers can trigger flares in sensitized skin.",
+    });
+    notes.push({
+      dimensions: ["psoriasis"],
+      climate: [],
+      sentiment: "caution",
+      text: "Fragrances can trigger the Koebner phenomenon in psoriasis — where skin irritation produces new plaques at the site of contact.",
+    });
+  }
+
+  if (fc === "sensitizer" && (sc === "Preservative" || ingName.includes("isothiazolinone") || ingName.includes("iodopropynyl"))) {
+    notes.push({
+      dimensions: ["eczema"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "MI/MCI (methylisothiazolinone/methylchloroisothiazolinone) and IPBC are specifically linked to atopic eczema contact sensitization — these preservatives are banned in EU leave-on products specifically because of eczema reactions.",
+    });
+  }
+
+  if (sc === "Ceramide") {
+    notes.push({
+      dimensions: ["eczema"],
+      climate: [],
+      sentiment: "benefit",
+      text: "Ceramides are specifically prescribed for atopic eczema — they restore the intercellular lipid structure that is structurally deficient in eczema skin, directly improving both hydration retention and barrier function.",
+    });
+  }
+
+  if (sc === "Emollient") {
+    notes.push({
+      dimensions: ["fungal_acne", "seborrheic"],
+      climate: ["hot", "humid"],
+      sentiment: "caution",
+      text: "Many plant oils and their derived esters contain C12-C24 chain fatty acids that Malassezia feeds on. In hot or humid conditions where yeast overgrowth is already accelerated, oil-heavy emollients can sustain fungal acne and seborrheic dermatitis despite otherwise gentle formulas.",
+    });
+  }
+
+  if (sc === "Emulsifier") {
+    notes.push({
+      dimensions: ["fungal_acne", "seborrheic"],
+      climate: [],
+      sentiment: "caution",
+      text: "Certain emulsifiers — particularly polysorbates and fatty acid esters — are documented Malassezia food sources. Products containing multiple emulsifiers can sustain fungal acne even in formulas that appear gentle by other measures.",
+    });
+  }
+
+  if (sc === "Exfoliant" && fc === "bha exfoliant") {
+    notes.push({
+      dimensions: ["psoriasis"],
+      climate: [],
+      sentiment: "benefit",
+      text: "Salicylic acid is used therapeutically in psoriasis to soften and remove scale — it's one of the few OTC ingredients with a documented beneficial role in psoriasis management.",
+    });
+  }
+
+  if (fc === "sulfate surfactant") {
+    notes.push({
+      dimensions: ["psoriasis", "eczema"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Sulfate surfactants strip the lipid film from an already-disrupted barrier — in psoriasis and eczema, this can trigger new plaques, intensify flares, and significantly slow recovery.",
+    });
+  }
+
+  if (ingName === "sulfur") {
+    notes.push({
+      dimensions: ["acne_prone", "oily", "fungal_acne", "seborrheic"],
+      climate: [],
+      sentiment: "benefit",
+      text: "Sulfur is both antibacterial and antifungal — it addresses the microbial component of acne, fungal acne, and seborrheic dermatitis simultaneously. One of the few actives beneficial across all three conditions.",
+    });
+    notes.push({
+      dimensions: ["dry", "damaged_barrier"],
+      climate: ["cold", "dry_climate"],
+      sentiment: "caution",
+      text: "Sulfur is a drying active — on already-dry or barrier-compromised skin, even low concentrations can accelerate transepidermal water loss and worsen flaking.",
+    });
+  }
+
+  if (sc === "UV Filter") {
+    notes.push({
+      dimensions: ["lupus_rash", "rosacea"],
+      climate: [],
+      sentiment: "benefit",
+      text: "Mineral UV filters (zinc oxide, titanium dioxide) are the preferred sun protection form for rosacea and lupus — they provide full-spectrum protection without the heat conversion that chemical filters generate and without known triggering of photosensitive reactions.",
     });
   }
 

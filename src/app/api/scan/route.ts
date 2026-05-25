@@ -14,7 +14,120 @@ function obfFullImage(url: string | null | undefined): string | null {
   return url.replace(/\.\d+\.jpg$/, ".full.jpg");
 }
 
-import type { PhotoCategory } from "@/types";
+import type { FormulaWarning, PhotoCategory } from "@/types";
+
+function detectCombinationWarnings(items: string[], flaggedItems: { flagged_category: string | null }[]): FormulaWarning[] {
+  const warnings: FormulaWarning[] = [];
+  const joined = items.join(", ").toLowerCase();
+
+  const hasZinc = /\bzinc\b/.test(joined) && !/zinc oxide/.test(joined) === false || /\bzinc\b/.test(joined);
+  const hasCopper = /\bcopper\b/.test(joined);
+  const hasVitC = /ascorbic acid|ascorbyl/.test(joined);
+  const hasRetinoid = /retinol|retinyl|retinaldehyde|tretinoin/.test(joined);
+  const hasAHA = /glycolic acid|lactic acid|mandelic acid|malic acid/.test(joined);
+  const hasBHA = /salicylic acid/.test(joined);
+  const hasBP = /benzoyl peroxide/.test(joined);
+  const hasWitchHazel = /hamamelis|witch hazel/.test(joined);
+  const hasNiacinamide = /niacinamide|nicotinamide/.test(joined);
+  const hasZincPCA = /zinc pca/.test(joined);
+  const hasFerulicAcid = /ferulic acid/.test(joined);
+  const hasVitE = /tocopherol/.test(joined);
+  const hasSelenium = /\bselenium\b/.test(joined);
+
+  const sensitizerCount = flaggedItems.filter(
+    (f) => f.flagged_category === "sensitizer" || f.flagged_category === "fragrance-allergen"
+  ).length;
+
+  // Danger combinations
+  if (hasZinc && hasCopper) {
+    warnings.push({
+      type: "danger",
+      title: "Zinc + Copper: effectiveness conflict",
+      body: "Zinc and copper compete for the same metal transporter binding sites in skin cells. High zinc concentration blocks copper peptide activity — if copper peptides are included for wound-healing or firming benefit, zinc compounds in the same formula or applied back-to-back can significantly reduce their effectiveness.",
+    });
+  }
+  if (hasCopper && hasWitchHazel) {
+    warnings.push({
+      type: "danger",
+      title: "Witch hazel + Copper: chelation inactivation",
+      body: "The tannins in witch hazel chelate (bind and neutralize) copper ions. Copper peptides formulated alongside witch hazel or applied directly after can be significantly inactivated before reaching skin.",
+    });
+  }
+  if (hasCopper && hasVitC) {
+    warnings.push({
+      type: "danger",
+      title: "Copper + Vitamin C: potential pro-oxidant",
+      body: "Vitamin C reduces Cu²⁺ to Cu⁺ through a redox reaction, which can react with oxygen to generate free radicals — the opposite of the antioxidant effect both are intended to provide. More of a concern at higher vitamin C concentrations (above 10%).",
+    });
+  }
+  if (hasBP && hasRetinoid) {
+    warnings.push({
+      type: "danger",
+      title: "Benzoyl peroxide + Retinoid: oxidizes the retinol",
+      body: "Benzoyl peroxide degrades retinol and retinyl esters on contact, rendering them ineffective even when applied in different products in the same routine. Separate them to morning and evening, or use a more BP-stable retinoid form (retinaldehyde, tretinoin).",
+    });
+  }
+  if (hasRetinoid && (hasAHA || hasBHA)) {
+    warnings.push({
+      type: "danger",
+      title: "Retinoid + Exfoliant: compounded irritation",
+      body: "Both retinoids and AHA/BHA exfoliants disrupt cell turnover and thin the stratum corneum — using them together significantly increases the risk of barrier disruption, redness, and peeling. Best separated to different nights or different routines.",
+    });
+  }
+  if (sensitizerCount >= 3) {
+    warnings.push({
+      type: "danger",
+      title: `High sensitizer load (${sensitizerCount} sensitizers detected)`,
+      body: "Individual sensitizers in a formula can each be within acceptable limits, but the combined contact sensitization burden accumulates. Formulas with 3 or more sensitizers significantly increase the likelihood of developing a contact allergy over time, especially for reactive or eczema-prone skin.",
+    });
+  }
+
+  // Synergy combinations
+  if (hasVitC && hasFerulicAcid) {
+    warnings.push({
+      type: "synergy",
+      title: "Vitamin C + Ferulic acid: stability synergy",
+      body: "Ferulic acid is one of the few ingredients that genuinely stabilizes vitamin C (ascorbic acid) in aqueous formulas, slowing oxidation and extending both shelf life and skin efficacy. This pairing is backed by published research.",
+    });
+  }
+  if (hasVitE && hasSelenium) {
+    warnings.push({
+      type: "synergy",
+      title: "Vitamin E + Selenium: antioxidant synergy",
+      body: "Selenium is a cofactor for glutathione peroxidase, which regenerates vitamin E after it neutralizes free radicals. Together they form a self-reinforcing antioxidant cycle — more effective than either alone.",
+    });
+  }
+  if (hasNiacinamide && hasZincPCA) {
+    warnings.push({
+      type: "synergy",
+      title: "Niacinamide + Zinc PCA: sebum control synergy",
+      body: "Niacinamide reduces sebaceous gland activity at the cellular level; zinc PCA inhibits 5-alpha-reductase, the enzyme that triggers excess sebum production. Together they target oily and acne-prone skin through complementary mechanisms.",
+    });
+  }
+  if (hasZinc && hasVitC && !hasCopper) {
+    warnings.push({
+      type: "synergy",
+      title: "Zinc + Vitamin C: antioxidant stabilization",
+      body: "Zinc helps stabilize vitamin C against oxidation, extending the active life of ascorbic acid in the formula. A mild but genuine pairing for antioxidant benefit.",
+    });
+  }
+
+  return warnings;
+}
+
+function detectStepTags(items: string[]): string[] {
+  const joined = items.join(", ").toLowerCase();
+  const tags: string[] = [];
+  if (/glycolic acid|lactic acid|mandelic acid|malic acid|salicylic acid/.test(joined)) tags.push("acid-step");
+  if (/\bascorbic acid\b/.test(joined)) tags.push("low-ph-step");
+  if (/retinol|retinyl|retinaldehyde|tretinoin/.test(joined)) tags.push("retinoid");
+  if (/zinc oxide|titanium dioxide/.test(joined)) tags.push("spf-last");
+  if (/petrolatum|beeswax|cera alba|cera flava|\bparaffin\b/.test(joined)) tags.push("seal-last");
+  const hasPenetrationEnhancer = /alcohol denat|denatured alcohol|sd alcohol/.test(joined);
+  const hasSensitizer = /\bfragrance\b|\bparfum\b|methylisothiazolinone|methylchloroisothiazolinone/.test(joined);
+  if (hasPenetrationEnhancer && hasSensitizer) tags.push("enhancer-caution");
+  return [...new Set(tags)];
+}
 
 const PHOTO_PATTERNS: { pattern: RegExp; level: PhotosensitiveItem["sunLevel"]; photoCategory: PhotoCategory; note: string; maxPosition?: number }[] = [
   {
@@ -713,5 +826,7 @@ export async function POST(req: NextRequest) {
     ).catch(() => {});
   }
 
-  return NextResponse.json({ product, safe: safeFiltered, flagged, unreviewed, photosensitive, sensoryTrigger, communityVariants, obfVariants, originalItems, isIncomplete });
+  const formula_warnings = detectCombinationWarnings(originalItems, flagged.map((f) => ({ flagged_category: f.ingredient.flagged_category })));
+  const step_tags = detectStepTags(originalItems);
+  return NextResponse.json({ product, safe: safeFiltered, flagged, unreviewed, photosensitive, sensoryTrigger, communityVariants, obfVariants, originalItems, isIncomplete, formula_warnings, step_tags });
 }

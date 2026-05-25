@@ -198,6 +198,13 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
     note: "Cetyl palmitate is a waxy ester used as an emollient and thickener. It creates a semi-occlusive seal that can trap warmth and sebum, causing an itching sensation and contributing to congestion on oily or reactive skin.",
   },
 
+  // ── Iodine — acne-prone / fungal-acne caution ────────────────────────────
+  {
+    pattern: /povidone.iodine|pvp.iodine|polyvinylpyrrolidone iodine|potassium iodide|sodium iodide/i,
+    sensory_category: "Iodine",
+    note: "Iodine compounds can cause acneiform eruptions (iodine acne) in susceptible individuals — small, uniform pustules that resemble but don't respond to standard acne treatments. Particularly relevant for acne-prone skin; also a concern for fungal acne since it can disrupt the skin microbiome balance.",
+  },
+
   // ── Comedogenic-itch ─────────────────────────────────────────────────────
   // Pore-blocking ingredients that cause congestion and inflammatory itch
   {

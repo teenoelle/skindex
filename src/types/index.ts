@@ -78,6 +78,21 @@ export type AlternativeProduct = {
   sameType: boolean;
 };
 
+export type FormulaWarning = {
+  type: "danger" | "synergy";
+  title: string;
+  body: string;
+};
+
+export type RoutineProduct = {
+  routineId: string;
+  name: string;
+  brand: string | null;
+  step_tags: string[];
+  ingredients: string[];
+  flaggedCategories: string[];
+};
+
 export type ScanResult = {
   product?: {
     id?: string | null;
@@ -100,4 +115,6 @@ export type ScanResult = {
   obfVariants?: ObfVariant[];
   originalItems: string[];
   isIncomplete?: boolean;
+  formula_warnings?: FormulaWarning[];
+  step_tags?: string[];
 };

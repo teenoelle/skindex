@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X, Menu } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
+import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -212,7 +212,7 @@ const RINSE_OFF_TYPES = new Set([
   "Clay Mask", "Rinse-Off Mask",
 ]);
 
-type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone";
+type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash";
 type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv";
 
 const SKIN_TYPES: { value: SkinType; label: string }[] = [
@@ -223,6 +223,12 @@ const SKIN_TYPES: { value: SkinType; label: string }[] = [
   { value: "acne_prone", label: "Acne-prone" },
   { value: "mature", label: "Mature" },
   { value: "hyperpigmentation_prone", label: "Hyperpigmentation" },
+  { value: "fungal_acne", label: "Fungal acne" },
+  { value: "rosacea", label: "Rosacea" },
+  { value: "seborrheic", label: "Seborrheic" },
+  { value: "eczema", label: "Eczema" },
+  { value: "psoriasis", label: "Psoriasis" },
+  { value: "lupus_rash", label: "Lupus rash" },
 ];
 
 const CLIMATE_TYPES: { value: ClimateType; label: string }[] = [
@@ -241,6 +247,12 @@ const SKIN_TYPE_NOTES: Record<SkinType, string> = {
   acne_prone: "For acne-prone skin, pore-clogging ingredients and film-formers are the main risks — watch the Congestion section after scanning.",
   mature: "Mature skin benefits most from peptides, ceramides, and emollients, and is more sensitive to the retinoid adjustment period — start at the lowest available concentration.",
   hyperpigmentation_prone: "For hyperpigmentation-prone skin, UV exposure directly undoes progress — many brightening actives also increase UV sensitivity, making daily SPF essential.",
+  fungal_acne: "Fungal acne (Malassezia folliculitis) is caused by yeast, not bacteria — it looks like regular acne but doesn't respond to antibiotics or most OTC acne treatments. Many 'safe' moisturizing oils and fatty acid esters feed Malassezia. Scanning every formula matters more here than for almost any other skin type.",
+  rosacea: "Rosacea triggers vary but commonly include heat, vasodilation, and chemical absorption. Chemical UV filters, alcohol-based formulas, menthol, warming agents, and high fragrance load are the main ingredient triggers — mineral sunscreens (zinc oxide, titanium dioxide) are strongly preferred.",
+  seborrheic: "Seborrheic dermatitis is Malassezia-driven and affects the T-zone: scalp margins, brows, sides of the nose, and eyelids. Certain plant oils can worsen it. Zinc compounds, sulfur, and anti-Malassezia actives (zinc pyrithione, piroctone olamine, selenium sulfide) are specifically beneficial.",
+  eczema: "Atopic eczema has specific preservative sensitivities. MI/MCI (methylisothiazolinone/methylchloroisothiazolinone) and IPBC are notorious eczema triggers. Ceramides, colloidal oatmeal, and thick emollients are specifically therapeutic here — unlike for acne, heavy barrier creams help rather than harm.",
+  psoriasis: "Psoriasis causes rapid cell turnover and thick scale. Keratolytics like salicylic acid can help remove scale. Fragrances and harsh surfactants trigger flares. Vitamin D analogues and antioxidants are specifically beneficial.",
+  lupus_rash: "The malar (butterfly) rash of lupus is highly photosensitive — UV exposure triggers flares. Chemical UV filters can also cause reactions; mineral-only sunscreens (zinc oxide, titanium dioxide) are strongly preferred. Photosensitizing ingredients carry significantly higher risk here than for any other type.",
 };
 
 const CLIMATE_NOTES: Record<ClimateType, string> = {
@@ -267,6 +279,11 @@ function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateT
   if (skinTypes.has("dry") || skinTypes.has("damaged_barrier") || climates.has("cold") || climates.has("dry_climate")) cats.push("Drying solvents", "Sulfate surfactants");
   if (climates.has("high_uv") || skinTypes.has("hyperpigmentation_prone")) cats.push("AHA exfoliants", "Retinoids");
   if (climates.has("hot") || climates.has("humid")) cats.push("Heavy occlusives", "Silicones");
+  if (skinTypes.has("fungal_acne") || skinTypes.has("seborrheic")) cats.push("Plant oils", "Fatty acid esters", "Emulsifiers");
+  if (skinTypes.has("rosacea")) cats.push("Chemical sunscreens", "Warming agents", "Drying solvents");
+  if (skinTypes.has("eczema")) cats.push("Sensitizing preservatives", "Fragrance allergens", "Sulfate surfactants");
+  if (skinTypes.has("psoriasis")) cats.push("Fragrances", "Sulfate surfactants");
+  if (skinTypes.has("lupus_rash")) cats.push("Chemical sunscreens", "Photosensitizers", "AHA exfoliants");
   return [...new Set(cats)];
 }
 
@@ -295,14 +312,24 @@ const SENSORY_CATEGORY_LABEL: Record<string, string> = {
 };
 
 const SENSORY_PROFILE_MAP: Partial<Record<string, SkinType[]>> = {
-  "Stinging": ["reactive", "damaged_barrier"],
-  "chemical-itch": ["reactive", "damaged_barrier"],
-  "Film-forming": ["oily", "acne_prone"],
-  "Occlusive": ["oily", "acne_prone"],
-  "occlusive-itch": ["oily", "acne_prone"],
-  "comedogenic-itch": ["oily", "acne_prone"],
-  "Cooling": ["reactive"],
-  "Warming": ["reactive"],
+  "Stinging": ["reactive", "damaged_barrier", "eczema", "rosacea"],
+  "chemical-itch": ["reactive", "damaged_barrier", "eczema"],
+  "Film-forming": ["oily", "acne_prone", "fungal_acne"],
+  "Occlusive": ["oily", "acne_prone", "fungal_acne", "seborrheic"],
+  "occlusive-itch": ["oily", "acne_prone", "fungal_acne"],
+  "comedogenic-itch": ["oily", "acne_prone", "fungal_acne"],
+  "Cooling": ["reactive", "rosacea"],
+  "Warming": ["reactive", "rosacea"],
+  "Iodine": ["acne_prone", "fungal_acne"],
+};
+
+const STEP_TAG_CONFIG: Record<string, { label: string; desc: string; className: string }> = {
+  "acid-step":        { label: "Acid step",            desc: "Apply before serums; leave 15–20 min before higher-pH actives like niacinamide or peptides",                     className: "border-amber-200 bg-amber-50 text-amber-700" },
+  "low-ph-step":      { label: "Low pH",               desc: "Ascorbic acid works best at pH 3–3.5. Apply before niacinamide, peptides, or moisturizers and wait 20 min",      className: "border-orange-200 bg-orange-50 text-orange-700" },
+  "retinoid":         { label: "Retinoid",             desc: "Apply last in PM routine. Do not layer with AHAs or BHAs the same evening — alternate evenings instead",         className: "border-purple-200 bg-purple-50 text-purple-700" },
+  "spf-last":         { label: "Apply last (AM)",      desc: "Sunscreen is always the final AM step — after all serums, moisturizers, and eye creams",                        className: "border-yellow-200 bg-yellow-50 text-yellow-700" },
+  "seal-last":        { label: "Seal last (PM)",       desc: "Occlusive ingredients lock in all prior layers — apply as the absolute final PM step",                          className: "border-gray-200 bg-gray-100 text-gray-600" },
+  "enhancer-caution": { label: "Penetration enhancer", desc: "Contains drying alcohol that drives co-applied ingredients deeper — avoid applying immediately before fragrance-heavy or sensitizer-containing products", className: "border-rose-200 bg-rose-50 text-rose-700" },
 };
 
 function getIngredientConcernLevel(
@@ -329,11 +356,16 @@ function getIngredientConcernLevel(
   if (match?.ingredient.status === "flagged") {
     const isMatch =
       (["pore-clogger", "occlusive", "bacteria-trap"].includes(fc) &&
-        (activeSkinTypes.has("acne_prone") || activeSkinTypes.has("oily"))) ||
+        (activeSkinTypes.has("acne_prone") || activeSkinTypes.has("oily") || activeSkinTypes.has("fungal_acne"))) ||
       (fc === "sensitizer" &&
-        (activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier"))) ||
+        (activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") || activeSkinTypes.has("eczema") || activeSkinTypes.has("rosacea") || activeSkinTypes.has("psoriasis"))) ||
+      (fc === "fragrance-allergen" &&
+        (activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") || activeSkinTypes.has("eczema"))) ||
+      (fc.toLowerCase() === "chemical sunscreen" &&
+        (activeSkinTypes.has("rosacea") || activeSkinTypes.has("lupus_rash"))) ||
+      (fc === "Drying Solvent" && activeSkinTypes.has("rosacea")) ||
       (["photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical"].includes(fc) &&
-        (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv")));
+        (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv") || activeSkinTypes.has("lupus_rash")));
     return isMatch ? "profile-matched" : "non-matching";
   }
 
@@ -418,6 +450,39 @@ const paragraphColor = {
   safe: "text-teal-700 font-medium",
   unreviewed: "text-gray-400",
 };
+
+function detectRoutineWarnings(products: RoutineProduct[]): { type: "danger" | "synergy"; title: string; body: string }[] {
+  if (products.length < 2) return [];
+  const warnings: { type: "danger" | "synergy"; title: string; body: string }[] = [];
+  const jp = (p: RoutineProduct) => p.ingredients.join(", ").toLowerCase();
+  const who = (pattern: RegExp) => products.filter(p => pattern.test(jp(p))).map(p => p.name);
+  const nameList = (names: string[]) => [...new Set(names)].join(" and ");
+
+  const zincWho = who(/\bzinc\b/);
+  const copperWho = who(/\bcopper\b/);
+  const retinoidWho = who(/retinol|retinyl|retinaldehyde|tretinoin/);
+  const exfoliantWho = who(/glycolic acid|lactic acid|mandelic acid|malic acid|salicylic acid/);
+  const bpWho = who(/benzoyl peroxide/);
+  const witchHazelWho = who(/hamamelis|witch hazel/);
+  const niacinamideWho = who(/niacinamide|nicotinamide/);
+  const acidStepProds = products.filter(p => p.step_tags.includes("acid-step") || p.step_tags.includes("low-ph-step"));
+
+  if (zincWho.length && copperWho.length)
+    warnings.push({ type: "danger", title: "Zinc + Copper conflict in routine", body: `${nameList([...zincWho, ...copperWho])} — zinc blocks copper peptide binding sites. Apply them in separate AM/PM routines.` });
+  if (copperWho.length && witchHazelWho.length)
+    warnings.push({ type: "danger", title: "Witch hazel + Copper: tannin inactivation", body: `${nameList([...copperWho, ...witchHazelWho])} — witch hazel tannins chelate and inactivate copper. Use in separate AM/PM routines.` });
+  if (retinoidWho.length && exfoliantWho.length)
+    warnings.push({ type: "danger", title: "Retinoid + Exfoliant: alternate evenings", body: `${nameList([...retinoidWho, ...exfoliantWho])} — do not use in the same PM session. Separate to different evenings to avoid compounded barrier disruption.` });
+  if (bpWho.length && retinoidWho.length)
+    warnings.push({ type: "danger", title: "Benzoyl peroxide + Retinoid: use separately", body: `${nameList([...bpWho, ...retinoidWho])} — benzoyl peroxide oxidizes retinol. Keep BP in AM, retinoid in PM.` });
+  if (acidStepProds.length > 1)
+    warnings.push({ type: "danger", title: "Multiple acid-step products", body: `${acidStepProds.map(p => p.name).join(" and ")} — using both in the same session doubles exfoliation stress. Alternate to different evenings.` });
+  if (acidStepProds.length && niacinamideWho.length) {
+    const names = nameList([...acidStepProds.map(p => p.name), ...niacinamideWho]);
+    warnings.push({ type: "danger", title: "Low pH + Niacinamide: wait 20 min between steps", body: `${names} — niacinamide doesn't absorb effectively immediately after a low-pH formula. Wait at least 20 min.` });
+  }
+  return warnings;
+}
 
 export default function Scanner({ initialProductId }: { initialProductId?: string | null }) {
   const { isSignedIn, isLoaded } = useUser();
@@ -510,6 +575,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [stickySearchOpen, setStickySearchOpen] = useState(false);
   const [stickyQuery, setStickyQuery] = useState("");
   const [hamburgerOpen, setHamburgerOpen] = useState(false);
+  const [routineProducts, setRoutineProducts] = useState<RoutineProduct[]>([]);
+  const [routineOpen, setRoutineOpen] = useState(false);
+  const [addedToRoutine, setAddedToRoutine] = useState(false);
   const stickySearchRef = useRef<HTMLInputElement>(null);
 
   const initialProductIdRef = useRef(initialProductId);
@@ -534,10 +602,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     try {
       const st = localStorage.getItem("skindex:skinTypes");
       const cl = localStorage.getItem("skindex:climates");
+      const rt = localStorage.getItem("skindex:routine");
       if (st) setActiveSkinTypes(new Set(JSON.parse(st) as SkinType[]));
       if (cl) setActiveClimates(new Set(JSON.parse(cl) as ClimateType[]));
+      if (rt) setRoutineProducts(JSON.parse(rt) as RoutineProduct[]);
     } catch {}
   }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem("skindex:routine", JSON.stringify(routineProducts)); } catch {}
+  }, [routineProducts]);
 
   useEffect(() => {
     fetch("/api/browse")
@@ -554,11 +628,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   useEffect(() => {
     const handler = () => {
-      setTab("browse");
+      setTab("search");
+      setQuery("");
+      setIngredients("");
+      setUrl("");
       setResult(null);
       setNotFound(false);
       setIHerbBlocked(false);
       setLimitReached(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.history.replaceState(null, "", "/");
     };
     window.addEventListener("skindex:reset", handler);
     return () => window.removeEventListener("skindex:reset", handler);
@@ -1157,6 +1236,25 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setTimeout(() => { setSaveListOpen(false); setSavedTo(null); }, 1800);
   }
 
+  function addToRoutine() {
+    if (!result?.product) return;
+    const newEntry: RoutineProduct = {
+      routineId: Date.now().toString(),
+      name: result.product.name,
+      brand: result.product.brand ?? null,
+      step_tags: result.step_tags ?? [],
+      ingredients: result.originalItems,
+      flaggedCategories: result.flagged.map((f) => f.ingredient.flagged_category ?? "").filter(Boolean),
+    };
+    setRoutineProducts((prev) => [...prev, newEntry]);
+    setAddedToRoutine(true);
+    setTimeout(() => setAddedToRoutine(false), 2000);
+  }
+
+  function removeFromRoutine(routineId: string) {
+    setRoutineProducts((prev) => prev.filter((p) => p.routineId !== routineId));
+  }
+
   function toggleSkinType(t: SkinType) {
     setActiveSkinTypes((prev) => {
       const next = new Set(prev);
@@ -1545,6 +1643,69 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     })()}
                     <p className="text-xs text-gray-400">Matching profile notes replace the generic explanation when you expand each ingredient.</p>
                   </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Routine panel — idle state */}
+          <section className="mb-6">
+            <button
+              type="button"
+              onClick={() => setRoutineOpen((v) => !v)}
+              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full"
+            >
+              Routine
+              {routineProducts.length > 0 && (
+                <span className="text-teal-600 font-medium normal-case tracking-normal">
+                  {routineProducts.length} product{routineProducts.length !== 1 ? "s" : ""}
+                </span>
+              )}
+              <span className="text-gray-300 ml-auto">{routineOpen ? "▲" : "▼"}</span>
+            </button>
+            {routineOpen && (
+              <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3">
+                {routineProducts.length === 0 ? (
+                  <p className="text-xs text-gray-400">No products yet. Scan a product and tap &quot;+ Add to routine&quot; to start building.</p>
+                ) : (
+                  <>
+                    <div className="space-y-2.5">
+                      {routineProducts.map((p) => (
+                        <div key={p.routineId} className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
+                            {p.brand && <p className="text-[10px] text-gray-400">{p.brand}</p>}
+                            {p.step_tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {p.step_tags.map((tag) => {
+                                  const cfg = STEP_TAG_CONFIG[tag];
+                                  if (!cfg) return null;
+                                  return <span key={tag} title={cfg.desc} className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-default ${cfg.className}`}>{cfg.label}</span>;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          <button type="button" onClick={() => removeFromRoutine(p.routineId)} className="text-[10px] text-gray-300 hover:text-rose-400 shrink-0 mt-0.5">Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                    {(() => {
+                      const routineWarns = detectRoutineWarnings(routineProducts);
+                      if (!routineWarns.length) return null;
+                      return (
+                        <div className="space-y-2 border-t border-gray-100 pt-2">
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Interactions</p>
+                          {routineWarns.map((w, i) => (
+                            <div key={i} className={`rounded-lg border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : "border-teal-100 bg-teal-50"}`}>
+                              <p className={`text-[10px] font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : "✦ "}{w.title}</p>
+                              <p className={`text-[10px] leading-relaxed ${w.type === "danger" ? "text-amber-700" : "text-teal-700"}`}>{w.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                    <button type="button" onClick={() => setRoutineProducts([])} className="text-[10px] text-gray-300 hover:text-rose-400">Clear routine</button>
+                  </>
                 )}
               </div>
             )}
@@ -1966,6 +2127,50 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   >
                     Rinse-off
                   </button>
+                </div>
+
+                {/* Step tags */}
+                {(result.step_tags ?? []).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {result.step_tags!.map((tag) => {
+                      const cfg = STEP_TAG_CONFIG[tag];
+                      if (!cfg) return null;
+                      return (
+                        <span key={tag} title={cfg.desc} className={`text-xs px-2 py-0.5 rounded-full border cursor-default ${cfg.className}`}>
+                          {cfg.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Add to routine */}
+                <div className="flex items-center gap-2 mt-2">
+                  {(() => {
+                    const inRoutine = routineProducts.some((p) => p.name === result.product?.name);
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (inRoutine) {
+                            const id = routineProducts.find((p) => p.name === result.product?.name)?.routineId;
+                            if (id) removeFromRoutine(id);
+                          } else {
+                            addToRoutine();
+                          }
+                        }}
+                        className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                          addedToRoutine
+                            ? "border-teal-600 text-teal-600"
+                            : inRoutine
+                            ? "border-gray-300 text-gray-400 hover:border-rose-400 hover:text-rose-500"
+                            : "border-gray-200 text-gray-500 hover:border-teal-600 hover:text-teal-600"
+                        }`}
+                      >
+                        {addedToRoutine ? "Added to routine ✓" : inRoutine ? "In routine · Remove" : "+ Add to routine"}
+                      </button>
+                    );
+                  })()}
                 </div>
 
                 {/* Image upload / change — signed-in users only */}
@@ -2508,6 +2713,69 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             )}
           </section>
 
+          {/* Routine panel — results state */}
+          <section className="mt-4">
+            <button
+              type="button"
+              onClick={() => setRoutineOpen((v) => !v)}
+              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full"
+            >
+              Routine
+              {routineProducts.length > 0 && (
+                <span className="text-teal-600 font-medium normal-case tracking-normal">
+                  {routineProducts.length} product{routineProducts.length !== 1 ? "s" : ""}
+                </span>
+              )}
+              <span className="text-gray-300 ml-auto">{routineOpen ? "▲" : "▼"}</span>
+            </button>
+            {routineOpen && (
+              <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3">
+                {routineProducts.length === 0 ? (
+                  <p className="text-xs text-gray-400">No products yet. Tap &quot;+ Add to routine&quot; on this product&apos;s card above to start building.</p>
+                ) : (
+                  <>
+                    <div className="space-y-2.5">
+                      {routineProducts.map((p) => (
+                        <div key={p.routineId} className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
+                            {p.brand && <p className="text-[10px] text-gray-400">{p.brand}</p>}
+                            {p.step_tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {p.step_tags.map((tag) => {
+                                  const cfg = STEP_TAG_CONFIG[tag];
+                                  if (!cfg) return null;
+                                  return <span key={tag} title={cfg.desc} className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-default ${cfg.className}`}>{cfg.label}</span>;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          <button type="button" onClick={() => removeFromRoutine(p.routineId)} className="text-[10px] text-gray-300 hover:text-rose-400 shrink-0 mt-0.5">Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                    {(() => {
+                      const routineWarns = detectRoutineWarnings(routineProducts);
+                      if (!routineWarns.length) return null;
+                      return (
+                        <div className="space-y-2 border-t border-gray-100 pt-2">
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Interactions</p>
+                          {routineWarns.map((w, i) => (
+                            <div key={i} className={`rounded-lg border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : "border-teal-100 bg-teal-50"}`}>
+                              <p className={`text-[10px] font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : "✦ "}{w.title}</p>
+                              <p className={`text-[10px] leading-relaxed ${w.type === "danger" ? "text-amber-700" : "text-teal-700"}`}>{w.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                    <button type="button" onClick={() => setRoutineProducts([])} className="text-[10px] text-gray-300 hover:text-rose-400">Clear routine</button>
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Ingredients parent section */}
           <section className="space-y-8 mt-4">
           <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest">
@@ -2560,6 +2828,26 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     </Fragment>
                   );
                 })}
+              </div>
+            </section>
+          )}
+
+          {/* Formula combination warnings */}
+          {(result.formula_warnings ?? []).length > 0 && (
+            <section className="mb-6">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Formula interactions</p>
+              <div className="space-y-2">
+                {result.formula_warnings!.map((w, i) => (
+                  <div
+                    key={i}
+                    className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : "border-teal-100 bg-teal-50"}`}
+                  >
+                    <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>
+                      {w.type === "danger" ? "⚠ " : "✦ "}{w.title}
+                    </p>
+                    <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-700" : "text-teal-700"}`}>{w.body}</p>
+                  </div>
+                ))}
               </div>
             </section>
           )}
