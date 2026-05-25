@@ -29,22 +29,25 @@ if (!filePath) { console.error("Usage: npx tsx scripts/write-curated-explanation
 const entries: { id: string; explanation: string; skin_climate_notes?: unknown }[] =
   JSON.parse(fs.readFileSync(path.resolve(filePath), "utf8"));
 
-let ok = 0, failed = 0;
-for (const entry of entries) {
-  const update: Record<string, unknown> = {
-    explanation: entry.explanation,
-    explanation_source: "ai",
-  };
-  if (entry.skin_climate_notes) update.skin_climate_notes = entry.skin_climate_notes;
+async function main() {
+  let ok = 0, failed = 0;
+  for (const entry of entries) {
+    const update: Record<string, unknown> = {
+      explanation: entry.explanation,
+      explanation_source: "ai",
+    };
+    if (entry.skin_climate_notes) update.skin_climate_notes = entry.skin_climate_notes;
 
-  const { error } = await supabase.from("ingredients").update(update).eq("id", entry.id);
-  if (error) {
-    console.error(`✗ ${entry.id}: ${error.message}`);
-    failed++;
-  } else {
-    console.log(`✓ ${entry.id}`);
-    ok++;
+    const { error } = await supabase.from("ingredients").update(update).eq("id", entry.id);
+    if (error) {
+      console.error(`✗ ${entry.id}: ${error.message}`);
+      failed++;
+    } else {
+      console.log(`✓ ${entry.id}`);
+      ok++;
+    }
   }
+  console.log(`\nDone — ${ok} written, ${failed} failed.`);
 }
 
-console.log(`\nDone — ${ok} written, ${failed} failed.`);
+main().catch((e) => { console.error(e); process.exit(1); });

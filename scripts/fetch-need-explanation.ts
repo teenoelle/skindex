@@ -22,13 +22,16 @@ const supabase = createClient(
 
 const limit = parseInt(process.argv.find((a) => /^\d+$/.test(a)) ?? "30");
 
-const { data, error } = await supabase
-  .from("ingredients")
-  .select("id, name, status, structural_category, category, flagged_category")
-  .or("explanation_source.is.null,explanation_source.eq.template")
-  .order("name")
-  .limit(limit);
+async function main() {
+  const { data, error } = await supabase
+    .from("ingredients")
+    .select("id, name, status, structural_category, category, flagged_category")
+    .or("explanation_source.is.null,explanation_source.eq.template")
+    .order("name")
+    .limit(limit);
 
-if (error) { console.error(error.message); process.exit(1); }
+  if (error) { console.error(error.message); process.exit(1); }
+  console.log(JSON.stringify(data ?? [], null, 2));
+}
 
-console.log(JSON.stringify(data ?? [], null, 2));
+main().catch((e) => { console.error(e); process.exit(1); });
