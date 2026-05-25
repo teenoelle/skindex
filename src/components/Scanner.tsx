@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
@@ -274,35 +274,6 @@ function toTitleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Preserve original casing unless the string is all-caps, then apply title case
-const CONGESTION_VECTOR_DEFS: { label: string; bumps: string; description: string }[] = [
-  {
-    label: "Pore-clogging",
-    bumps: "Blackheads & closed comedones",
-    description: "These ingredients can penetrate follicle walls and cause hyperkeratosis — the cell buildup that forms blackheads (open comedones) and closed comedones, which are flesh-colored, hard bumps beneath the skin surface. Each ingredient's comedogenicity rating (0–5 scale) is shown in its row below.",
-  },
-  {
-    label: "Milia risk",
-    bumps: "Hard white bumps just under the skin",
-    description: "Film-forming ingredients can trap dead skin cells beneath the surface, preventing them from shedding normally. The cells pack together and harden into milia — small, firm, white bumps just under the skin that are not inside pores and don't respond to pore-clearing treatments.",
-  },
-  {
-    label: "Traps congestion",
-    bumps: "Worsens existing buildup",
-    description: "Heavy occlusive ingredients seal the skin surface tightly. When congestion is already forming — excess sebum, dead cells, bacteria — this seal locks it in underneath, accelerating the development of bumps.",
-  },
-  {
-    label: "Inflammatory",
-    bumps: "Red papules (not comedones)",
-    description: "Sensitizing or allergenic ingredients can trigger an immune response in the skin, producing red, inflamed papules — bumps that look like acne but are caused by irritation or allergy, not by pore-clogging.",
-  },
-];
-
-const UNIVERSAL_CONCERN_CATEGORIES = new Set([
-  "formaldehyde releaser",
-  "sensitizing preservative",
-  "biocide",
-]);
 
 // Broader set used for the "By concern" grouped view — concerns that apply regardless of skin profile
 const CONCERN_UNIVERSAL_CATEGORIES = new Set([
@@ -799,16 +770,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   function handleIngredientClick(
     item: string,
     match: { status: string; ingredient: { id: string; explanation: string | null } } | null,
-    hasPhoto: boolean,
-    hasSensory: boolean,
+    _hasPhoto: boolean,
+    _hasSensory: boolean,
   ) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (match) next.add(match.ingredient.id);
-      if (hasSensory) next.add(`sensory-${item}`);
-      if (hasPhoto) next.add(`photo-${item}`);
-      return next;
-    });
+    const rowKey = `concern-${item}`;
+    setConcernExpanded((prev) => { const next = new Set(prev); next.add(rowKey); return next; });
     if (match && !match.ingredient.explanation && !(match.ingredient.id in explanations)) {
       setExplanations((prev) => ({ ...prev, [match.ingredient.id]: null }));
       fetch("/api/explain", {
@@ -821,15 +787,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         .catch(() => {});
     }
     requestAnimationFrame(() => {
-      if (match?.status === "flagged") {
-        document.getElementById("section-flagged")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else if (hasSensory) {
-        document.getElementById("section-sensory")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else if (hasPhoto) {
-        document.getElementById("section-photosensitive")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else if (match) {
-        document.getElementById(`ingredient-${match.ingredient.id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
+      document.getElementById(rowKey)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
   }
 
@@ -2321,7 +2279,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <button
                 type="button"
                 className={`${result.flagged.length > 0 ? "text-rose-700" : "text-gray-400"} hover:underline underline-offset-2`}
-                onClick={() => document.getElementById("section-flagged")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                onClick={() => document.getElementById("section-by-concern")?.scrollIntoView({ behavior: "smooth", block: "start" })}
               >
                 {result.flagged.length} flagged
               </button>
@@ -2331,7 +2289,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <button
                     type="button"
                     className="text-amber-700 hover:underline underline-offset-2"
-                    onClick={() => document.getElementById("section-sensory")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    onClick={() => document.getElementById("section-by-concern")?.scrollIntoView({ behavior: "smooth", block: "start" })}
                   >
                     {result.sensoryTrigger.length} sensory trigger{result.sensoryTrigger.length !== 1 ? "s" : ""}
                   </button>
@@ -2343,7 +2301,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <button
                     type="button"
                     className="text-yellow-700 hover:underline underline-offset-2"
-                    onClick={() => document.getElementById("section-photosensitive")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    onClick={() => document.getElementById("section-by-concern")?.scrollIntoView({ behavior: "smooth", block: "start" })}
                   >
                     {result.photosensitive.length} photosensitive
                   </button>
@@ -2353,7 +2311,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <button
                 type="button"
                 className="text-teal-700 hover:underline underline-offset-2"
-                onClick={() => document.getElementById("section-safe")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                onClick={() => document.getElementById("section-by-concern")?.scrollIntoView({ behavior: "smooth", block: "start" })}
               >
                 {result.safe.length} safe
               </button>
@@ -2598,9 +2556,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {/* By concern — grouped ingredient view */}
           {result.originalItems.length > 0 && (() => {
             const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
+
+            const RINSE_OFF_SUPPRESS_SENSORY_CATS = new Set(["Pilling", "Film-forming", "occlusive-itch", "comedogenic-itch"]);
+            const RINSE_OFF_SUPPRESS_PHOTO_CATS = new Set(["photo-retinoid", "photo-BHA", "photo-brightening"]);
+
             type GroupItem = {
               item: string;
               match: ReturnType<typeof getItemMatch>;
+              fullMatch: IngredientMatch | null;
               sensoryItem: SensoryTriggerItem | null;
               photoItem: PhotosensitiveItem | null;
             };
@@ -2610,29 +2573,58 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
             for (const item of result.originalItems) {
               const match = getItemMatch(item, result.safe, result.flagged);
-              const sensoryItem = (result.sensoryTrigger ?? []).find(
+              const cleaned = normalizeForMatch(item.replace(/\([^)]*\)/g, ""));
+              const fullMatch = result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned)
+                ?? result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned)
+                ?? null;
+              let sensoryItem = (result.sensoryTrigger ?? []).find(
                 (s) => normalizeForMatch(s.rawName) === normalizeForMatch(item)
               ) ?? null;
-              const photoItem = (result.photosensitive ?? []).find(
+              if (isRinseOff && sensoryItem && RINSE_OFF_SUPPRESS_SENSORY_CATS.has(sensoryItem.sensory_category ?? "")) {
+                sensoryItem = null;
+              }
+              let photoItem = (result.photosensitive ?? []).find(
                 (p) => normalizeForMatch(p.rawName) === normalizeForMatch(item)
               ) ?? null;
+              if (isRinseOff && photoItem && RINSE_OFF_SUPPRESS_PHOTO_CATS.has(photoItem.photoCategory ?? "")) {
+                photoItem = null;
+              }
               const level = getIngredientConcernLevel(match, sensoryItem, photoItem, activeSkinTypes, activeClimates);
-              if (level !== "skip") groups[level].push({ item, match, sensoryItem, photoItem });
+              if (level !== "skip") groups[level].push({ item, match, fullMatch, sensoryItem, photoItem });
             }
 
-            const GROUP_COLORS: Record<ConcernLevel, { header: string; dot: string; border: string; divider: string; nameOpen: string; concern: string }> = {
-              universal:          { header: "text-rose-700",   dot: "bg-rose-400",   border: "border-rose-100",   divider: "divide-rose-100",   nameOpen: "text-rose-700",   concern: "text-rose-700" },
-              "profile-matched":  { header: "text-amber-700",  dot: "bg-amber-400",  border: "border-amber-100",  divider: "divide-amber-100",  nameOpen: "text-amber-700",  concern: "text-amber-700" },
-              "non-matching":     { header: "text-yellow-700", dot: "bg-yellow-400", border: "border-yellow-100", divider: "divide-yellow-100", nameOpen: "text-yellow-700", concern: "text-yellow-700" },
-              neutral:            { header: "text-teal-700",   dot: "bg-teal-400",   border: "border-teal-100",   divider: "divide-teal-100",   nameOpen: "text-teal-700",   concern: "text-teal-700" },
+            const CONCERN_STRIPE: Record<ConcernLevel, string> = {
+              universal:         "border-rose-500",
+              "profile-matched": "border-amber-500",
+              "non-matching":    "border-yellow-500",
+              neutral:           "border-teal-500",
+            };
+            const CONCERN_PILL: Record<ConcernLevel, string> = {
+              universal:         "bg-rose-50 text-rose-700",
+              "profile-matched": "bg-amber-50 text-amber-700",
+              "non-matching":    "bg-yellow-50 text-yellow-700",
+              neutral:           "bg-teal-50 text-teal-700",
+            };
+            const GROUP_HEADER_COLOR: Record<ConcernLevel, string> = {
+              universal:         "text-rose-700",
+              "profile-matched": "text-amber-700",
+              "non-matching":    "text-yellow-700",
+              neutral:           "text-teal-700",
+            };
+            const GROUP_BORDER: Record<ConcernLevel, string> = {
+              universal:         "border-rose-100 divide-rose-100",
+              "profile-matched": "border-amber-100 divide-amber-100",
+              "non-matching":    "border-yellow-100 divide-yellow-100",
+              neutral:           "border-teal-100 divide-teal-100",
             };
 
-            const renderConcernRow = ({ item, match, sensoryItem, photoItem }: GroupItem, level: ConcernLevel) => {
+            const renderConcernRow = ({ item, match, fullMatch, sensoryItem, photoItem }: GroupItem, level: ConcernLevel) => {
               const rowKey = `concern-${item}`;
               const isOpen = concernExpanded.has(rowKey);
               const ingId = match?.ingredient.id ?? null;
               const dbExplanation = match?.ingredient.explanation ?? null;
               const explanation = dbExplanation ?? (ingId ? explanations[ingId] : null);
+              const isLoading = isOpen && ingId !== null && !dbExplanation && ingId in explanations && explanations[ingId] === null;
 
               const toggle = () => {
                 setConcernExpanded((prev) => {
@@ -2665,51 +2657,51 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 ? (photoItem.sunLevel === "avoid" ? "Photosensitizer" : "Photo caution")
                 : null;
               const concernLabel = catLabel ?? sensoryLabel ?? photoLabel;
-              const c = GROUP_COLORS[level];
+              const benefitLabel = safeCategory ? (CATEGORY_LABELS[safeCategory] ?? safeCategory) : null;
 
               const allBenefitNotes = (match?.ingredient.skin_climate_notes ?? []).filter((n) => n.sentiment === "benefit");
-              const safeProfileNotes = match?.status === "safe"
-                ? filterNotes(match.ingredient.skin_climate_notes).filter((n) => n.sentiment === "benefit")
-                : [];
+              const profileBenefitNotes = filterNotes(match?.ingredient.skin_climate_notes).filter((n) => n.sentiment === "benefit");
+              const profileCautionNotes = filterNotes(match?.ingredient.skin_climate_notes).filter(
+                (n) => n.sentiment === "caution" || n.sentiment === "strong_caution"
+              );
 
               return (
-                <div key={rowKey} className="overflow-hidden">
+                <div key={rowKey} id={rowKey} className="overflow-hidden">
                   <button
                     type="button"
                     className="w-full flex items-center justify-between px-3 py-2 text-left"
                     onClick={toggle}
                   >
-                    <span className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <span className={`text-sm font-medium truncate ${isOpen ? c.nameOpen : "text-gray-800"}`}>
+                    <span className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+                      <span className={`text-sm font-medium truncate ${isOpen ? GROUP_HEADER_COLOR[level] : "text-gray-800"}`}>
                         {smartCase(item)}
                       </span>
                       {structCat && (
-                        <>
-                          <span className="text-gray-300 text-xs shrink-0">·</span>
-                          <span className="text-xs text-gray-400 shrink-0">{structCat}</span>
-                        </>
+                        <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-2 py-0.5 shrink-0">{structCat}</span>
                       )}
                       {concernLabel ? (
-                        <>
-                          <span className="text-gray-300 text-xs shrink-0">·</span>
-                          <span className={`text-xs shrink-0 ${c.concern}`}>{concernLabel}</span>
-                        </>
-                      ) : safeCategory ? (
-                        <>
-                          <span className="text-gray-300 text-xs shrink-0">·</span>
-                          <span className="text-xs text-teal-700 shrink-0">{CATEGORY_LABELS[safeCategory] ?? safeCategory}</span>
-                        </>
+                        <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${CONCERN_PILL[level]}`}>{concernLabel}</span>
+                      ) : benefitLabel ? (
+                        <span className="text-xs bg-teal-50 text-teal-700 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>
                       ) : null}
                     </span>
                     <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                   </button>
                   {isOpen && (
-                    <div className="px-3 pb-3 space-y-1.5">
+                    <div className="px-3 pb-3 space-y-2">
                       {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
-                        <p className="text-xs text-gray-400 leading-relaxed">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
+                        <div className="pl-3 border-l-2 border-gray-300">
+                          <p className="text-xs text-gray-500 leading-relaxed">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
+                          {fullMatch?.comedogenicRating && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              <span className="font-medium">{fullMatch.comedogenicRating}</span>
+                              {fullMatch.comedogenicRating !== "oxid." ? " on the 0–5 scale" : " (oxidation-dependent)"}
+                            </p>
+                          )}
+                        </div>
                       )}
                       {match?.status === "flagged" && allBenefitNotes.length > 0 && (
-                        <div className="space-y-0.5 pt-1 border-t border-gray-100">
+                        <div className="pl-3 border-l-2 border-teal-500 space-y-0.5">
                           {allBenefitNotes.map((note, i) => (
                             <p key={i} className="text-xs text-teal-700 leading-relaxed">
                               {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
@@ -2718,9 +2710,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           ))}
                         </div>
                       )}
-                      {match?.status === "safe" && safeProfileNotes.length > 0 && (
-                        <div className="space-y-0.5">
-                          {safeProfileNotes.map((note, i) => (
+                      {match?.status === "safe" && profileBenefitNotes.length > 0 && (
+                        <div className="pl-3 border-l-2 border-teal-500 space-y-0.5">
+                          {profileBenefitNotes.map((note, i) => (
                             <p key={i} className="text-xs text-teal-700 leading-relaxed">
                               {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
                               {note.text}
@@ -2728,15 +2720,49 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           ))}
                         </div>
                       )}
-                      {sensoryItem && (
-                        <p className={`text-xs leading-relaxed ${c.concern}`}>{sensoryItem.sensory_note}</p>
+                      {level !== "neutral" && (
+                        <div className={`pl-3 border-l-2 ${CONCERN_STRIPE[level]} space-y-1`}>
+                          {isLoading ? (
+                            <p className="text-xs text-gray-400 italic">Generating explanation…</p>
+                          ) : explanation ? (
+                            <p className="text-xs text-gray-600 leading-relaxed">{explanation}</p>
+                          ) : null}
+                          {fullMatch?.benefit_note && (
+                            <p className="text-xs text-gray-400 leading-relaxed">{fullMatch.benefit_note}</p>
+                          )}
+                          {sensoryItem?.sensory_note && (
+                            <p className="text-xs text-gray-600 leading-relaxed">{sensoryItem.sensory_note}</p>
+                          )}
+                          {sensoryItem?.sensory_category === "Film-forming" && (
+                            <p className="text-xs text-gray-400">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
+                          )}
+                          {sensoryItem?.sensory_category === "Occlusive" && (
+                            <p className="text-xs text-gray-400">Bump type: worsens existing congestion by sealing the skin surface.</p>
+                          )}
+                          {photoItem?.photo_note && (
+                            <p className="text-xs text-gray-600 leading-relaxed">{photoItem.photo_note}</p>
+                          )}
+                          {profileCautionNotes.length > 0 && (
+                            <div className="space-y-0.5">
+                              {profileCautionNotes.map((note, i) => (
+                                <p key={i} className="text-xs text-gray-600 leading-relaxed">
+                                  {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
+                                  {note.text}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
-                      {photoItem?.photo_note && (
-                        <p className={`text-xs leading-relaxed ${c.concern}`}>{photoItem.photo_note}</p>
+                      {level === "neutral" && (isLoading || explanation) && (
+                        <div className="pl-3 border-l-2 border-teal-500">
+                          {isLoading ? (
+                            <p className="text-xs text-gray-400 italic">Generating explanation…</p>
+                          ) : (
+                            <p className="text-xs text-gray-500 leading-relaxed">{explanation}</p>
+                          )}
+                        </div>
                       )}
-                      {explanation ? (
-                        <p className="text-xs text-gray-600 leading-relaxed">{explanation}</p>
-                      ) : null}
                     </div>
                   )}
                 </div>
@@ -2745,34 +2771,32 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
             const renderGroup = (label: string, items: GroupItem[], level: ConcernLevel, isCollapsible = false) => {
               if (items.length === 0) return null;
-              const c = GROUP_COLORS[level];
-              const header = (
-                <div className={`flex items-center gap-2 ${c.header} ${isCollapsible ? "cursor-pointer" : ""}`}
-                  onClick={isCollapsible ? () => setNeutralGroupOpen((p) => !p) : undefined}
-                  role={isCollapsible ? "button" : undefined}
-                >
-                  <span className={`w-2 h-2 rounded-full ${c.dot} inline-block shrink-0`} />
-                  <span className="text-xs font-semibold uppercase tracking-wider">{label} — {items.length}</span>
-                  {isCollapsible && (
-                    <span className="ml-auto text-xs opacity-50">{neutralGroupOpen ? "▲" : "▼"}</span>
-                  )}
-                </div>
-              );
-              const body = (
-                <div className={`mt-1.5 border ${c.border} rounded-xl overflow-hidden divide-y ${c.divider}`}>
-                  {items.map((g) => renderConcernRow(g, level))}
-                </div>
-              );
+              const borderColors = GROUP_BORDER[level];
+              const headerColor = GROUP_HEADER_COLOR[level];
+              const isGroupOpen = level === "neutral" ? neutralGroupOpen : true;
               return (
                 <div className="mt-3">
-                  {header}
-                  {isCollapsible ? (neutralGroupOpen && body) : body}
+                  <div
+                    className={`flex items-center gap-2 ${headerColor} ${isCollapsible ? "cursor-pointer" : ""}`}
+                    onClick={isCollapsible ? () => setNeutralGroupOpen((p) => !p) : undefined}
+                    role={isCollapsible ? "button" : undefined}
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wider">{label} — {items.length}</span>
+                    {isCollapsible && (
+                      <span className="ml-auto text-xs opacity-50">{isGroupOpen ? "▲" : "▼"}</span>
+                    )}
+                  </div>
+                  {(!isCollapsible || isGroupOpen) && (
+                    <div className={`mt-1.5 border rounded-xl overflow-hidden divide-y ${borderColors}`}>
+                      {items.map((g) => renderConcernRow(g, level))}
+                    </div>
+                  )}
                 </div>
               );
             };
 
             return (
-              <section>
+              <section id="section-by-concern">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">By concern</p>
                 {renderGroup("Universal concerns", groups.universal, "universal")}
                 {hasProfile && renderGroup("Your profile", groups["profile-matched"], "profile-matched")}
@@ -2803,567 +2827,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </p>
           )}
 
-          {/* Product congestion profile */}
-          {(() => {
-            const poreClogging = result.flagged.filter((f) => f.ingredient.flagged_category === "pore-clogger");
-            const miliaRisk = (result.sensoryTrigger ?? []).filter((s) => s.sensory_category === "Film-forming");
-            const trapsCongest = (result.sensoryTrigger ?? []).filter((s) => s.sensory_category === "Occlusive");
-            const inflammatory = result.flagged.filter((f) =>
-              ["sensitizer", "fragrance-allergen", "preservative-allergen"].includes(f.ingredient.flagged_category ?? "")
-            );
-            const vectors = [
-              {
-                label: "Pore-clogging",
-                items: isRinseOff ? [] : poreClogging.map((f) => ({
-                  name: smartCase(f.displayName),
-                  expandKey: f.ingredient.id,
-                  elementId: `ingredient-${f.ingredient.id}`,
-                })),
-              },
-              {
-                label: "Milia risk",
-                items: isRinseOff ? [] : miliaRisk.map((s) => ({
-                  name: smartCase(s.rawName),
-                  expandKey: `sensory-${s.rawName}`,
-                  elementId: `sensory-row-${s.rawName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
-                })),
-              },
-              {
-                label: "Traps congestion",
-                items: isRinseOff ? [] : trapsCongest.map((s) => ({
-                  name: smartCase(s.rawName),
-                  expandKey: `sensory-${s.rawName}`,
-                  elementId: `sensory-row-${s.rawName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
-                })),
-              },
-              {
-                label: "Inflammatory",
-                items: inflammatory.map((f) => ({
-                  name: smartCase(f.displayName),
-                  expandKey: f.ingredient.id,
-                  elementId: `ingredient-${f.ingredient.id}`,
-                })),
-              },
-            ].filter((v) => v.items.length > 0);
-            if (vectors.length === 0) return null;
-            return (
-              <section>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Product congestion profile</p>
-                {isRinseOff && (
-                  <p className="text-xs text-gray-400 mb-2">Pore-clogging, milia, and occlusion risks are negligible when a product is rinsed off. Sensitizers and allergens are flagged regardless — they can trigger an immune response on contact, even briefly.</p>
-                )}
-                <div className="border border-gray-100 rounded-xl overflow-hidden">
-                  <div className="divide-y divide-gray-50">
-                    {vectors.map((v) => {
-                      const def = CONGESTION_VECTOR_DEFS.find((d) => d.label === v.label);
-                      const key = `cp-${v.label}`;
-                      const isOpen = expanded.has(key);
-                      return (
-                        <div key={v.label} className="px-4 py-1.5">
-                          <div className="flex items-start gap-3">
-                            <button
-                              type="button"
-                              onClick={() => setExpanded((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
-                              className="text-xs font-medium text-gray-700 hover:text-gray-900 shrink-0 text-left w-36"
-                            >
-                              {v.label} <span className="text-gray-300 text-[10px]">{isOpen ? "▲" : "▼"}</span>
-                            </button>
-                            <p className="text-xs text-gray-400 flex-1 leading-relaxed">
-                              {v.items.map((item, i) => (
-                                <Fragment key={item.elementId}>
-                                  {i > 0 && ", "}
-                                  <button
-                                    type="button"
-                                    className="hover:text-gray-700 hover:underline"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setExpanded((prev) => { const n = new Set(prev); n.add(item.expandKey); return n; });
-                                      setTimeout(() => {
-                                        document.getElementById(item.elementId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                      }, 50);
-                                    }}
-                                  >
-                                    {item.name}
-                                  </button>
-                                </Fragment>
-                              ))}
-                            </p>
-                          </div>
-                          {isOpen && def && (
-                            <div className="mt-2 space-y-0.5">
-                              <p className="text-xs text-gray-500 leading-relaxed">{def.description}</p>
-                              <p className="text-xs text-gray-400">Bump type: {def.bumps}</p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </section>
-            );
-          })()}
-
-          {/* Flagged, Sensory, and Photosensitive — rendered in profile-match order */}
-          {(() => {
-            type SectionId = "flagged" | "sensory" | "photo";
-            const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
-
-            const RINSE_OFF_SUPPRESS_SENSORY = ["Pilling", "Film-forming", "occlusive-itch", "comedogenic-itch"];
-            const visibleSensory = isRinseOff
-              ? (result.sensoryTrigger ?? []).filter((s) => !s.sensory_category || !RINSE_OFF_SUPPRESS_SENSORY.includes(s.sensory_category))
-              : (result.sensoryTrigger ?? []);
-            const suppressedSensory = (result.sensoryTrigger ?? []).length - visibleSensory.length;
-
-            const RINSE_OFF_SUPPRESS_PHOTO: string[] = ["photo-retinoid", "photo-BHA", "photo-brightening"];
-            const visiblePhoto = isRinseOff
-              ? (result.photosensitive ?? []).filter((p) => !p.photoCategory || !RINSE_OFF_SUPPRESS_PHOTO.includes(p.photoCategory))
-              : (result.photosensitive ?? []);
-            const suppressedPhoto = (result.photosensitive ?? []).length - visiblePhoto.length;
-
-            const flaggedScore = hasProfile
-              ? result.flagged.filter((item) => filterNotes(item.ingredient.skin_climate_notes).length > 0).length
-              : 0;
-            const sensoryScore = hasProfile
-              ? visibleSensory.filter((item) => {
-                  const cats = item.sensory_category ? SENSORY_PROFILE_MAP[item.sensory_category] : null;
-                  return cats ? cats.some((t) => activeSkinTypes.has(t)) : false;
-                }).length
-              : 0;
-            const photoScore = hasProfile && activeSkinTypes.has("reactive") ? visiblePhoto.length : 0;
-
-            const defaultOrder: SectionId[] = ["flagged", "sensory", "photo"];
-            const sectionOrder: SectionId[] = hasProfile
-              ? [...defaultOrder].sort((a, b) => {
-                  const scores: Record<SectionId, number> = { flagged: flaggedScore, sensory: sensoryScore, photo: photoScore };
-                  return scores[b] - scores[a];
-                })
-              : defaultOrder;
-
-            const sortedFlagged = hasProfile
-              ? [...result.flagged].sort((a, b) => {
-                  const tier = (item: IngredientMatch) => {
-                    if (UNIVERSAL_CONCERN_CATEGORIES.has(item.ingredient.flagged_category ?? "")) return 0;
-                    if (filterNotes(item.ingredient.skin_climate_notes).length > 0) return 1;
-                    return 2;
-                  };
-                  return tier(a) - tier(b);
-                })
-              : result.flagged;
-
-            const renderFlagged = (): React.ReactNode => {
-              if (result.flagged.length === 0) return null;
-              return (
-                <section id="section-flagged">
-                  <div className="flex items-center gap-2 flex-wrap mb-2">
-                    <p className="text-xs font-semibold text-rose-700 uppercase tracking-widest">
-                      Flagged Ingredients — {result.flagged.length}
-                    </p>
-                    {!isRinseOff && result.flagged.some((f) => f.ingredient.flagged_category === "pore-clogger") && (
-                      <span className="text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">pore-clogging</span>
-                    )}
-                    {result.flagged.some((f) => ["sensitizer","fragrance-allergen","preservative-allergen"].includes(f.ingredient.flagged_category ?? "")) && (
-                      <span className="text-xs text-rose-700 bg-rose-50 rounded-full px-2 py-0.5">inflammatory</span>
-                    )}
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {sortedFlagged.map((item) => {
-                      const { id, explanation: dbExplanation, flagged_category, category: ingCat, structural_category } = item.ingredient;
-                      const isOpen = expanded.has(id);
-                      const explanation = dbExplanation ?? explanations[id];
-                      const isLoading = isOpen && !dbExplanation && !(id in explanations);
-                      const catKey = flagged_category ?? ingCat;
-                      const catLabel = catKey ? CATEGORY_LABELS[catKey] : null;
-                      const isUniversal = UNIVERSAL_CONCERN_CATEGORIES.has(flagged_category ?? "");
-                      const matchedNotes = filterNotes(item.ingredient.skin_climate_notes);
-                      const showPersonalized = hasProfile && !isUniversal && matchedNotes.length > 0;
-
-                      return (
-                        <div key={id} id={`ingredient-${id}`} className="border-l-4 border-l-gray-200 overflow-hidden">
-                          <button
-                            className="w-full flex items-center justify-between px-3 py-1 text-left"
-                            onClick={() => toggleExpand(id, dbExplanation)}
-                          >
-                            <span className="flex items-center gap-1.5 min-w-0 flex-1">
-                              <span className={`text-sm font-medium truncate ${isOpen ? "text-rose-700" : "text-gray-800"}`}>
-                                {smartCase(item.displayName)}
-                              </span>
-                              {structural_category && (
-                                <>
-                                  <span className="text-gray-300 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-gray-400 shrink-0">{structural_category}</span>
-                                </>
-                              )}
-                              {catLabel && (
-                                <>
-                                  <span className="text-gray-300 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-rose-700 shrink-0">{catLabel}</span>
-                                </>
-                              )}
-                              {isUniversal && (
-                                <>
-                                  <span className="text-gray-300 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-gray-400 shrink-0">universal concern</span>
-                                </>
-                              )}
-                              {item.comedogenicRating && (
-                                <>
-                                  <span className="text-gray-200 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-gray-400 shrink-0">{item.comedogenicRating}</span>
-                                </>
-                              )}
-                            </span>
-                            <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
-                          </button>
-                          {isOpen && (
-                            <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
-                              {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
-                                <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
-                              )}
-                              {item.comedogenicRating && (
-                                <p className="text-xs text-gray-500"><span className="font-medium">{item.comedogenicRating}</span>{item.comedogenicRating !== "oxid." ? " on the 0–5 scale" : " (oxidation-dependent, not a fixed scale rating)"}</p>
-                              )}
-                              {showPersonalized ? (
-                                <div className="space-y-1">
-                                  {matchedNotes.map((note, i) => (
-                                    <p key={i} className={`text-xs leading-relaxed ${
-                                      note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
-                                      note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
-                                    }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
-                                  ))}
-                                </div>
-                              ) : (
-                                <>
-                                  {isLoading ? (
-                                    <span className="italic text-gray-400">Generating explanation…</span>
-                                  ) : explanation ? explanation : (
-                                    <span className="italic text-gray-400">No explanation yet.</span>
-                                  )}
-                                  {item.benefit_note && (
-                                    <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">{item.benefit_note}</p>
-                                  )}
-                                  {isUniversal && matchedNotes.length > 0 && (
-                                    <div className="space-y-1 pt-1 border-t border-gray-100">
-                                      {matchedNotes.map((note, i) => (
-                                        <p key={i} className={`text-xs leading-relaxed ${
-                                          note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
-                                          note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
-                                        }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
-                                      ))}
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            };
-
-            const renderSensory = (): React.ReactNode => {
-              if (visibleSensory.length === 0) return null;
-              return (
-                <section id="section-sensory">
-                  <div className="flex items-center gap-2 flex-wrap mb-2">
-                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-widest">
-                      Sensory Trigger Ingredients — {visibleSensory.length}
-                    </p>
-                    {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Film-forming") && (
-                      <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">milia risk</span>
-                    )}
-                    {!isRinseOff && (result.sensoryTrigger ?? []).some((s) => s.sensory_category === "Occlusive") && (
-                      <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">traps congestion</span>
-                    )}
-                    {visibleSensory.some((s) => s.sensory_category === "chemical-itch") && (
-                      <span className="text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">contact allergens</span>
-                    )}
-                  </div>
-                  {isRinseOff && suppressedSensory > 0 && (
-                    <p className="text-xs text-gray-400 mb-2">{suppressedSensory} ingredient{suppressedSensory !== 1 ? "s" : ""} (pilling, film-forming) suppressed — these require prolonged skin contact to cause problems and are not a concern in rinse-off products.</p>
-                  )}
-                  <div className="divide-y divide-gray-100">
-                    {visibleSensory.map((item) => {
-                      const key = `sensory-${item.rawName}`;
-                      const isOpen = expanded.has(key);
-                      const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
-                      const flaggedMatch = result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned);
-                      const safeMatch = result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned);
-                      const match = flaggedMatch ?? safeMatch;
-                      const structCat = match?.ingredient.structural_category ?? null;
-                      const rowId = `sensory-row-${item.rawName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
-
-                      if (flaggedMatch) {
-                        return (
-                          <div key={item.rawName} id={rowId} className="flex items-center gap-1.5 px-3 py-1 border-l-4 border-l-gray-200">
-                            <span className="text-sm text-gray-500 truncate">{smartCase(item.rawName)}</span>
-                            {item.sensory_category && (
-                              <>
-                                <span className="text-gray-300 text-xs shrink-0">·</span>
-                                <span className="text-xs text-amber-700 shrink-0">{item.sensory_category}</span>
-                              </>
-                            )}
-                            <a href={`#ingredient-${flaggedMatch.ingredient.id}`} className="ml-auto text-xs text-rose-600 shrink-0">
-                              see Flagged ↑
-                            </a>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div key={item.rawName} id={rowId} className="border-l-4 border-l-gray-200 overflow-hidden">
-                          <button
-                            className="w-full flex items-center justify-between px-3 py-1 text-left"
-                            onClick={() => setExpanded((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(key)) next.delete(key); else next.add(key);
-                              return next;
-                            })}
-                          >
-                            <span className="flex items-center gap-1.5 min-w-0 flex-1">
-                              <span className={`text-sm font-medium truncate ${isOpen ? "text-amber-700" : "text-gray-800"}`}>
-                                {smartCase(item.rawName)}
-                              </span>
-                              {structCat && (
-                                <>
-                                  <span className="text-gray-300 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-gray-400 shrink-0">{structCat}</span>
-                                </>
-                              )}
-                              {item.sensory_category && (
-                                <>
-                                  <span className="text-gray-300 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-amber-700 shrink-0">{SENSORY_CATEGORY_LABEL[item.sensory_category] ?? item.sensory_category}</span>
-                                </>
-                              )}
-                              {item.sensory_category === "Film-forming" && (
-                                <>
-                                  <span className="text-gray-200 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-gray-400 shrink-0">milia risk</span>
-                                </>
-                              )}
-                              {item.sensory_category === "Occlusive" && (
-                                <>
-                                  <span className="text-gray-200 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-gray-400 shrink-0">traps congestion</span>
-                                </>
-                              )}
-                              {item.sensory_category === "comedogenic-itch" && (
-                                <>
-                                  <span className="text-gray-200 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-gray-400 shrink-0">pore-blocking</span>
-                                </>
-                              )}
-                            </span>
-                            <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
-                          </button>
-                          {isOpen && (
-                            <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
-                              {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
-                                <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
-                              )}
-                              {item.sensory_note && <p>{item.sensory_note}</p>}
-                              {item.sensory_category === "Film-forming" && (
-                                <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
-                              )}
-                              {item.sensory_category === "Occlusive" && (
-                                <p className="text-xs text-gray-400 pt-1 border-t border-gray-100">Bump type: worsens existing congestion by sealing the skin surface and locking in sebum and dead cells underneath.</p>
-                              )}
-                              {(() => {
-                                const notes = filterNotes(match?.ingredient.skin_climate_notes);
-                                if (!notes.length) return null;
-                                return (
-                                  <div className="space-y-1 pt-1 border-t border-gray-100">
-                                    {notes.map((note, i) => (
-                                      <p key={i} className={`text-xs leading-relaxed ${
-                                        note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
-                                        note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
-                                      }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
-                                    ))}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            };
-
-            const renderPhoto = (): React.ReactNode => {
-              if (visiblePhoto.length === 0) return null;
-              return (
-                <section id="section-photosensitive">
-                  <p className="text-xs font-semibold text-yellow-700 uppercase tracking-widest mb-2">
-                    Photosensitive Ingredients — {visiblePhoto.length}
-                  </p>
-                  {isRinseOff && suppressedPhoto > 0 && (
-                    <p className="text-xs text-gray-400 mb-2">{suppressedPhoto} ingredient{suppressedPhoto !== 1 ? "s" : ""} (retinoids, BHA, brightening) suppressed — negligible risk when rinsed off. AHAs and botanicals remain flagged as they cause reactions even with brief contact.</p>
-                  )}
-                  <div className="divide-y divide-gray-100">
-                    {visiblePhoto.map((item) => {
-                      const key = `photo-${item.rawName}`;
-                      const isOpen = expanded.has(key);
-                      const cleaned = normalizeForMatch(item.rawName.replace(/\([^)]*\)/g, ""));
-                      const flaggedMatch = result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned);
-                      const safeMatch = result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned);
-                      const structCat = (flaggedMatch ?? safeMatch)?.ingredient.structural_category ?? null;
-                      const catLabel = item.photoCategory ? CATEGORY_LABELS[item.photoCategory] : null;
-
-                      if (flaggedMatch) {
-                        return (
-                          <div key={item.rawName} className="flex items-center gap-1.5 px-3 py-1 border-l-4 border-l-gray-200">
-                            <span className="text-sm text-gray-500 truncate">{smartCase(item.rawName)}</span>
-                            {catLabel && (
-                              <>
-                                <span className="text-gray-300 text-xs shrink-0">·</span>
-                                <span className="text-xs text-yellow-700 shrink-0">{catLabel}</span>
-                              </>
-                            )}
-                            {item.photo_note && (
-                              <span className="text-xs text-gray-400 hidden sm:inline shrink-0">{item.photo_note}</span>
-                            )}
-                            <a href={`#ingredient-${flaggedMatch.ingredient.id}`} className="ml-auto text-xs text-rose-600 shrink-0">
-                              see Flagged ↑
-                            </a>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div key={item.rawName} className="border-l-4 border-l-gray-200 overflow-hidden">
-                          <button
-                            className="w-full flex items-center justify-between px-3 py-1 text-left"
-                            onClick={() => setExpanded((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(key)) next.delete(key); else next.add(key);
-                              return next;
-                            })}
-                          >
-                            <span className="flex items-center gap-1.5 min-w-0 flex-1">
-                              <span className={`text-sm font-medium truncate ${isOpen ? "text-yellow-700" : "text-gray-800"}`}>
-                                {smartCase(item.rawName)}
-                              </span>
-                              {structCat && (
-                                <>
-                                  <span className="text-gray-300 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-gray-400 shrink-0">{structCat}</span>
-                                </>
-                              )}
-                              {catLabel && (
-                                <>
-                                  <span className="text-gray-300 text-xs shrink-0">·</span>
-                                  <span className="text-xs text-yellow-700 shrink-0">{catLabel}</span>
-                                </>
-                              )}
-                            </span>
-                            <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
-                          </button>
-                          {isOpen && (
-                            <div className="px-3 pb-2 text-sm text-gray-600 leading-relaxed space-y-1">
-                              {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
-                                <p className="text-xs text-gray-400">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
-                              )}
-                              {!item.isPositionBased && safeMatch?.ingredient.explanation && <p>{safeMatch.ingredient.explanation}</p>}
-                              {item.photo_note && <p>{item.photo_note}</p>}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            };
-
-            const renderers: Record<SectionId, () => React.ReactNode> = {
-              flagged: renderFlagged,
-              sensory: renderSensory,
-              photo: renderPhoto,
-            };
-
-            return <>{sectionOrder.map((sid) => <Fragment key={sid}>{renderers[sid]()}</Fragment>)}</>;
-          })()}
-
-          {/* Safe ingredients */}
-          {result.safe.length > 0 && (
-            <section id="section-safe">
-              <p className="text-xs font-semibold text-teal-700 uppercase tracking-widest mb-2">
-                Safe Ingredients — {result.safe.length}
-              </p>
-              <div className="divide-y divide-gray-100">
-                {result.safe.map((item) => {
-                  const { id, explanation: dbExplanation, category: ingCat, structural_category } = item.ingredient;
-                  const isOpen = expanded.has(id);
-                  const explanation = dbExplanation ?? explanations[id];
-                  const isLoading = isOpen && !dbExplanation && !(id in explanations);
-                  const catLabel = ingCat ? CATEGORY_LABELS[ingCat] : null;
-
-                  return (
-                    <div key={id} id={`ingredient-${id}`} className="border-l-2 border-l-gray-200 overflow-hidden">
-                      <button
-                        className="w-full flex items-center justify-between pl-3 pr-2 py-0.5 text-left"
-                        onClick={() => toggleExpand(id, dbExplanation)}
-                      >
-                        <span className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <span className={`text-sm font-medium truncate ${isOpen ? "text-teal-700" : "text-gray-700"}`}>
-                            {smartCase(item.displayName)}
-                          </span>
-                          {structural_category && (
-                            <>
-                              <span className="text-gray-300 text-xs shrink-0">·</span>
-                              <span className="text-xs text-gray-400 shrink-0">{structural_category}</span>
-                            </>
-                          )}
-                          {catLabel && (
-                            <>
-                              <span className="text-gray-300 text-xs shrink-0">·</span>
-                              <span className="text-xs text-teal-700 shrink-0">{catLabel}</span>
-                            </>
-                          )}
-                        </span>
-                        <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
-                      </button>
-                      {isOpen && (
-                        <div className="pl-3 pr-2 pb-1.5 text-sm text-gray-500 leading-relaxed">
-                          {structural_category && STRUCTURAL_DESCRIPTIONS[structural_category] && (
-                            <p className="text-xs text-gray-400 mb-1">{STRUCTURAL_DESCRIPTIONS[structural_category]}</p>
-                          )}
-                          {(() => {
-                            const notes = filterNotes(item.ingredient.skin_climate_notes);
-                            const hasActiveProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
-                            if (hasActiveProfile && notes.length > 0) {
-                              return (
-                                <div className="space-y-1">
-                                  {notes.map((note, i) => (
-                                    <p key={i} className={`text-xs leading-relaxed ${
-                                      note.sentiment === "strong_caution" || note.sentiment === "caution" ? "text-amber-700" :
-                                      note.sentiment === "benefit" ? "text-teal-700" : "text-gray-500"
-                                    }`}>{noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}{note.text}</p>
-                                  ))}
-                                </div>
-                              );
-                            }
-                            return isLoading ? (
-                              <span className="italic text-gray-400">Generating explanation…</span>
-                            ) : explanation ? explanation : (
-                              <span className="italic text-gray-400">No explanation yet.</span>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
 
           {/* Unreviewed ingredients */}
           {result.unreviewed.length > 0 && (
