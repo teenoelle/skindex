@@ -545,6 +545,145 @@ export function generateNotes(ing: {
     });
   }
 
+  // ── DEVICES ────────────────────────────────────────────────────────────────
+
+  if (sc === "Retinoid") {
+    notes.push({
+      dimensions: [],
+      climate: ["red_nir", "blue_light", "amber_light", "heat_steam"],
+      sentiment: "strong_caution",
+      text: "Retinoids sensitize skin to energy absorption — do not apply before any light therapy session or heated device. The combination significantly increases irritation and burn risk. Use retinoids PM on days you do light therapy AM, or alternate evenings entirely.",
+    });
+  }
+
+  if (fc === "aha exfoliant" || fc === "bha exfoliant") {
+    notes.push({
+      dimensions: [],
+      climate: ["red_nir", "blue_light", "amber_light", "heat_steam"],
+      sentiment: "strong_caution",
+      text: "Freshly exfoliated skin is more sensitive to energy from light devices and heat tools. Wait at least 24 hours after applying exfoliants before any light therapy session — or do the device session first and apply acids 20+ min later.",
+    });
+  }
+
+  if (fc === "chemical sunscreen") {
+    notes.push({
+      dimensions: [],
+      climate: ["red_nir", "blue_light", "amber_light"],
+      sentiment: "strong_caution",
+      text: "Chemical UV filters absorb light energy and convert it to heat within the skin layer. Using a chemical-filter product before a light device session creates concentrated, uncontrolled heat at the skin surface. Rinse off before your session.",
+    });
+  }
+
+  if (fc === "drying solvent") {
+    notes.push({
+      dimensions: [],
+      climate: ["red_nir", "blue_light", "amber_light"],
+      sentiment: "caution",
+      text: "Penetration enhancers temporarily open the skin barrier. Combined with a light device, this amplifies delivery of all co-applied ingredients — including any sensitizers or irritants in the formula. Avoid applying this immediately before a light therapy session.",
+    });
+  }
+
+  if (sc === "Silicone") {
+    notes.push({
+      dimensions: [],
+      climate: ["microcurrent"],
+      sentiment: "caution",
+      text: "Silicone blocks electrical conductivity and prevents microcurrent from passing through the skin effectively. Apply a water-based hyaluronic acid or gel as the conductive medium for microcurrent — not a silicone-containing formula.",
+    });
+  }
+
+  if (sc === "Wax") {
+    notes.push({
+      dimensions: [],
+      climate: ["microcurrent"],
+      sentiment: "caution",
+      text: "Wax creates an insulating layer on skin that blocks electrical conductivity required for microcurrent. Apply a water-based conductive medium before using microcurrent — not a wax-containing product.",
+    });
+  }
+
+  if (cat === "antioxidant") {
+    notes.push({
+      dimensions: [],
+      climate: ["red_nir"],
+      sentiment: "benefit",
+      text: "Antioxidants applied 5–10 min before a red or near-infrared session work alongside the device's cellular regeneration signaling — both reduce oxidative stress and support mitochondrial function through complementary mechanisms.",
+    });
+  }
+
+  if (sc === "Peptide") {
+    notes.push({
+      dimensions: [],
+      climate: ["red_nir"],
+      sentiment: "benefit",
+      text: "Peptides signal collagen synthesis through receptor pathways. Red and near-infrared light activates the same downstream production cascade via ATP and mitochondrial stimulation. Applying peptides before your session amplifies both effects.",
+    });
+  }
+
+  // ── SUPPLEMENTS ────────────────────────────────────────────────────────────
+
+  if (cat === "antioxidant") {
+    notes.push({
+      dimensions: ["hyperpigmentation_prone"],
+      climate: ["phytoestrogen_load", "high_uv"],
+      sentiment: "benefit",
+      text: "With an active phytoestrogen supplement load and UV exposure, antioxidants serve double duty: they neutralize UV-generated free radicals AND reduce the melanocyte-stimulating oxidative stress that phytoestrogens amplify. More important here than in a standard skincare context.",
+    });
+  }
+
+  if (sc === "UV Filter") {
+    notes.push({
+      dimensions: ["hyperpigmentation_prone"],
+      climate: ["phytoestrogen_load"],
+      sentiment: "benefit",
+      text: "With a phytoestrogen supplement load, UV exposure directly triggers estrogen-stimulated melanocyte activity — the same mechanism as OCP-associated melasma. UV protection is more critical here than usual.",
+    });
+  }
+
+  if (fc === "chemical sunscreen") {
+    notes.push({
+      dimensions: [],
+      climate: ["phytoestrogen_load"],
+      sentiment: "caution",
+      text: "With a phytoestrogen supplement load and hormonally sensitive skin, some individuals find chemical UV filters cause reactivity. Mineral sunscreens (zinc oxide, titanium dioxide) provide equivalent protection without the hormonal-interaction concern.",
+    });
+  }
+
+  if (sc === "Ceramide") {
+    notes.push({
+      dimensions: [],
+      climate: ["collagen_support"],
+      sentiment: "benefit",
+      text: "Topical ceramides restore the skin surface barrier while your collagen supplement stack (collagen peptides, phytoceramides, glycine, silica) rebuilds the underlying structural foundation — complementary mechanisms working on different depth layers.",
+    });
+  }
+
+  if (sc === "Peptide") {
+    notes.push({
+      dimensions: [],
+      climate: ["collagen_support"],
+      sentiment: "benefit",
+      text: "Topical peptides signal collagen synthesis while your systemic collagen supplements (collagen peptides, lysine, glycine) supply the amino acid building blocks those signals call for. The combination addresses both the signaling and the substrate side of the same process.",
+    });
+  }
+
+  if (cat === "anti-malassezia" || cat === "antimicrobial") {
+    notes.push({
+      dimensions: ["acne_prone", "fungal_acne", "seborrheic"],
+      climate: ["insulin_sensitizing"],
+      sentiment: "benefit",
+      text: "Insulin-sensitizing supplements (berberine, inositol, chromium) reduce sebum at the systemic level — less substrate for acne bacteria and Malassezia. Pairing with antimicrobial and anti-Malassezia topicals addresses both the fuel source and the pathogen simultaneously.",
+    });
+  }
+
+  if (fc === "barrier-disrupting" || sc === "Retinoid") {
+    notes.push({
+      dimensions: ["rosacea"],
+      climate: ["vasodilating_supps"],
+      sentiment: "caution",
+      text: "Vasodilating supplements (beet root, ginkgo, ginger) increase skin blood flow and permeability. Barrier-disrupting topicals on already-vasodilated rosacea skin penetrate more deeply and are more likely to trigger a reaction.",
+    });
+  }
+
   // Deduplicate identical notes that might arise from overlapping rules
   const seen = new Set<string>();
   return notes.filter((n) => {

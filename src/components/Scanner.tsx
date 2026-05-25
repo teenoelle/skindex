@@ -214,7 +214,7 @@ const RINSE_OFF_TYPES = new Set([
 ]);
 
 type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash";
-type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water";
+type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water" | "red_nir" | "blue_light" | "amber_light" | "vibration_sonic" | "heat_steam" | "microcurrent" | "iodine_load" | "phytoestrogen_load" | "anti_androgenic" | "vasodilating_supps" | "immune_stimulating" | "insulin_sensitizing" | "anabolic_dht" | "high_dose_b12" | "collagen_support";
 
 const SKIN_TYPES: { value: SkinType; label: string }[] = [
   { value: "oily", label: "Oily" },
@@ -247,6 +247,29 @@ const WATER_TYPES: { value: ClimateType; label: string }[] = [
   { value: "heavy_metal_water", label: "Lead / metals" },
 ];
 
+const DEVICE_TYPES: { value: ClimateType; label: string }[] = [
+  { value: "red_nir", label: "Red / NIR" },
+  { value: "blue_light", label: "Blue light" },
+  { value: "amber_light", label: "Amber / yellow" },
+  { value: "vibration_sonic", label: "Vibration / sonic" },
+  { value: "heat_steam", label: "Heat / steam" },
+  { value: "microcurrent", label: "Microcurrent" },
+];
+
+const SUPPLEMENT_TYPES: { value: ClimateType; label: string }[] = [
+  { value: "iodine_load", label: "Iodine load" },
+  { value: "phytoestrogen_load", label: "Phytoestrogen" },
+  { value: "anti_androgenic", label: "Anti-androgenic" },
+  { value: "vasodilating_supps", label: "Vasodilating" },
+  { value: "immune_stimulating", label: "Immune stimulating" },
+  { value: "insulin_sensitizing", label: "Insulin sensitizing" },
+  { value: "anabolic_dht", label: "Anabolic / DHT" },
+  { value: "high_dose_b12", label: "High-dose B12" },
+  { value: "collagen_support", label: "Collagen support" },
+];
+
+const ALL_MODIFIER_TYPES = [...CLIMATE_TYPES, ...WATER_TYPES, ...DEVICE_TYPES, ...SUPPLEMENT_TYPES];
+
 const SKIN_TYPE_NOTES: Record<SkinType, string> = {
   oily: "Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.",
   dry: "Dry skin has a thinner lipid layer and loses water fastest in cold or dry air — drying solvents, sulfate surfactants, and clay are worth watching closely.",
@@ -273,15 +296,38 @@ const CLIMATE_NOTES: Record<ClimateType, string> = {
   chlorinated_water: "Chlorinated and chloramine-treated tap water can oxidize skin barrier lipids on contact — particularly relevant for eczema and reactive skin. A vitamin C (ascorbic acid) toner applied immediately after washing neutralizes residual disinfectant before it can damage the barrier.",
   iron_water: "Iron-bearing water (indicated by rust stains on sinks or fixtures) introduces ferrous and ferric ions that generate free radicals on contact with skin, accelerating barrier lipid oxidation. Chelating agents and antioxidants (especially vitamins C and E) counteract this.",
   heavy_metal_water: "Lead or heavy metal contamination in tap water is a public health concern — filtering your water or using bottled/filtered water for face washing is the most effective intervention. Topical measures can reduce but not eliminate exposure: chelating cleansers (containing tetrasodium EDTA or phytic acid) bind surface metals, barrier-repair products reduce transdermal uptake, and penetration enhancers (drying alcohols) should be avoided as they increase absorption. If you suspect lead, test your water.",
+  red_nir: "Red and near-infrared light amplifies collagen-synthesis pathways — vitamin C and peptides applied 5–10 min before sessions have additive effects. Do not apply retinoids, AHAs, benzoyl peroxide, or chemical sunscreens immediately before: photosensitized skin absorbs device energy more intensely. Wait 20+ min after a session before applying actives.",
+  blue_light: "Blue light (415–450nm) targets acne bacteria via singlet oxygen. Do not combine with benzoyl peroxide in the same session. Avoid retinoids and AHAs before use. Not recommended over rosacea-affected skin — blue light at device intensity can worsen vascular inflammation.",
+  amber_light: "Amber and yellow light reduces vascular reactivity and facial redness — particularly beneficial for rosacea. Same pre-session rules apply: no retinoids, AHAs, or chemical sunscreens immediately before use.",
+  vibration_sonic: "Vibration and sonic tools improve lymphatic drainage and cleanser penetration. Use only during the cleansing step — not after applying actives. Avoid over active eczema or psoriasis lesions: friction worsens the Koebner response.",
+  heat_steam: "Heat opens the skin barrier and concentrates product delivery. Never apply retinoids, AHAs, or benzoyl peroxide before facial steamers or heated tools — heat drives these in harder than intended. Strongly contraindicated for rosacea: heat is a primary flush trigger.",
+  microcurrent: "Microcurrent requires a water-based conductive medium — silicones and heavy waxes block conductivity. Do not use over active breakouts or with photosensitizing topicals. Apply a water-based HA serum or gel as the conductive medium, not this product.",
+  iodine_load: "Iodine-rich supplements (kelp, red marine algae, spirulina) can trigger iodine acne — uniform papular eruptions that don't respond to BP, salicylic acid, or antibiotics because the mechanism is iodine-driven. If acne persists despite treatment, this supplement stack is a primary suspect.",
+  phytoestrogen_load: "Phytoestrogen-containing supplements (licorice root, apigenin, resveratrol, evening primrose, quercetin) amplify estrogen-sensitive skin responses. Combined with UV exposure, this significantly elevates melasma risk. Daily SPF and topical antioxidants are more important, not less.",
+  anti_androgenic: "Anti-androgenic supplements (saw palmetto, spearmint, green tea, white peony) reduce DHT-driven sebum production — directly beneficial for acne-prone, oily, and seborrheic skin. Topical sebum-regulating actives work alongside this systemic reduction.",
+  vasodilating_supps: "Vasodilating supplements (beet root, L-citrulline, ginkgo, ginger) increase blood flow and can trigger flushing. If rosacea is active, this supplement combination is a likely contributor. Combining vasodilating supplements with heat devices amplifies flushing risk further.",
+  immune_stimulating: "Immune-stimulating supplements (echinacea, astragalus, mushroom complexes, guduchi, cat's claw) activate immune pathways. For autoimmune conditions like lupus or psoriasis, immune stimulants can trigger flares — discuss with your rheumatologist before continuing.",
+  insulin_sensitizing: "Insulin-sensitizing supplements (berberine, inositol, chromium, gymnema) reduce IGF-1-driven sebum production — a meaningful systemic benefit for acne-prone and oily skin. Topical sebum-controlling actives are more effective when systemic sebum is already reduced.",
+  anabolic_dht: "Creatine and similar androgen-supporting supplements have been shown in RCTs to raise the DHT:testosterone ratio by 40–56%, increasing sebum. If acne is an active concern, this is a modifiable factor worth testing by eliminating it for 6–8 weeks.",
+  high_dose_b12: "High-dose vitamin B12 has a documented mechanism for triggering acne: it alters porphyrin metabolism in C. acnes, triggering inflammatory breakouts. If acne appeared or worsened after starting B12, this is the most likely cause — lower doses or methylcobalamin may be better tolerated.",
+  collagen_support: "Taking collagen-support supplements (collagen peptides, lysine, glycine, silica, phytoceramides, sea buckthorn) provides systemic raw materials for the same repair pathways that topical retinoids, peptides, and vitamin C signal. The combination is additive.",
 };
 
 function noteLabel(n: SkinClimateNote): string {
   const skinLabels = n.dimensions.map((d) => SKIN_TYPES.find((s) => s.value === d)?.label ?? d);
-  const climateLabels = n.climate.map((c) => CLIMATE_TYPES.find((t) => t.value === c)?.label ?? c);
+  const climateLabels = n.climate.map((c) => ALL_MODIFIER_TYPES.find((t) => t.value === c)?.label ?? c);
   const parts: string[] = [];
   if (skinLabels.length) parts.push(skinLabels.join(", "));
   if (climateLabels.length) parts.push(climateLabels.join(", "));
   return parts.join(" · ");
+}
+
+function climateNoteStyle(c: ClimateType): string {
+  const amberSet = new Set<ClimateType>(["heavy_metal_water", "heat_steam", "iodine_load", "immune_stimulating", "anabolic_dht", "high_dose_b12"]);
+  if (amberSet.has(c)) return "text-amber-800 bg-amber-50 border-amber-200";
+  if (DEVICE_TYPES.some(d => d.value === c)) return "text-blue-800 bg-blue-50 border-blue-200";
+  if (SUPPLEMENT_TYPES.some(s => s.value === c)) return "text-violet-800 bg-violet-50 border-violet-100";
+  return "text-gray-600 bg-gray-50 border-gray-100";
 }
 
 function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateType>): string[] {
@@ -300,6 +346,12 @@ function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateT
   if (climates.has("chlorinated_water")) cats.push("Vitamin C", "Antioxidants");
   if (climates.has("iron_water")) cats.push("Chelating agents", "Antioxidants");
   if (climates.has("heavy_metal_water")) cats.push("Chelating agents", "Penetration enhancers");
+  if (["red_nir","blue_light","amber_light","heat_steam"].some(d => climates.has(d as ClimateType))) cats.push("Retinoids", "AHA exfoliants", "Chemical sunscreens");
+  if (climates.has("microcurrent")) cats.push("Silicones", "Heavy waxes");
+  if (climates.has("iodine_load")) cats.push("Iodine compounds");
+  if (climates.has("vasodilating_supps") && skinTypes.has("rosacea")) cats.push("Heat triggers", "Warming agents");
+  if (climates.has("phytoestrogen_load") && skinTypes.has("hyperpigmentation_prone")) cats.push("UV protection", "Brightening actives");
+  if (climates.has("anabolic_dht") && skinTypes.has("acne_prone")) cats.push("Pore-cloggers", "Sebum triggers");
   return [...new Set(cats)];
 }
 
@@ -497,6 +549,68 @@ function detectRoutineWarnings(products: RoutineProduct[]): { type: "danger" | "
     const names = nameList([...acidStepProds.map(p => p.name), ...niacinamideWho]);
     warnings.push({ type: "danger", title: "Low pH + Niacinamide: wait 20 min between steps", body: `${names} — niacinamide doesn't absorb effectively immediately after a low-pH formula. Wait at least 20 min.` });
   }
+  return warnings;
+}
+
+function detectDeviceWarnings(
+  result: ScanResult,
+  devices: Set<ClimateType>
+): { type: "danger" | "synergy"; title: string; body: string }[] {
+  if (devices.size === 0) return [];
+  const warnings: { type: "danger" | "synergy"; title: string; body: string }[] = [];
+  const lightDevices: ClimateType[] = ["red_nir", "blue_light", "amber_light"];
+  const hasLightDevice = lightDevices.some(d => devices.has(d));
+  const stepTags = result.step_tags ?? [];
+  const flaggedCats = result.flagged.map(m => (m.ingredient.flagged_category ?? "").toLowerCase());
+
+  if (hasLightDevice && stepTags.includes("retinoid"))
+    warnings.push({ type: "danger", title: "Retinoid before light therapy", body: "Retinoids sensitize skin to energy absorption — applying before a light therapy session significantly increases irritation and burn risk. Use retinoids PM on days you do light therapy AM, or alternate evenings entirely." });
+  if (hasLightDevice && stepTags.includes("acid-step"))
+    warnings.push({ type: "danger", title: "Exfoliant before light therapy", body: "Freshly exfoliated skin is more sensitive to all wavelengths. Wait at least 24 hours after applying AHAs or BHAs before a light therapy session — or do the session first and apply acids 20+ min later." });
+  if (hasLightDevice && flaggedCats.includes("chemical sunscreen"))
+    warnings.push({ type: "danger", title: "Chemical filter before light therapy", body: "Chemical UV filters absorb light energy and convert it to heat within the skin layer. Using a chemical-filter product before a light device session creates concentrated heat at the skin surface. Rinse off before your session, or apply only after." });
+  if (hasLightDevice && stepTags.includes("enhancer-caution"))
+    warnings.push({ type: "danger", title: "Penetration enhancer before light therapy", body: "This product contains a penetration enhancer (drying alcohol) that temporarily opens the skin barrier. Combined with a light device, this amplifies delivery of all co-applied ingredients — including any irritants or sensitizers in the formula." });
+  if (devices.has("heat_steam") && (stepTags.includes("retinoid") || stepTags.includes("acid-step")))
+    warnings.push({ type: "danger", title: "Active ingredient before heat device", body: "Heat opens the barrier and concentrates ingredient delivery. Retinoids or exfoliants applied before a steamer or heated tool penetrate more aggressively than intended. Wash face before using any heat device if these are in your routine." });
+  if (devices.has("microcurrent")) {
+    const hasSilicone = result.safe.some(m => m.ingredient.structural_category === "Silicone");
+    const hasWax = result.safe.some(m => m.ingredient.structural_category === "Wax");
+    if (hasSilicone || hasWax)
+      warnings.push({ type: "danger", title: "Silicone / wax blocks microcurrent", body: `This product contains ${[hasSilicone && "silicone", hasWax && "wax"].filter(Boolean).join(" and ")} that blocks electrical conductivity. Apply a water-based HA serum or gel as the conductive medium for microcurrent — not this product.` });
+  }
+  if (devices.has("red_nir")) {
+    const hasAntioxidant = result.safe.some(m => ["antioxidant","brightening"].some(c => (m.ingredient.category ?? "").includes(c)) || (m.ingredient.name ?? "").toLowerCase().includes("ascorbic"));
+    const hasPeptide = result.safe.some(m => m.ingredient.structural_category === "Peptide");
+    if (hasAntioxidant || hasPeptide) {
+      const active = [hasAntioxidant && "antioxidants / vitamin C", hasPeptide && "peptides"].filter(Boolean).join(" and ");
+      warnings.push({ type: "synergy", title: `Red/NIR synergy — ${active}`, body: `${active.charAt(0).toUpperCase() + active.slice(1)} applied 5–10 min before your red or near-infrared session work on the same collagen-synthesis pathways the device stimulates — applying beforehand amplifies both effects.` });
+    }
+  }
+  return warnings;
+}
+
+function detectSupplementWarnings(
+  skinTypes: Set<SkinType>,
+  climates: Set<ClimateType>
+): { type: "danger" | "caution" | "synergy"; title: string; body: string }[] {
+  const warnings: { type: "danger" | "caution" | "synergy"; title: string; body: string }[] = [];
+  if (climates.has("iodine_load") && (skinTypes.has("acne_prone") || skinTypes.has("fungal_acne")))
+    warnings.push({ type: "danger", title: "Iodine load + acne-prone skin", body: "Kelp, red marine algae, and spirulina create a significant iodine load. Iodine acne produces uniform papular eruptions that don't respond to BP, salicylic acid, or antibiotics — the mechanism is iodine-driven, not bacterial. Eliminating these supplements for 4–6 weeks is a key diagnostic test if acne persists despite treatment." });
+  if (climates.has("phytoestrogen_load") && skinTypes.has("hyperpigmentation_prone") && climates.has("high_uv"))
+    warnings.push({ type: "danger", title: "Phytoestrogen × UV — elevated melasma risk", body: "Phytoestrogens (licorice root, apigenin, resveratrol, evening primrose) stimulate melanocytes. Combined with UV exposure, this is the same mechanism as OCP-associated melasma. Daily broad-spectrum SPF and topical antioxidants are non-negotiable." });
+  if (climates.has("vasodilating_supps") && skinTypes.has("rosacea"))
+    warnings.push({ type: "caution", title: "Vasodilating supplements + rosacea", body: "Your supplement stack includes multiple vasodilators (beet root, L-citrulline, ginkgo, ginger). Together these can be a significant contributor to flushing. If flushing is active, test each supplement individually to identify the primary trigger." });
+  if (climates.has("immune_stimulating") && skinTypes.has("lupus_rash"))
+    warnings.push({ type: "danger", title: "Immune stimulants + lupus", body: "Immune-stimulating supplements (echinacea, astragalus, mushroom complexes, guduchi, cat's claw) activate the same immune pathways that attack healthy tissue in lupus. Discuss these with your rheumatologist before continuing — flare risk is real." });
+  if (climates.has("anabolic_dht") && skinTypes.has("acne_prone"))
+    warnings.push({ type: "caution", title: "DHT-raising supplements + acne", body: "Creatine has been shown in RCTs to raise the DHT:testosterone ratio by 40–56%, increasing androgen-driven sebum. Eliminating creatine for 6–8 weeks is worth testing if acne is active." });
+  if (climates.has("high_dose_b12") && skinTypes.has("acne_prone"))
+    warnings.push({ type: "caution", title: "High-dose B12 + acne-prone skin", body: "High-dose B12 alters porphyrin metabolism in C. acnes, triggering inflammatory breakouts. If acne worsened after starting B12, this is the most likely cause — lower doses or methylcobalamin may be better tolerated." });
+  if (climates.has("collagen_support"))
+    warnings.push({ type: "synergy", title: "Collagen support stack", body: "Your collagen supplement stack (collagen peptides, lysine, glycine, silica, phytoceramides) provides systemic raw materials for the same repair pathways that topical retinoids, peptides, and vitamin C signal. The combination is additive." });
+  if (climates.has("insulin_sensitizing") && (skinTypes.has("acne_prone") || skinTypes.has("oily")))
+    warnings.push({ type: "synergy", title: "Insulin sensitizers + sebum control", body: "Berberine, inositol, and chromium reduce IGF-1-driven sebum at the systemic level — topical sebum-controlling actives work alongside this, not in isolation. The combination is more effective than either alone." });
   return warnings;
 }
 
@@ -1647,18 +1761,23 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <p className="text-xs text-gray-400 mb-1.5">Water quality</p>
                   <div className="flex flex-wrap gap-1.5">
                     {WATER_TYPES.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => toggleClimate(value)}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                          activeClimates.has(value)
-                            ? "bg-teal-700 text-white border-teal-700"
-                            : "text-gray-500 border-gray-200 hover:border-gray-400"
-                        }`}
-                      >
-                        {label}
-                      </button>
+                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Devices</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEVICE_TYPES.map(({ value, label }) => (
+                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-blue-700 text-white border-blue-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Supplements</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUPPLEMENT_TYPES.map(({ value, label }) => (
+                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-violet-700 text-white border-violet-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
                     ))}
                   </div>
                 </div>
@@ -1668,8 +1787,21 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       <p key={t} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{SKIN_TYPE_NOTES[t]}</p>
                     ))}
                     {[...activeClimates].map((c) => (
-                      <p key={c} className={`text-xs rounded-lg px-2.5 py-1.5 leading-relaxed border ${c === "heavy_metal_water" ? "text-amber-800 bg-amber-50 border-amber-200" : "text-gray-600 bg-gray-50 border-gray-100"}`}>{CLIMATE_NOTES[c]}</p>
+                      <p key={c} className={`text-xs rounded-lg px-2.5 py-1.5 leading-relaxed border ${climateNoteStyle(c)}`}>{CLIMATE_NOTES[c]}</p>
                     ))}
+                    {(() => {
+                      const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
+                      return suppWarns.length > 0 ? (
+                        <div className="space-y-1.5 pt-0.5">
+                          {suppWarns.map((w, i) => (
+                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : w.type === "caution" ? "border-orange-200 bg-orange-50" : "border-teal-100 bg-teal-50"}`}>
+                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-orange-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
+                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-700" : w.type === "caution" ? "text-orange-700" : "text-teal-700"}`}>{w.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
                     {(() => {
                       const watches = profileWatchCategories(activeSkinTypes, activeClimates);
                       return watches.length > 0 ? (
@@ -2731,18 +2863,23 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <p className="text-xs text-gray-400 mb-1.5">Water quality</p>
                   <div className="flex flex-wrap gap-1.5">
                     {WATER_TYPES.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => toggleClimate(value)}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                          activeClimates.has(value)
-                            ? "bg-teal-700 text-white border-teal-700"
-                            : "text-gray-500 border-gray-200 hover:border-gray-400"
-                        }`}
-                      >
-                        {label}
-                      </button>
+                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Devices</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEVICE_TYPES.map(({ value, label }) => (
+                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-blue-700 text-white border-blue-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Supplements</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUPPLEMENT_TYPES.map(({ value, label }) => (
+                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-violet-700 text-white border-violet-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
                     ))}
                   </div>
                 </div>
@@ -2752,8 +2889,21 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       <p key={t} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{SKIN_TYPE_NOTES[t]}</p>
                     ))}
                     {[...activeClimates].map((c) => (
-                      <p key={c} className={`text-xs rounded-lg px-2.5 py-1.5 leading-relaxed border ${c === "heavy_metal_water" ? "text-amber-800 bg-amber-50 border-amber-200" : "text-gray-600 bg-gray-50 border-gray-100"}`}>{CLIMATE_NOTES[c]}</p>
+                      <p key={c} className={`text-xs rounded-lg px-2.5 py-1.5 leading-relaxed border ${climateNoteStyle(c)}`}>{CLIMATE_NOTES[c]}</p>
                     ))}
+                    {(() => {
+                      const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
+                      return suppWarns.length > 0 ? (
+                        <div className="space-y-1.5 pt-0.5">
+                          {suppWarns.map((w, i) => (
+                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : w.type === "caution" ? "border-orange-200 bg-orange-50" : "border-teal-100 bg-teal-50"}`}>
+                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-orange-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
+                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-700" : w.type === "caution" ? "text-orange-700" : "text-teal-700"}`}>{w.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
                     {(() => {
                       const watches = profileWatchCategories(activeSkinTypes, activeClimates);
                       return watches.length > 0 ? (
@@ -2905,6 +3055,24 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               </div>
             </section>
           )}
+
+          {/* Device interaction warnings */}
+          {(() => {
+            const devWarns = detectDeviceWarnings(result, activeClimates);
+            return devWarns.length > 0 ? (
+              <section className="mb-6">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Device interactions</p>
+                <div className="space-y-2">
+                  {devWarns.map((w, i) => (
+                    <div key={i} className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-blue-200 bg-blue-50" : "border-teal-100 bg-teal-50"}`}>
+                      <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-blue-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚡ " : "✦ "}{w.title}</p>
+                      <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-blue-700" : "text-teal-700"}`}>{w.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null;
+          })()}
 
           {/* By concern — grouped ingredient view */}
           {result.originalItems.length > 0 && (() => {
