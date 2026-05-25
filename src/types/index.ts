@@ -5,12 +5,19 @@ export type SkinClimateNote = {
   text: string;
 };
 
+export type ExplanationStructured = {
+  formula_role: string | null;
+  benefit: string | null;
+  concern: string | null;
+};
+
 export type DbIngredient = {
   id: string;
   name: string;
   inci_name: string | null;
   status: "safe" | "flagged";
   explanation: string | null;
+  explanation_structured: ExplanationStructured | null;
   skin_climate_notes: SkinClimateNote[] | null;
   category: string | null;
   flagged_category: string | null;

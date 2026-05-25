@@ -595,6 +595,7 @@ export async function POST(req: NextRequest) {
             inci_name: null,
             status: "flagged",
             explanation: rule.note,
+            explanation_structured: null,
             category: "pore-clogger",
             flagged_category: "pore-clogger",
             structural_category: null,

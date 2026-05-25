@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X, Menu } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { DbIngredient, IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
+import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -435,6 +435,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [showUnreviewed, setShowUnreviewed] = useState(false);
   const [showObfVariants, setShowObfVariants] = useState(false);
   const [explanations, setExplanations] = useState<Record<string, string | null>>({});
+  const [explanationsStructured, setExplanationsStructured] = useState<Record<string, ExplanationStructured | null>>({});
   const [alternatives, setAlternatives] = useState<AlternativeProduct[]>([]);
   const [alternativesLoading, setAlternativesLoading] = useState(false);
   const [alternativesFetched, setAlternativesFetched] = useState(false);
@@ -643,6 +644,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setShowObfVariants(false);
     setExpanded(new Set());
     setExplanations({});
+    setExplanationsStructured({});
     setAlternatives([]);
     setAlternativesLoading(false);
     setAlternativesFetched(false);
@@ -750,6 +752,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       });
       const data = await res.json();
       setExplanations((prev) => ({ ...prev, [id]: data.explanation ?? null }));
+      if (data.explanation_structured) {
+        setExplanationsStructured((prev) => ({ ...prev, [id]: data.explanation_structured }));
+      }
     } catch {
       // leave as null
     }
@@ -769,13 +774,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   function handleIngredientClick(
     item: string,
-    match: { status: string; ingredient: { id: string; explanation: string | null } } | null,
+    match: { status: string; ingredient: { id: string; explanation: string | null; explanation_structured: import("@/types").ExplanationStructured | null } } | null,
     _hasPhoto: boolean,
     _hasSensory: boolean,
   ) {
     const rowKey = `concern-${item}`;
     setConcernExpanded((prev) => { const next = new Set(prev); next.add(rowKey); return next; });
-    if (match && !match.ingredient.explanation && !(match.ingredient.id in explanations)) {
+    if (match && !match.ingredient.explanation_structured && !match.ingredient.explanation && !(match.ingredient.id in explanations)) {
       setExplanations((prev) => ({ ...prev, [match.ingredient.id]: null }));
       fetch("/api/explain", {
         method: "POST",
@@ -783,7 +788,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         body: JSON.stringify({ id: match.ingredient.id }),
       })
         .then((r) => r.json())
-        .then((data) => setExplanations((prev) => ({ ...prev, [match.ingredient.id]: data.explanation ?? null })))
+        .then((data) => {
+          setExplanations((prev) => ({ ...prev, [match.ingredient.id]: data.explanation ?? null }));
+          if (data.explanation_structured) {
+            setExplanationsStructured((prev) => ({ ...prev, [match.ingredient.id]: data.explanation_structured }));
+          }
+        })
         .catch(() => {});
     }
     requestAnimationFrame(() => {
@@ -807,6 +817,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setShowObfVariants(false);
     setExpanded(new Set());
     setExplanations({});
+    setExplanationsStructured({});
     setConcernExpanded(new Set());
     setNeutralGroupOpen(false);
     setAlternatives([]);
@@ -2623,8 +2634,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               const isOpen = concernExpanded.has(rowKey);
               const ingId = match?.ingredient.id ?? null;
               const dbExplanation = match?.ingredient.explanation ?? null;
+              const dbStructured = match?.ingredient.explanation_structured ?? null;
+              const fetchedStructured = ingId ? (explanationsStructured[ingId] ?? null) : null;
+              const structured = dbStructured ?? fetchedStructured;
               const explanation = dbExplanation ?? (ingId ? explanations[ingId] : null);
-              const isLoading = isOpen && ingId !== null && !dbExplanation && ingId in explanations && explanations[ingId] === null;
+              const hasAnyExplanation = !!(structured || dbExplanation);
+              const isLoading = isOpen && ingId !== null && !hasAnyExplanation && ingId in explanations && explanations[ingId] === null;
 
               const toggle = () => {
                 setConcernExpanded((prev) => {
@@ -2633,7 +2648,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   next.add(rowKey);
                   return next;
                 });
-                if (!isOpen && ingId && !dbExplanation && !(ingId in explanations)) {
+                if (!isOpen && ingId && !hasAnyExplanation && !(ingId in explanations)) {
                   setExplanations((prev) => ({ ...prev, [ingId]: null }));
                   fetch("/api/explain", {
                     method: "POST",
@@ -2641,7 +2656,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     body: JSON.stringify({ id: ingId }),
                   })
                     .then((r) => r.json())
-                    .then((data) => setExplanations((prev) => ({ ...prev, [ingId]: data.explanation ?? null })))
+                    .then((data) => {
+                      setExplanations((prev) => ({ ...prev, [ingId]: data.explanation ?? null }));
+                      if (data.explanation_structured) {
+                        setExplanationsStructured((prev) => ({ ...prev, [ingId]: data.explanation_structured }));
+                      }
+                    })
                     .catch(() => {});
                 }
               };
@@ -2689,47 +2709,55 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </button>
                   {isOpen && (
                     <div className="px-3 pb-3 space-y-2">
-                      {structCat && STRUCTURAL_DESCRIPTIONS[structCat] && (
-                        <div className="pl-3 border-l-2 border-gray-300">
-                          <p className="text-xs text-gray-500 leading-relaxed">{STRUCTURAL_DESCRIPTIONS[structCat]}</p>
-                          {fullMatch?.comedogenicRating && (
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              <span className="font-medium">{fullMatch.comedogenicRating}</span>
-                              {fullMatch.comedogenicRating !== "oxid." ? " on the 0–5 scale" : " (oxidation-dependent)"}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      {match?.status === "flagged" && allBenefitNotes.length > 0 && (
-                        <div className="pl-3 border-l-2 border-teal-500 space-y-0.5">
-                          {allBenefitNotes.map((note, i) => (
-                            <p key={i} className="text-xs text-teal-700 leading-relaxed">
-                              {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
-                              {note.text}
-                            </p>
-                          ))}
-                        </div>
-                      )}
-                      {match?.status === "safe" && profileBenefitNotes.length > 0 && (
-                        <div className="pl-3 border-l-2 border-teal-500 space-y-0.5">
-                          {profileBenefitNotes.map((note, i) => (
-                            <p key={i} className="text-xs text-teal-700 leading-relaxed">
-                              {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
-                              {note.text}
-                            </p>
-                          ))}
-                        </div>
-                      )}
+                      {/* Formula role stripe — gray */}
+                      {(() => {
+                        const roleText = structured?.formula_role ?? (structCat ? STRUCTURAL_DESCRIPTIONS[structCat] : null);
+                        if (!roleText && !fullMatch?.comedogenicRating) return null;
+                        return (
+                          <div className="pl-3 border-l-2 border-gray-300">
+                            {roleText && <p className="text-xs text-gray-500 leading-relaxed">{roleText}</p>}
+                            {fullMatch?.comedogenicRating && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                <span className="font-medium">{fullMatch.comedogenicRating}</span>
+                                {fullMatch.comedogenicRating !== "oxid." ? " on the 0–5 scale" : " (oxidation-dependent)"}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      {/* Benefit stripe — teal */}
+                      {(() => {
+                        const benefitSentence = structured?.benefit ?? null;
+                        const benefitNotes = match?.status === "flagged" ? allBenefitNotes : profileBenefitNotes;
+                        const benefitNote = fullMatch?.benefit_note ?? null;
+                        if (!benefitSentence && !benefitNotes.length && !benefitNote) return null;
+                        return (
+                          <div className="pl-3 border-l-2 border-teal-500 space-y-0.5">
+                            {benefitSentence && (
+                              <p className="text-xs text-teal-700 leading-relaxed">{benefitSentence}</p>
+                            )}
+                            {benefitNote && (
+                              <p className="text-xs text-teal-700 leading-relaxed">{benefitNote}</p>
+                            )}
+                            {benefitNotes.map((note, i) => (
+                              <p key={i} className="text-xs text-teal-700 leading-relaxed">
+                                {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
+                                {note.text}
+                              </p>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      {/* Concern stripe — level-colored (non-neutral only) */}
                       {level !== "neutral" && (
                         <div className={`pl-3 border-l-2 ${CONCERN_STRIPE[level]} space-y-1`}>
                           {isLoading ? (
                             <p className="text-xs text-gray-400 italic">Generating explanation…</p>
-                          ) : explanation ? (
+                          ) : structured?.concern ? (
+                            <p className="text-xs text-gray-600 leading-relaxed">{structured.concern}</p>
+                          ) : explanation && !structured ? (
                             <p className="text-xs text-gray-600 leading-relaxed">{explanation}</p>
                           ) : null}
-                          {fullMatch?.benefit_note && (
-                            <p className="text-xs text-gray-400 leading-relaxed">{fullMatch.benefit_note}</p>
-                          )}
                           {sensoryItem?.sensory_note && (
                             <p className="text-xs text-gray-600 leading-relaxed">{sensoryItem.sensory_note}</p>
                           )}
@@ -2754,13 +2782,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           )}
                         </div>
                       )}
-                      {level === "neutral" && (isLoading || explanation) && (
+                      {/* Neutral: loading state if no structured data yet */}
+                      {level === "neutral" && isLoading && (
                         <div className="pl-3 border-l-2 border-teal-500">
-                          {isLoading ? (
-                            <p className="text-xs text-gray-400 italic">Generating explanation…</p>
-                          ) : (
-                            <p className="text-xs text-gray-500 leading-relaxed">{explanation}</p>
-                          )}
+                          <p className="text-xs text-gray-400 italic">Generating explanation…</p>
                         </div>
                       )}
                     </div>
