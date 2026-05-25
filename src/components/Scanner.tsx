@@ -2679,9 +2679,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               const concernLabel = catLabel ?? sensoryLabel ?? photoLabel;
               const benefitLabel = safeCategory ? (CATEGORY_LABELS[safeCategory] ?? safeCategory) : null;
 
-              const allBenefitNotes = (match?.ingredient.skin_climate_notes ?? []).filter((n) => n.sentiment === "benefit");
-              const profileBenefitNotes = filterNotes(match?.ingredient.skin_climate_notes).filter((n) => n.sentiment === "benefit");
-              const profileCautionNotes = filterNotes(match?.ingredient.skin_climate_notes).filter(
+              const rawClimateNotes = match?.ingredient.skin_climate_notes;
+              const rawNotes: SkinClimateNote[] = Array.isArray(rawClimateNotes) ? rawClimateNotes : [];
+              const allBenefitNotes = rawNotes.filter((n) => n.sentiment === "benefit");
+              const profileBenefitNotes = filterNotes(rawNotes).filter((n) => n.sentiment === "benefit");
+              const profileCautionNotes = filterNotes(rawNotes).filter(
                 (n) => n.sentiment === "caution" || n.sentiment === "strong_caution"
               );
 
