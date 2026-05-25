@@ -160,6 +160,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   "Preservative Booster": "Preservative booster",
   "Botanical Water": "Botanical water",
   "Trace Mineral": "Trace mineral",
+  "chelating": "Chelating",
 };
 
 const STRUCTURAL_DESCRIPTIONS: Record<string, string> = {
@@ -213,7 +214,7 @@ const RINSE_OFF_TYPES = new Set([
 ]);
 
 type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash";
-type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv";
+type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water";
 
 const SKIN_TYPES: { value: SkinType; label: string }[] = [
   { value: "oily", label: "Oily" },
@@ -239,6 +240,13 @@ const CLIMATE_TYPES: { value: ClimateType; label: string }[] = [
   { value: "high_uv", label: "High UV" },
 ];
 
+const WATER_TYPES: { value: ClimateType; label: string }[] = [
+  { value: "hard_water", label: "Hard / mineral" },
+  { value: "chlorinated_water", label: "Chlorinated" },
+  { value: "iron_water", label: "Iron / rust" },
+  { value: "heavy_metal_water", label: "Lead / metals" },
+];
+
 const SKIN_TYPE_NOTES: Record<SkinType, string> = {
   oily: "Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.",
   dry: "Dry skin has a thinner lipid layer and loses water fastest in cold or dry air — drying solvents, sulfate surfactants, and clay are worth watching closely.",
@@ -261,6 +269,10 @@ const CLIMATE_NOTES: Record<ClimateType, string> = {
   cold: "Cold air depletes skin lipids fastest — barrier-repairing ingredients (ceramides, fatty acids, emollients) are most effective and most needed in this climate.",
   hot: "In hot weather, skin permeability increases, making sensitizers and chemical UV filters absorb more readily and triggering stronger reactions.",
   high_uv: "In high-UV environments, daily broad-spectrum SPF is essential — AHAs, retinoids, and many brightening ingredients all increase UV sensitivity.",
+  hard_water: "Hard (mineral-rich) water is alkaline (pH 7–9) and leaves a calcium/magnesium film on skin after rinsing. This disrupts the skin's natural acid mantle, impairs cleanser rinse-off, and is a documented eczema aggravator. Look for cleansers containing chelating agents (EDTA, phytic acid) and follow with a low-pH toner quickly after washing.",
+  chlorinated_water: "Chlorinated and chloramine-treated tap water can oxidize skin barrier lipids on contact — particularly relevant for eczema and reactive skin. A vitamin C (ascorbic acid) toner applied immediately after washing neutralizes residual disinfectant before it can damage the barrier.",
+  iron_water: "Iron-bearing water (indicated by rust stains on sinks or fixtures) introduces ferrous and ferric ions that generate free radicals on contact with skin, accelerating barrier lipid oxidation. Chelating agents and antioxidants (especially vitamins C and E) counteract this.",
+  heavy_metal_water: "Lead or heavy metal contamination in tap water is a public health concern — filtering your water or using bottled/filtered water for face washing is the most effective intervention. Topical measures can reduce but not eliminate exposure: chelating cleansers (containing tetrasodium EDTA or phytic acid) bind surface metals, barrier-repair products reduce transdermal uptake, and penetration enhancers (drying alcohols) should be avoided as they increase absorption. If you suspect lead, test your water.",
 };
 
 function noteLabel(n: SkinClimateNote): string {
@@ -284,6 +296,10 @@ function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateT
   if (skinTypes.has("eczema")) cats.push("Sensitizing preservatives", "Fragrance allergens", "Sulfate surfactants");
   if (skinTypes.has("psoriasis")) cats.push("Fragrances", "Sulfate surfactants");
   if (skinTypes.has("lupus_rash")) cats.push("Chemical sunscreens", "Photosensitizers", "AHA exfoliants");
+  if (climates.has("hard_water")) cats.push("Chelating agents", "High-pH cleansers");
+  if (climates.has("chlorinated_water")) cats.push("Vitamin C", "Antioxidants");
+  if (climates.has("iron_water")) cats.push("Chelating agents", "Antioxidants");
+  if (climates.has("heavy_metal_water")) cats.push("Chelating agents", "Penetration enhancers");
   return [...new Set(cats)];
 }
 
@@ -363,7 +379,7 @@ function getIngredientConcernLevel(
         (activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") || activeSkinTypes.has("eczema"))) ||
       (fc.toLowerCase() === "chemical sunscreen" &&
         (activeSkinTypes.has("rosacea") || activeSkinTypes.has("lupus_rash"))) ||
-      (fc === "Drying Solvent" && activeSkinTypes.has("rosacea")) ||
+      (fc === "Drying Solvent" && (activeSkinTypes.has("rosacea") || activeClimates.has("heavy_metal_water"))) ||
       (["photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical"].includes(fc) &&
         (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv") || activeSkinTypes.has("lupus_rash")));
     return isMatch ? "profile-matched" : "non-matching";
@@ -1627,13 +1643,32 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     ))}
                   </div>
                 </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Water quality</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WATER_TYPES.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleClimate(value)}
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                          activeClimates.has(value)
+                            ? "bg-teal-700 text-white border-teal-700"
+                            : "text-gray-500 border-gray-200 hover:border-gray-400"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
                   <div className="space-y-1.5 pt-1">
                     {[...activeSkinTypes].map((t) => (
                       <p key={t} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{SKIN_TYPE_NOTES[t]}</p>
                     ))}
                     {[...activeClimates].map((c) => (
-                      <p key={c} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{CLIMATE_NOTES[c]}</p>
+                      <p key={c} className={`text-xs rounded-lg px-2.5 py-1.5 leading-relaxed border ${c === "heavy_metal_water" ? "text-amber-800 bg-amber-50 border-amber-200" : "text-gray-600 bg-gray-50 border-gray-100"}`}>{CLIMATE_NOTES[c]}</p>
                     ))}
                     {(() => {
                       const watches = profileWatchCategories(activeSkinTypes, activeClimates);
@@ -2692,13 +2727,32 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     ))}
                   </div>
                 </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Water quality</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WATER_TYPES.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleClimate(value)}
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                          activeClimates.has(value)
+                            ? "bg-teal-700 text-white border-teal-700"
+                            : "text-gray-500 border-gray-200 hover:border-gray-400"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
                   <div className="space-y-1.5 pt-1">
                     {[...activeSkinTypes].map((t) => (
                       <p key={t} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{SKIN_TYPE_NOTES[t]}</p>
                     ))}
                     {[...activeClimates].map((c) => (
-                      <p key={c} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{CLIMATE_NOTES[c]}</p>
+                      <p key={c} className={`text-xs rounded-lg px-2.5 py-1.5 leading-relaxed border ${c === "heavy_metal_water" ? "text-amber-800 bg-amber-50 border-amber-200" : "text-gray-600 bg-gray-50 border-gray-100"}`}>{CLIMATE_NOTES[c]}</p>
                     ))}
                     {(() => {
                       const watches = profileWatchCategories(activeSkinTypes, activeClimates);

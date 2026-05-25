@@ -262,7 +262,8 @@ function detectCategory(name: string, sc: string | null): string | null {
   if (sc === "Protein") return "Strengthening";
   if (sc === "Conditioning Agent") return "Conditioning";
   if (sc === "Emollient") return "Moisturizing";
-  if (sc && ["UV Filter","Chelating Agent","pH Adjuster","Emulsifier","Thickener","Fragrance"].includes(sc))
+  if (sc === "Chelating Agent") return "chelating";
+  if (sc && ["UV Filter","pH Adjuster","Emulsifier","Thickener","Fragrance"].includes(sc))
     return null;
 
   if (sc === "Ceramide") return "barrier-repairing";
