@@ -214,7 +214,7 @@ const RINSE_OFF_TYPES = new Set([
 ]);
 
 type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash";
-type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water" | "red_nir" | "blue_light" | "amber_light" | "vibration_sonic" | "heat_steam" | "microcurrent" | "iodine_load" | "phytoestrogen_load" | "anti_androgenic" | "vasodilating_supps" | "immune_stimulating" | "insulin_sensitizing" | "anabolic_dht" | "high_dose_b12" | "collagen_support";
+type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water" | "red_nir" | "blue_light" | "amber_light" | "vibration_sonic" | "heat_steam" | "microcurrent" | "iodine_load" | "phytoestrogen_load" | "anti_androgenic" | "vasodilating_supps" | "immune_stimulating" | "insulin_sensitizing" | "anabolic_dht" | "high_dose_b12" | "collagen_support" | "high_glycemic" | "dairy_regular" | "gluten_sensitive" | "histamine_foods" | "alcohol_regular" | "spicy_foods" | "high_iodine_diet";
 
 const SKIN_TYPES: { value: SkinType; label: string }[] = [
   { value: "oily", label: "Oily" },
@@ -268,7 +268,17 @@ const SUPPLEMENT_TYPES: { value: ClimateType; label: string }[] = [
   { value: "collagen_support", label: "Collagen support" },
 ];
 
-const ALL_MODIFIER_TYPES = [...CLIMATE_TYPES, ...WATER_TYPES, ...DEVICE_TYPES, ...SUPPLEMENT_TYPES];
+const DIET_TYPES: { value: ClimateType; label: string }[] = [
+  { value: "high_glycemic", label: "High glycemic" },
+  { value: "dairy_regular", label: "Dairy" },
+  { value: "gluten_sensitive", label: "Gluten" },
+  { value: "histamine_foods", label: "Histamine foods" },
+  { value: "alcohol_regular", label: "Alcohol" },
+  { value: "spicy_foods", label: "Spicy foods" },
+  { value: "high_iodine_diet", label: "High-iodine diet" },
+];
+
+const ALL_MODIFIER_TYPES = [...CLIMATE_TYPES, ...WATER_TYPES, ...DEVICE_TYPES, ...SUPPLEMENT_TYPES, ...DIET_TYPES];
 
 const SKIN_TYPE_NOTES: Record<SkinType, string> = {
   oily: "Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.",
@@ -311,6 +321,13 @@ const CLIMATE_NOTES: Record<ClimateType, string> = {
   anabolic_dht: "Creatine and similar androgen-supporting supplements have been shown in RCTs to raise the DHT:testosterone ratio by 40–56%, increasing sebum. If acne is an active concern, this is a modifiable factor worth testing by eliminating it for 6–8 weeks.",
   high_dose_b12: "High-dose vitamin B12 has a documented mechanism for triggering acne: it alters porphyrin metabolism in C. acnes, triggering inflammatory breakouts. If acne appeared or worsened after starting B12, this is the most likely cause — lower doses or methylcobalamin may be better tolerated.",
   collagen_support: "Taking collagen-support supplements (collagen peptides, lysine, glycine, silica, phytoceramides, sea buckthorn) provides systemic raw materials for the same repair pathways that topical retinoids, peptides, and vitamin C signal. The combination is additive.",
+  high_glycemic: "A high glycemic index diet (refined carbs, processed sugars, white bread, pastries) raises insulin and IGF-1, directly increasing androgen-driven sebum production. This is a well-documented dietary driver of acne — reducing glycemic load works on the same axis as topical sebum-reducing actives.",
+  dairy_regular: "Regular dairy intake — particularly skim milk and whey protein — raises serum IGF-1 and delivers bioactive hormones. This has a documented correlation with acne, especially cystic and jawline breakouts. Full-fat and fermented dairy (yogurt, kefir) have weaker associations.",
+  gluten_sensitive: "Gluten sensitivity and celiac disease are associated with systemic inflammation that can manifest in the skin as eczema flares, psoriasis worsening, and dermatitis herpetiformis. Bread, wheat pasta, and flour-based products are the primary triggers — baker's yeast in bread is incidental; it's the wheat gluten that drives the reaction.",
+  histamine_foods: "High-histamine foods (fermented foods, aged cheese, wine, vinegar, tomatoes, spinach, cured meats) trigger histamine-mediated flushing and skin reactivity. For rosacea and reactive skin, this mimics contact allergen responses — a histamine release causing redness, warmth, and itching.",
+  alcohol_regular: "Alcohol is a direct vasodilator and one of the most reliable rosacea flush triggers. It also dehydrates systemically and impairs the skin barrier repair cycle — acutely relevant for dry and barrier-compromised skin. Even moderate regular intake can sustain a baseline of chronic low-grade vascular inflammation.",
+  spicy_foods: "Capsaicin and piperine in spicy foods activate TRPV1 (the heat-sensing nerve receptor) in facial skin — the same receptor that responds to menthol and eucalyptol. On rosacea-affected skin this triggers the same flush cycle that topical warming agents do. Identifying and reducing primary spicy triggers has a measurable effect on baseline redness.",
+  high_iodine_diet: "A high-iodine diet (seaweed, shellfish, generous iodized salt) can contribute to iodine acne through the same mechanism as iodine supplements — uniform papular eruptions that don't respond to standard acne treatments. Dietary sources are usually lower intensity than supplements but compound with any iodine load from kelp or marine algae capsules.",
 };
 
 function noteLabel(n: SkinClimateNote): string {
@@ -326,6 +343,7 @@ function climateNoteStyle(c: ClimateType): string {
   const amberSet = new Set<ClimateType>(["heavy_metal_water", "heat_steam", "iodine_load", "immune_stimulating", "anabolic_dht", "high_dose_b12"]);
   if (amberSet.has(c)) return "text-amber-800 bg-amber-50 border-amber-200";
   if (DEVICE_TYPES.some(d => d.value === c)) return "text-blue-800 bg-blue-50 border-blue-200";
+  if (DIET_TYPES.some(d => d.value === c)) return "text-emerald-800 bg-emerald-50 border-emerald-200";
   if (SUPPLEMENT_TYPES.some(s => s.value === c)) return "text-violet-800 bg-violet-50 border-violet-100";
   return "text-gray-600 bg-gray-50 border-gray-100";
 }
@@ -352,6 +370,12 @@ function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateT
   if (climates.has("vasodilating_supps") && skinTypes.has("rosacea")) cats.push("Heat triggers", "Warming agents");
   if (climates.has("phytoestrogen_load") && skinTypes.has("hyperpigmentation_prone")) cats.push("UV protection", "Brightening actives");
   if (climates.has("anabolic_dht") && skinTypes.has("acne_prone")) cats.push("Pore-cloggers", "Sebum triggers");
+  if ((climates.has("high_glycemic") || climates.has("dairy_regular")) && skinTypes.has("acne_prone")) cats.push("Pore-cloggers", "Sebum-stimulating actives");
+  if (climates.has("gluten_sensitive") && (skinTypes.has("eczema") || skinTypes.has("psoriasis"))) cats.push("Fragrance allergens", "Sulfate surfactants");
+  if (climates.has("histamine_foods") && (skinTypes.has("rosacea") || skinTypes.has("reactive"))) cats.push("Warming agents", "Fragrance allergens");
+  if (climates.has("alcohol_regular") && skinTypes.has("rosacea")) cats.push("Warming agents", "Vasodilating ingredients");
+  if (climates.has("spicy_foods") && skinTypes.has("rosacea")) cats.push("Heat triggers", "TRPV1 activators");
+  if (climates.has("high_iodine_diet") && skinTypes.has("acne_prone")) cats.push("Iodine compounds");
   return [...new Set(cats)];
 }
 
@@ -611,6 +635,32 @@ function detectSupplementWarnings(
     warnings.push({ type: "synergy", title: "Collagen support stack", body: "Your collagen supplement stack (collagen peptides, lysine, glycine, silica, phytoceramides) provides systemic raw materials for the same repair pathways that topical retinoids, peptides, and vitamin C signal. The combination is additive." });
   if (climates.has("insulin_sensitizing") && (skinTypes.has("acne_prone") || skinTypes.has("oily")))
     warnings.push({ type: "synergy", title: "Insulin sensitizers + sebum control", body: "Berberine, inositol, and chromium reduce IGF-1-driven sebum at the systemic level — topical sebum-controlling actives work alongside this, not in isolation. The combination is more effective than either alone." });
+  return warnings;
+}
+
+function detectDietaryWarnings(
+  skinTypes: Set<SkinType>,
+  climates: Set<ClimateType>
+): { type: "danger" | "caution" | "synergy"; title: string; body: string }[] {
+  const warnings: { type: "danger" | "caution" | "synergy"; title: string; body: string }[] = [];
+  if ((climates.has("high_glycemic") || climates.has("dairy_regular")) && (skinTypes.has("acne_prone") || skinTypes.has("oily"))) {
+    const source = [climates.has("high_glycemic") && "high glycemic foods", climates.has("dairy_regular") && "dairy"].filter(Boolean).join(" and ");
+    warnings.push({ type: "danger", title: `${source.charAt(0).toUpperCase() + source.slice(1)} + acne-prone skin`, body: `${source.charAt(0).toUpperCase() + source.slice(1)} raises insulin and IGF-1, directly increasing androgen-driven sebum. Reducing glycemic load and testing a 4-week dairy elimination are among the highest-impact modifiable factors for acne.` });
+  }
+  if (climates.has("high_glycemic") && skinTypes.has("mature"))
+    warnings.push({ type: "caution", title: "High glycemic diet + mature skin", body: "Sugar and refined carbs drive glycation — glucose cross-linking collagen and elastin fibers, stiffening them and accelerating visible aging. Reducing dietary sugar has additive effects with topical antioxidants and peptides." });
+  if (climates.has("gluten_sensitive") && (skinTypes.has("eczema") || skinTypes.has("psoriasis")))
+    warnings.push({ type: "caution", title: "Gluten sensitivity + inflammatory skin condition", body: "Undiagnosed gluten sensitivity or celiac disease sustains systemic inflammation that can worsen eczema and psoriasis. A supervised gluten-free trial of 8–12 weeks is diagnostic — improvement within that window suggests the skin condition is gluten-driven." });
+  if (climates.has("histamine_foods") && (skinTypes.has("rosacea") || skinTypes.has("reactive")))
+    warnings.push({ type: "caution", title: "Histamine foods + reactive / rosacea skin", body: "High-histamine foods (fermented foods, aged cheese, wine, vinegar, tomatoes) trigger the same histamine-release mechanism as contact allergens. For rosacea and reactive skin, this sustains a baseline of inflammation that makes topical products less effective." });
+  if (climates.has("alcohol_regular") && skinTypes.has("rosacea"))
+    warnings.push({ type: "danger", title: "Alcohol + rosacea", body: "Alcohol is one of the most consistent rosacea flush triggers — it acts through vasodilation, histamine release, and systemic dehydration simultaneously. Any topical rosacea management is substantially undermined by regular alcohol intake." });
+  if (climates.has("alcohol_regular") && (skinTypes.has("dry") || skinTypes.has("damaged_barrier")))
+    warnings.push({ type: "caution", title: "Alcohol + dry / barrier-compromised skin", body: "Regular alcohol intake dehydrates systemically and impairs the skin barrier repair cycle. For already dry or compromised skin, this extends recovery time and reduces the effectiveness of barrier-repairing actives." });
+  if (climates.has("spicy_foods") && skinTypes.has("rosacea"))
+    warnings.push({ type: "caution", title: "Spicy foods + rosacea", body: "Capsaicin activates TRPV1 heat receptors in facial skin — the same pathway triggered by menthol and warming topicals. On rosacea skin this sustains baseline vascular reactivity that makes other triggers more intense." });
+  if (climates.has("high_iodine_diet") && (skinTypes.has("acne_prone") || climates.has("iodine_load")))
+    warnings.push({ type: "caution", title: "High-iodine diet" + (climates.has("iodine_load") ? " + iodine supplements" : " + acne-prone skin"), body: "Dietary iodine from seaweed, shellfish, and iodized salt compounds with any supplement iodine load. Combined, they can produce iodine acne — uniform papular eruptions that don't respond to BP or salicylic acid." });
   return warnings;
 }
 
@@ -1774,10 +1824,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Supplements</p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <p className="text-xs text-gray-400 mb-1.5">Internal factors</p>
+                  <p className="text-[10px] text-gray-400 mb-1">Supplements</p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
                     {SUPPLEMENT_TYPES.map(({ value, label }) => (
                       <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-violet-700 text-white border-violet-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mb-1">Diet</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DIET_TYPES.map(({ value, label }) => (
+                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-emerald-700 text-white border-emerald-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
                     ))}
                   </div>
                 </div>
@@ -1791,9 +1848,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     ))}
                     {(() => {
                       const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
-                      return suppWarns.length > 0 ? (
+                      const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
+                      const allWarns = [...suppWarns, ...dietWarns];
+                      return allWarns.length > 0 ? (
                         <div className="space-y-1.5 pt-0.5">
-                          {suppWarns.map((w, i) => (
+                          {allWarns.map((w, i) => (
                             <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : w.type === "caution" ? "border-orange-200 bg-orange-50" : "border-teal-100 bg-teal-50"}`}>
                               <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-orange-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
                               <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-700" : w.type === "caution" ? "text-orange-700" : "text-teal-700"}`}>{w.body}</p>
@@ -2876,10 +2935,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Supplements</p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <p className="text-xs text-gray-400 mb-1.5">Internal factors</p>
+                  <p className="text-[10px] text-gray-400 mb-1">Supplements</p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
                     {SUPPLEMENT_TYPES.map(({ value, label }) => (
                       <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-violet-700 text-white border-violet-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mb-1">Diet</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DIET_TYPES.map(({ value, label }) => (
+                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-emerald-700 text-white border-emerald-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
                     ))}
                   </div>
                 </div>
@@ -2893,9 +2959,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     ))}
                     {(() => {
                       const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
-                      return suppWarns.length > 0 ? (
+                      const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
+                      const allWarns = [...suppWarns, ...dietWarns];
+                      return allWarns.length > 0 ? (
                         <div className="space-y-1.5 pt-0.5">
-                          {suppWarns.map((w, i) => (
+                          {allWarns.map((w, i) => (
                             <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : w.type === "caution" ? "border-orange-200 bg-orange-50" : "border-teal-100 bg-teal-50"}`}>
                               <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-orange-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
                               <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-700" : w.type === "caution" ? "text-orange-700" : "text-teal-700"}`}>{w.body}</p>
@@ -3072,6 +3140,33 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 </div>
               </section>
             ) : null;
+          })()}
+
+          {/* Diet & lifestyle contextual banner */}
+          {(() => {
+            const activeDietChips = DIET_TYPES.filter(d => activeClimates.has(d.value));
+            if (activeDietChips.length === 0) return null;
+            const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
+            if (dietWarns.length === 0 && activeDietChips.length === 0) return null;
+            return (
+              <section className="mb-6">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Diet & lifestyle</p>
+                {dietWarns.length > 0 ? (
+                  <div className="space-y-2">
+                    {dietWarns.map((w, i) => (
+                      <div key={i} className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-emerald-200 bg-emerald-50" : w.type === "caution" ? "border-emerald-100 bg-emerald-50" : "border-teal-100 bg-teal-50"}`}>
+                        <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-emerald-900" : w.type === "caution" ? "text-emerald-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
+                        <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-emerald-800" : w.type === "caution" ? "text-emerald-700" : "text-teal-700"}`}>{w.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 leading-relaxed">
+                    Active diet flags: {activeDietChips.map(d => d.label).join(", ")}. No specific interactions detected for this product and skin profile combination.
+                  </p>
+                )}
+              </section>
+            );
           })()}
 
           {/* By concern — grouped ingredient view */}
