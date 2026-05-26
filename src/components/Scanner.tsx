@@ -62,7 +62,8 @@ type ImportResult = {
 type UserList = { id: string; name: string; is_public: boolean; itemCount: number };
 
 type BrowseType = { name: string; count: number };
-type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; flaggedCount: number; sensoryCount: number; photoCount: number };
+type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; ingredient_list: string | null; flaggedCount: number; sensoryCount: number; photoCount: number; profileFlaggedCount?: number };
+type IngredientList = { id: string; name: string; type: "avoid" | "want"; items: string[] };
 
 const CATEGORY_LABELS: Record<string, string> = {
   // kebab-case (newer workflow)
@@ -664,6 +665,21 @@ function detectDietaryWarnings(
   return warnings;
 }
 
+function profileMatchedCategories(skinTypes: Set<SkinType>, climates: Set<ClimateType>): string[] {
+  const cats: string[] = [];
+  if (skinTypes.has("acne_prone") || skinTypes.has("oily") || skinTypes.has("fungal_acne"))
+    cats.push("pore-clogger", "occlusive", "bacteria-trap");
+  if (skinTypes.has("reactive") || skinTypes.has("damaged_barrier") || skinTypes.has("eczema") || skinTypes.has("rosacea") || skinTypes.has("psoriasis"))
+    cats.push("sensitizer");
+  if (skinTypes.has("reactive") || skinTypes.has("damaged_barrier") || skinTypes.has("eczema"))
+    cats.push("fragrance-allergen");
+  if (skinTypes.has("rosacea") || skinTypes.has("lupus_rash"))
+    cats.push("Chemical Sunscreen");
+  if (skinTypes.has("hyperpigmentation_prone") || climates.has("high_uv") || skinTypes.has("lupus_rash"))
+    cats.push("photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical");
+  return [...new Set(cats)];
+}
+
 export default function Scanner({ initialProductId }: { initialProductId?: string | null }) {
   const { isSignedIn, isLoaded } = useUser();
 
@@ -690,6 +706,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [browseSelectedType, setBrowseSelectedType] = useState<string | null>(null);
   const [browseProducts, setBrowseProducts] = useState<BrowseProduct[]>([]);
   const [browseLoading, setBrowseLoading] = useState(false);
+  const [browsePhotosafe, setBrowsePhotosafe] = useState(false);
+  const [browseProfileLinked, setBrowseProfileLinked] = useState(false);
+  const [ingredientLists, setIngredientLists] = useState<IngredientList[]>([]);
+  const [ingListsOpen, setIngListsOpen] = useState(false);
+  const [newIngListOpen, setNewIngListOpen] = useState(false);
+  const [newIngListName, setNewIngListName] = useState("");
+  const [newIngListType, setNewIngListType] = useState<"avoid" | "want">("avoid");
+  const [addItemInputs, setAddItemInputs] = useState<Record<string, string>>({});
   const [imageUploadOpen, setImageUploadOpen] = useState(false);
   const [imageUploadUrl, setImageUploadUrl] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
@@ -783,15 +807,21 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       const st = localStorage.getItem("skindex:skinTypes");
       const cl = localStorage.getItem("skindex:climates");
       const rt = localStorage.getItem("skindex:routine");
+      const il = localStorage.getItem("skindex:ingredientLists");
       if (st) setActiveSkinTypes(new Set(JSON.parse(st) as SkinType[]));
       if (cl) setActiveClimates(new Set(JSON.parse(cl) as ClimateType[]));
       if (rt) setRoutineProducts(JSON.parse(rt) as RoutineProduct[]);
+      if (il) setIngredientLists(JSON.parse(il) as IngredientList[]);
     } catch {}
   }, []);
 
   useEffect(() => {
     try { localStorage.setItem("skindex:routine", JSON.stringify(routineProducts)); } catch {}
   }, [routineProducts]);
+
+  useEffect(() => {
+    try { localStorage.setItem("skindex:ingredientLists", JSON.stringify(ingredientLists)); } catch {}
+  }, [ingredientLists]);
 
   useEffect(() => {
     fetch("/api/browse")
@@ -1490,7 +1520,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setBrowseSelectedType(typeName);
     setBrowseProducts([]);
     setBrowseLoading(true);
-    const res = await fetch(`/api/browse?type=${encodeURIComponent(typeName)}`);
+    const params = new URLSearchParams({ type: typeName });
+    const concerns = profileMatchedCategories(activeSkinTypes, activeClimates);
+    if (concerns.length) params.set("concerns", concerns.join(","));
+    const res = await fetch(`/api/browse?${params.toString()}`);
     const data = await res.json();
     setBrowseProducts(data.products ?? []);
     setBrowseLoading(false);
@@ -1874,6 +1907,88 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             )}
           </section>
 
+          {/* Ingredient lists panel — idle state */}
+          <section className="mb-6">
+            <button
+              type="button"
+              onClick={() => setIngListsOpen(v => !v)}
+              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full"
+            >
+              Ingredient lists
+              {ingredientLists.some(l => l.items.length > 0) && (
+                <span className="text-gray-500 font-medium normal-case tracking-normal">
+                  {ingredientLists.filter(l => l.items.length > 0).length} active
+                </span>
+              )}
+              <span className="text-gray-300 ml-auto">{ingListsOpen ? "▲" : "▼"}</span>
+            </button>
+            {ingListsOpen && (
+              <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3">
+                <p className="text-xs text-gray-400">Build avoid and want lists to filter browse results. Lists are saved locally on this device.</p>
+                {ingredientLists.map((list) => (
+                  <div key={list.id} className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${list.type === "avoid" ? "bg-rose-50 text-rose-700" : "bg-teal-50 text-teal-700"}`}>{list.type === "avoid" ? "Avoid" : "Want"}</span>
+                      <span className="text-xs font-medium text-gray-700 flex-1">{list.name}</span>
+                      <button type="button" onClick={() => setIngredientLists(ls => ls.filter(l => l.id !== list.id))} className="text-[10px] text-gray-400 hover:text-rose-600">Delete list</button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {list.items.map((item) => (
+                        <span key={item} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                          {item}
+                          <button type="button" onClick={() => setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: l.items.filter(i => i !== item) } : l))} className="text-gray-400 hover:text-rose-600 leading-none">×</button>
+                        </span>
+                      ))}
+                    </div>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const val = (addItemInputs[list.id] ?? "").trim().toLowerCase();
+                      if (!val || list.items.includes(val)) return;
+                      setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
+                      setAddItemInputs(m => ({ ...m, [list.id]: "" }));
+                    }} className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={addItemInputs[list.id] ?? ""}
+                        onChange={(e) => setAddItemInputs(m => ({ ...m, [list.id]: e.target.value }))}
+                        placeholder="Add ingredient…"
+                        className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
+                      />
+                      <button type="submit" className="text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600">Add</button>
+                    </form>
+                  </div>
+                ))}
+                {newIngListOpen ? (
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newIngListName.trim()) return;
+                    setIngredientLists(ls => [...ls, { id: crypto.randomUUID(), name: newIngListName.trim(), type: newIngListType, items: [] }]);
+                    setNewIngListName("");
+                    setNewIngListOpen(false);
+                  }} className="space-y-1.5 pt-1 border-t border-gray-100">
+                    <p className="text-[10px] text-gray-400 pt-1">New list</p>
+                    <input
+                      type="text"
+                      value={newIngListName}
+                      onChange={(e) => setNewIngListName(e.target.value)}
+                      placeholder="List name…"
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
+                      autoFocus
+                    />
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => setNewIngListType("avoid")} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${newIngListType === "avoid" ? "bg-rose-600 text-white border-rose-600" : "text-gray-500 border-gray-200"}`}>Avoid</button>
+                      <button type="button" onClick={() => setNewIngListType("want")} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${newIngListType === "want" ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200"}`}>Want</button>
+                      <button type="submit" className="ml-auto text-xs px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700">Create</button>
+                      <button type="button" onClick={() => setNewIngListOpen(false)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200">Cancel</button>
+                    </div>
+                  </form>
+                ) : (
+                  <button type="button" onClick={() => setNewIngListOpen(true)} className="text-xs text-gray-400 hover:text-gray-700">+ New list</button>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Routine panel — idle state */}
           <section className="mb-6">
             <button
@@ -1986,7 +2101,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
           {browseSelectedType && (
             <div>
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-3">
                 <button
                   onClick={() => { setBrowseSelectedType(null); setBrowseProducts([]); }}
                   className="text-xs text-gray-400 hover:text-gray-700"
@@ -1996,43 +2111,77 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 <span className="text-xs text-gray-300">·</span>
                 <span className="text-sm font-medium text-gray-700">{browseSelectedType}</span>
               </div>
+              {/* Browse filter chips */}
+              {!browseLoading && browseProducts.length > 0 && (() => {
+                const ingText = (p: BrowseProduct) => (p.ingredient_list ?? "").toLowerCase();
+                const avoidLists = ingredientLists.filter(l => l.type === "avoid" && l.items.length > 0);
+                const wantLists = ingredientLists.filter(l => l.type === "want" && l.items.length > 0);
+                const profileCats = profileMatchedCategories(activeSkinTypes, activeClimates);
+                const filtered = browseProducts.filter(p => {
+                  if (browsePhotosafe && p.photoCount > 0) return false;
+                  if (browseProfileLinked && (p.profileFlaggedCount ?? 0) > 0) return false;
+                  const txt = ingText(p);
+                  if (avoidLists.some(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
+                  if (wantLists.length > 0 && !wantLists.every(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
+                  return true;
+                });
+                const activeFilterCount = (browsePhotosafe ? 1 : 0) + (browseProfileLinked ? 1 : 0) + avoidLists.length + wantLists.length;
+                return (
+                  <>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Photo-safe</button>
+                      {profileCats.length > 0 && (
+                        <button type="button" onClick={() => setBrowseProfileLinked(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseProfileLinked ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Profile-safe</button>
+                      )}
+                      {avoidLists.map(l => (
+                        <span key={l.id} className="text-xs px-2 py-0.5 rounded-full border bg-rose-50 text-rose-700 border-rose-200">✗ {l.name}</span>
+                      ))}
+                      {wantLists.map(l => (
+                        <span key={l.id} className="text-xs px-2 py-0.5 rounded-full border bg-teal-50 text-teal-700 border-teal-100">✓ {l.name}</span>
+                      ))}
+                      {activeFilterCount > 0 && filtered.length !== browseProducts.length && (
+                        <span className="text-xs text-gray-400 self-center">{filtered.length} of {browseProducts.length}</span>
+                      )}
+                    </div>
+                    {filtered.length === 0 && (
+                      <p className="text-sm text-gray-400 text-center py-6">No products match your active filters.</p>
+                    )}
+                    <div className="space-y-2">
+                      {filtered.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => { resetTab("search"); setQuery(p.name); handleScan({ tab: "search", query: p.name }); }}
+                          className="w-full flex items-center gap-3 border border-gray-300 rounded-xl p-3 text-left hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                        >
+                          {p.image_url && (
+                            <img src={`/api/image-proxy?url=${encodeURIComponent(p.image_url)}`} alt={p.name} className="w-10 h-10 object-contain rounded-lg bg-gray-50 shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate" title={p.name}>{p.name}</p>
+                            {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {p.flaggedCount === 0 && p.sensoryCount === 0 && p.photoCount === 0 ? (
+                              <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe</span>
+                            ) : (
+                              <>
+                                {p.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{p.flaggedCount} flagged</span>}
+                                {p.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{p.sensoryCount} sensory</span>}
+                                {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photo</span>}
+                              </>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
               {browseLoading && <p className="text-sm text-gray-400 text-center py-6">Loading…</p>}
               {!browseLoading && browseProducts.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-6">No products found.</p>
               )}
-              <div className="space-y-2">
-                {browseProducts.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => { resetTab("search"); setQuery(p.name); handleScan({ tab: "search", query: p.name }); }}
-                    className="w-full flex items-center gap-3 border border-gray-300 rounded-xl p-3 text-left hover:border-gray-400 hover:bg-gray-50 transition-colors"
-                  >
-                    {p.image_url && (
-                      <img
-                        src={`/api/image-proxy?url=${encodeURIComponent(p.image_url)}`}
-                        alt={p.name}
-                        className="w-10 h-10 object-contain rounded-lg bg-gray-50 shrink-0"
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate" title={p.name}>{p.name}</p>
-                      {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {p.flaggedCount === 0 && p.sensoryCount === 0 && p.photoCount === 0 ? (
-                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe</span>
-                      ) : (
-                        <>
-                          {p.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{p.flaggedCount} flagged</span>}
-                          {p.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{p.sensoryCount} sensory triggers</span>}
-                          {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photosensitive</span>}
-                        </>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
             </div>
           )}
         </div>
@@ -2985,6 +3134,88 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             )}
           </section>
 
+          {/* Ingredient lists panel — results state */}
+          <section className="mb-4">
+            <button
+              type="button"
+              onClick={() => setIngListsOpen(v => !v)}
+              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full"
+            >
+              Ingredient lists
+              {ingredientLists.some(l => l.items.length > 0) && (
+                <span className="text-gray-500 font-medium normal-case tracking-normal">
+                  {ingredientLists.filter(l => l.items.length > 0).length} active
+                </span>
+              )}
+              <span className="text-gray-300 ml-auto">{ingListsOpen ? "▲" : "▼"}</span>
+            </button>
+            {ingListsOpen && (
+              <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3">
+                <p className="text-xs text-gray-400">Build avoid and want lists to filter browse results. Lists are saved locally on this device.</p>
+                {ingredientLists.map((list) => (
+                  <div key={list.id} className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${list.type === "avoid" ? "bg-rose-50 text-rose-700" : "bg-teal-50 text-teal-700"}`}>{list.type === "avoid" ? "Avoid" : "Want"}</span>
+                      <span className="text-xs font-medium text-gray-700 flex-1">{list.name}</span>
+                      <button type="button" onClick={() => setIngredientLists(ls => ls.filter(l => l.id !== list.id))} className="text-[10px] text-gray-400 hover:text-rose-600">Delete list</button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {list.items.map((item) => (
+                        <span key={item} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                          {item}
+                          <button type="button" onClick={() => setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: l.items.filter(i => i !== item) } : l))} className="text-gray-400 hover:text-rose-600 leading-none">×</button>
+                        </span>
+                      ))}
+                    </div>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const val = (addItemInputs[list.id] ?? "").trim().toLowerCase();
+                      if (!val || list.items.includes(val)) return;
+                      setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
+                      setAddItemInputs(m => ({ ...m, [list.id]: "" }));
+                    }} className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={addItemInputs[list.id] ?? ""}
+                        onChange={(e) => setAddItemInputs(m => ({ ...m, [list.id]: e.target.value }))}
+                        placeholder="Add ingredient…"
+                        className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
+                      />
+                      <button type="submit" className="text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600">Add</button>
+                    </form>
+                  </div>
+                ))}
+                {newIngListOpen ? (
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newIngListName.trim()) return;
+                    setIngredientLists(ls => [...ls, { id: crypto.randomUUID(), name: newIngListName.trim(), type: newIngListType, items: [] }]);
+                    setNewIngListName("");
+                    setNewIngListOpen(false);
+                  }} className="space-y-1.5 pt-1 border-t border-gray-100">
+                    <p className="text-[10px] text-gray-400 pt-1">New list</p>
+                    <input
+                      type="text"
+                      value={newIngListName}
+                      onChange={(e) => setNewIngListName(e.target.value)}
+                      placeholder="List name…"
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
+                      autoFocus
+                    />
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => setNewIngListType("avoid")} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${newIngListType === "avoid" ? "bg-rose-600 text-white border-rose-600" : "text-gray-500 border-gray-200"}`}>Avoid</button>
+                      <button type="button" onClick={() => setNewIngListType("want")} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${newIngListType === "want" ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200"}`}>Want</button>
+                      <button type="submit" className="ml-auto text-xs px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700">Create</button>
+                      <button type="button" onClick={() => setNewIngListOpen(false)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200">Cancel</button>
+                    </div>
+                  </form>
+                ) : (
+                  <button type="button" onClick={() => setNewIngListOpen(true)} className="text-xs text-gray-400 hover:text-gray-700">+ New list</button>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Routine panel — results state */}
           <section className="mt-4">
             <button
@@ -3069,6 +3300,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   const sensoryItem = (result.sensoryTrigger ?? []).find(
                     (s) => normalizeForMatch(s.rawName) === normalizeForMatch(item)
                   );
+                  const itemNorm = normalizeForMatch(item);
+                  const onAvoidList = ingredientLists.some(l => l.type === "avoid" && l.items.some(av => itemNorm.includes(av)));
                   const colorKey: keyof typeof paragraphColor =
                     match?.status === "flagged" ? "flagged"
                     : sensoryItem ? "sensory-trigger"
@@ -3083,7 +3316,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     <Fragment key={i}>
                       <button
                         type="button"
-                        className={`${colorClass} hover:underline underline-offset-2`}
+                        className={`${colorClass} hover:underline underline-offset-2${onAvoidList ? " bg-rose-100 rounded px-0.5" : ""}`}
+                        title={onAvoidList ? "On your avoid list" : undefined}
                         onClick={() => {
                           if (match || photoItem || sensoryItem) {
                             handleIngredientClick(item, match, !!photoItem, !!sensoryItem);
@@ -3092,7 +3326,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           }
                         }}
                       >
-                        {smartCase(item)}
+                        {onAvoidList && <span className="text-rose-500 mr-0.5">⊗</span>}{smartCase(item)}
                       </button>
                       {i < result.originalItems.length - 1 && (
                         <span className="text-gray-400">, </span>

@@ -8,7 +8,6 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
 
   if (!type) {
-    // Return type counts for the grid
     const { data } = await supabase
       .from("products")
       .select("type")
@@ -28,7 +27,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ types });
   }
 
-  // Return products for a specific type
   const { data: products } = await supabase
     .from("products")
     .select("id, name, brand, image_url, ingredient_list")
@@ -40,6 +38,7 @@ export async function GET(req: NextRequest) {
 
   const productIds = products.map((p) => p.id);
 
+  // All flagged ingredients (for general flaggedCount)
   const { data: allFlagged } = await supabase
     .from("ingredients")
     .select("id")
@@ -57,14 +56,40 @@ export async function GET(req: NextRequest) {
     dbCounts.set(link.product_id, (dbCounts.get(link.product_id) ?? 0) + 1);
   }
 
+  // Profile-specific flagged count (optional — when concerns param is present)
+  const concernsParam = req.nextUrl.searchParams.get("concerns");
+  const concerns = concernsParam ? concernsParam.split(",").filter(Boolean) : [];
+  const profileCounts = new Map<string, number>();
+
+  if (concerns.length > 0) {
+    const { data: concernIngredients } = await supabase
+      .from("ingredients")
+      .select("id")
+      .in("flagged_category", concerns);
+    const concernIds = (concernIngredients ?? []).map((i) => i.id);
+
+    if (concernIds.length > 0) {
+      const { data: concernLinks } = await supabase
+        .from("product_ingredients")
+        .select("product_id")
+        .in("product_id", productIds)
+        .in("ingredient_id", concernIds);
+      for (const link of concernLinks ?? []) {
+        profileCounts.set(link.product_id, (profileCounts.get(link.product_id) ?? 0) + 1);
+      }
+    }
+  }
+
   const results = products.map((p) => ({
     id: p.id,
     name: p.name,
     brand: p.brand ?? null,
     image_url: p.image_url ?? null,
+    ingredient_list: p.ingredient_list ?? null,
     flaggedCount: (dbCounts.get(p.id) ?? 0) + (p.ingredient_list ? countComedogenicPatternMatches(p.ingredient_list) : 0),
     sensoryCount: p.ingredient_list ? countSensoryPatternMatches(p.ingredient_list) : 0,
     photoCount: p.ingredient_list ? countPhotoPatternMatches(p.ingredient_list) : 0,
+    profileFlaggedCount: concerns.length > 0 ? (profileCounts.get(p.id) ?? 0) : undefined,
   })).sort((a, b) => {
     if (a.flaggedCount !== b.flaggedCount) return a.flaggedCount - b.flaggedCount;
     if (a.sensoryCount !== b.sensoryCount) return a.sensoryCount - b.sensoryCount;
