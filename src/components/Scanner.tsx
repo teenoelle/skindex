@@ -214,7 +214,7 @@ const RINSE_OFF_TYPES = new Set([
   "Clay Mask", "Rinse-Off Mask",
 ]);
 
-type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash";
+type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash" | "keratosis_pilaris" | "body_acne";
 type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water" | "red_nir" | "blue_light" | "amber_light" | "vibration_sonic" | "heat_steam" | "microcurrent" | "iodine_load" | "phytoestrogen_load" | "anti_androgenic" | "vasodilating_supps" | "immune_stimulating" | "insulin_sensitizing" | "anabolic_dht" | "high_dose_b12" | "collagen_support" | "high_glycemic" | "dairy_regular" | "gluten_sensitive" | "histamine_foods" | "alcohol_regular" | "spicy_foods" | "high_iodine_diet";
 
 const SKIN_TYPES: { value: SkinType; label: string }[] = [
@@ -231,6 +231,8 @@ const SKIN_TYPES: { value: SkinType; label: string }[] = [
   { value: "eczema", label: "Eczema" },
   { value: "psoriasis", label: "Psoriasis" },
   { value: "lupus_rash", label: "Lupus rash" },
+  { value: "keratosis_pilaris", label: "Keratosis pilaris" },
+  { value: "body_acne", label: "Body acne" },
 ];
 
 const CLIMATE_TYPES: { value: ClimateType; label: string }[] = [
@@ -295,6 +297,8 @@ const SKIN_TYPE_NOTES: Record<SkinType, string> = {
   eczema: "Atopic eczema has specific preservative sensitivities. MI/MCI (methylisothiazolinone/methylchloroisothiazolinone) and IPBC are notorious eczema triggers. Ceramides, colloidal oatmeal, and thick emollients are specifically therapeutic here — unlike for acne, heavy barrier creams help rather than harm.",
   psoriasis: "Psoriasis causes rapid cell turnover and thick scale. Keratolytics like salicylic acid can help remove scale. Fragrances and harsh surfactants trigger flares. Vitamin D analogues and antioxidants are specifically beneficial.",
   lupus_rash: "The malar (butterfly) rash of lupus is highly photosensitive — UV exposure triggers flares. Chemical UV filters can also cause reactions; mineral-only sunscreens (zinc oxide, titanium dioxide) are strongly preferred. Photosensitizing ingredients carry significantly higher risk here than for any other type.",
+  keratosis_pilaris: "Keratosis pilaris (the rough, bumpy texture on upper arms and thighs) is caused by keratin plugging follicles. Gentle chemical exfoliants — urea, lactic acid, salicylic acid — dissolve plugs; physical scrubs and harsh stripping cleansers worsen the inflammation that keeps follicles blocked. Heavy occlusives can trap keratin and worsen congestion.",
+  body_acne: "Body acne is driven by the same pore-clogging and bacterial mechanisms as face acne, but friction and sweat occlusion under clothing are major amplifiers. Fabric softener residue, heavy emollients in body wash, and thick lotions all contribute. The same pore-clogger flags that matter on face apply here — watch the Congestion and Occlusive sections.",
 };
 
 const CLIMATE_NOTES: Record<ClimateType, string> = {
@@ -361,6 +365,8 @@ function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateT
   if (skinTypes.has("eczema")) cats.push("Sensitizing preservatives", "Fragrance allergens", "Sulfate surfactants");
   if (skinTypes.has("psoriasis")) cats.push("Fragrances", "Sulfate surfactants");
   if (skinTypes.has("lupus_rash")) cats.push("Chemical sunscreens", "Photosensitizers", "AHA exfoliants");
+  if (skinTypes.has("keratosis_pilaris")) cats.push("Heavy occlusives", "Physical exfoliants", "Sulfate surfactants");
+  if (skinTypes.has("body_acne")) cats.push("Occlusives", "Waxes", "Film-formers", "Pore-cloggers");
   if (climates.has("hard_water")) cats.push("Chelating agents", "High-pH cleansers");
   if (climates.has("chlorinated_water")) cats.push("Vitamin C", "Antioxidants");
   if (climates.has("iron_water")) cats.push("Chelating agents", "Antioxidants");
@@ -408,9 +414,9 @@ const SENSORY_PROFILE_MAP: Partial<Record<string, SkinType[]>> = {
   "Stinging": ["reactive", "damaged_barrier", "eczema", "rosacea"],
   "chemical-itch": ["reactive", "damaged_barrier", "eczema"],
   "Film-forming": ["oily", "acne_prone", "fungal_acne"],
-  "Occlusive": ["oily", "acne_prone", "fungal_acne", "seborrheic"],
-  "occlusive-itch": ["oily", "acne_prone", "fungal_acne"],
-  "comedogenic-itch": ["oily", "acne_prone", "fungal_acne"],
+  "Occlusive": ["oily", "acne_prone", "fungal_acne", "seborrheic", "body_acne", "keratosis_pilaris"],
+  "occlusive-itch": ["oily", "acne_prone", "fungal_acne", "body_acne"],
+  "comedogenic-itch": ["oily", "acne_prone", "fungal_acne", "body_acne"],
   "Cooling": ["reactive", "rosacea"],
   "Warming": ["reactive", "rosacea"],
   "Iodine": ["acne_prone", "fungal_acne"],
@@ -451,7 +457,7 @@ function getIngredientConcernLevel(
   if (match?.ingredient.status === "flagged") {
     const isMatch =
       (["pore-clogger", "occlusive", "bacteria-trap"].includes(fc) &&
-        (activeSkinTypes.has("acne_prone") || activeSkinTypes.has("oily") || activeSkinTypes.has("fungal_acne"))) ||
+        (activeSkinTypes.has("acne_prone") || activeSkinTypes.has("oily") || activeSkinTypes.has("fungal_acne") || activeSkinTypes.has("body_acne") || activeSkinTypes.has("keratosis_pilaris"))) ||
       (fc === "sensitizer" &&
         (activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") || activeSkinTypes.has("eczema") || activeSkinTypes.has("rosacea") || activeSkinTypes.has("psoriasis"))) ||
       (fc === "fragrance-allergen" &&
@@ -670,7 +676,7 @@ function detectDietaryWarnings(
 
 function profileMatchedCategories(skinTypes: Set<SkinType>, climates: Set<ClimateType>): string[] {
   const cats: string[] = [];
-  if (skinTypes.has("acne_prone") || skinTypes.has("oily") || skinTypes.has("fungal_acne"))
+  if (skinTypes.has("acne_prone") || skinTypes.has("oily") || skinTypes.has("fungal_acne") || skinTypes.has("body_acne") || skinTypes.has("keratosis_pilaris"))
     cats.push("pore-clogger", "occlusive", "bacteria-trap");
   if (skinTypes.has("reactive") || skinTypes.has("damaged_barrier") || skinTypes.has("eczema") || skinTypes.has("rosacea") || skinTypes.has("psoriasis"))
     cats.push("sensitizer");
@@ -2226,7 +2232,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
             <div className="space-y-5">
               {(() => {
-                const AREA_ORDER = ["Face", "Body", "Hair", "Lip", "Makeup", "Sun"];
+                const AREA_ORDER = ["Face", "Body", "Hands", "Hair", "Lip", "Nails", "Makeup"];
                 const grouped = new Map<string, BrowseType[]>();
                 const ungrouped: BrowseType[] = [];
                 for (const t of browseTypes) {
@@ -2238,15 +2244,24 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     ungrouped.push(t);
                   }
                 }
-                const typeButton = (t: BrowseType) => (
-                  <button
-                    key={t.name}
-                    onClick={() => selectBrowseType(t.name)}
-                    className="text-sm text-gray-700 border border-gray-200 rounded-full px-3 py-1 hover:border-gray-400 hover:text-gray-900 transition-colors"
-                  >
-                    {t.name} <span className="text-gray-400 text-xs">{t.count}</span>
-                  </button>
-                );
+                const typeButton = (t: BrowseType) =>
+                  t.count === 0 ? (
+                    <span
+                      key={t.name}
+                      title="No products yet — be the first to add one"
+                      className="text-sm text-gray-300 border border-gray-100 rounded-full px-3 py-1 cursor-default select-none"
+                    >
+                      {t.name} <span className="text-xs">0</span>
+                    </span>
+                  ) : (
+                    <button
+                      key={t.name}
+                      onClick={() => selectBrowseType(t.name)}
+                      className="text-sm text-gray-700 border border-gray-200 rounded-full px-3 py-1 hover:border-gray-400 hover:text-gray-900 transition-colors"
+                    >
+                      {t.name} <span className="text-gray-400 text-xs">{t.count}</span>
+                    </button>
+                  );
                 const areaSection = (label: string, types: BrowseType[]) => (
                   <div key={label}>
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">{label}</p>
@@ -2256,7 +2271,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 const sections: React.ReactNode[] = [];
                 for (const area of AREA_ORDER) {
                   const types = grouped.get(area);
-                  if (types?.length) { sections.push(areaSection(area, types)); grouped.delete(area); }
+                  if (types) { sections.push(areaSection(area, types)); grouped.delete(area); }
                 }
                 for (const [area, types] of grouped) sections.push(areaSection(area, types));
                 if (ungrouped.length > 0) sections.push(areaSection("Other", ungrouped));

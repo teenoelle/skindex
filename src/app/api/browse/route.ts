@@ -8,20 +8,25 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
 
   if (!type) {
-    const { data } = await supabase
-      .from("products")
-      .select("type")
-      .not("ingredient_list", "is", null)
-      .eq("is_archived", false);
+    // Fetch all canonical types and live product counts in parallel
+    const [{ data: allTypes }, { data: products }] = await Promise.all([
+      supabase.from("product_types").select("name"),
+      supabase
+        .from("products")
+        .select("type")
+        .not("ingredient_list", "is", null)
+        .eq("is_archived", false),
+    ]);
 
     const counts: Record<string, number> = {};
-    for (const row of data ?? []) {
+    for (const row of products ?? []) {
       const t = row.type?.trim();
       if (t) counts[t] = (counts[t] ?? 0) + 1;
     }
 
-    const types = Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
+    // Merge: every canonical type appears, 0 if no products yet
+    const types = (allTypes ?? [])
+      .map(({ name }) => ({ name, count: counts[name] ?? 0 }))
       .sort((a, b) => b.count - a.count);
 
     return NextResponse.json({ types });
