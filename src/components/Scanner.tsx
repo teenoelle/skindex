@@ -800,6 +800,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [addedToRoutine, setAddedToRoutine] = useState(false);
   const [routinePanelOpen, setRoutinePanelOpen] = useState(false);
   const [addRoutinePickerOpen, setAddRoutinePickerOpen] = useState(false);
+  const [skinTypeHint, setSkinTypeHint] = useState<SkinType | null>(null);
   const stickySearchRef = useRef<HTMLInputElement>(null);
   const ingSuggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1952,20 +1953,33 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <p className="text-xs text-gray-400 mb-1.5">Skin type</p>
                   <div className="flex flex-wrap gap-1.5">
                     {SKIN_TYPES.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => toggleSkinType(value)}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                          activeSkinTypes.has(value)
-                            ? "bg-teal-700 text-white border-teal-700"
-                            : "text-gray-500 border-gray-200 hover:border-gray-400"
-                        }`}
-                      >
-                        {label}
-                      </button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleSkinType(value)}
+                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                            activeSkinTypes.has(value)
+                              ? "bg-teal-700 text-white border-teal-700"
+                              : "text-gray-500 border-gray-200 hover:border-gray-400"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSkinTypeHint(h => h === value ? null : value)}
+                          className="text-[10px] text-gray-300 hover:text-gray-500 leading-none"
+                          aria-label={`About ${label}`}
+                        >ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {skinTypeHint && SKIN_TYPE_NOTES[skinTypeHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{SKIN_TYPES.find(s => s.value === skinTypeHint)?.label} — </span>
+                      {SKIN_TYPE_NOTES[skinTypeHint]}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-1.5">Climate</p>
@@ -2232,7 +2246,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
             <div className="space-y-5">
               {(() => {
-                const AREA_ORDER = ["Face", "Body", "Hands", "Hair", "Lip", "Nails", "Makeup"];
+                const AREA_ORDER = ["Face", "Makeup", "Lip", "Hands", "Nails", "Hair", "Body"];
                 const grouped = new Map<string, BrowseType[]>();
                 const ungrouped: BrowseType[] = [];
                 for (const t of browseTypes) {
@@ -3340,20 +3354,33 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <p className="text-xs text-gray-400 mb-1.5">Skin type</p>
                   <div className="flex flex-wrap gap-1.5">
                     {SKIN_TYPES.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => toggleSkinType(value)}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                          activeSkinTypes.has(value)
-                            ? "bg-teal-700 text-white border-teal-700"
-                            : "text-gray-500 border-gray-200 hover:border-gray-400"
-                        }`}
-                      >
-                        {label}
-                      </button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleSkinType(value)}
+                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                            activeSkinTypes.has(value)
+                              ? "bg-teal-700 text-white border-teal-700"
+                              : "text-gray-500 border-gray-200 hover:border-gray-400"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSkinTypeHint(h => h === value ? null : value)}
+                          className="text-[10px] text-gray-300 hover:text-gray-500 leading-none"
+                          aria-label={`About ${label}`}
+                        >ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {skinTypeHint && SKIN_TYPE_NOTES[skinTypeHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{SKIN_TYPES.find(s => s.value === skinTypeHint)?.label} — </span>
+                      {SKIN_TYPE_NOTES[skinTypeHint]}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-1.5">Climate</p>
