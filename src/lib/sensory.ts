@@ -137,6 +137,11 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
     note: "A hard plant wax that creates a stiff, occlusive film on skin. Can trap sweat and sebum beneath the surface, causing warmth and itching that prompt touching.",
   },
   {
+    pattern: /microcrystalline wax|cera microcristallina|\bozokerite\b|synthetic beeswax|synthetic wax|euphorbia cerifera|helianthus annuus seed wax/i,
+    sensory_category: "Occlusive",
+    note: "A stiff synthetic or mineral wax that forms a dense occlusive seal on skin. In hot or humid conditions it traps heat and sebum underneath, increasing congestion risk and the prickling or itching sensation that leads to touching and picking.",
+  },
+  {
     pattern: /\bdimethicone\b|trimethylsiloxysilicate/i,
     sensory_category: "Pilling",
     note: "Can ball up into a gritty, visible residue when applied over water-based layers or in excess — especially if the previous layer hasn't fully absorbed. The physical sensation of pilled product on skin frequently triggers rubbing and picking.",

@@ -222,7 +222,7 @@ const SKIN_TYPES: { value: SkinType; label: string }[] = [
   { value: "dry", label: "Dry" },
   { value: "reactive", label: "Reactive" },
   { value: "damaged_barrier", label: "Damaged barrier" },
-  { value: "acne_prone", label: "Acne-prone" },
+  { value: "acne_prone", label: "Acne" },
   { value: "mature", label: "Mature" },
   { value: "hyperpigmentation_prone", label: "Hyperpigmentation" },
   { value: "fungal_acne", label: "Fungal acne" },
@@ -286,7 +286,7 @@ const SKIN_TYPE_NOTES: Record<SkinType, string> = {
   dry: "Dry skin has a thinner lipid layer and loses water fastest in cold or dry air — drying solvents, sulfate surfactants, and clay are worth watching closely.",
   reactive: "Reactive skin has a lower tolerance threshold — sensitizers, fragrance allergens, and chemical sunscreens are worth watching closely, especially in warm weather.",
   damaged_barrier: "A compromised barrier lets ingredients penetrate faster and deeper — irritants and sensitizers hit harder and recovery takes longer than it would on intact skin.",
-  acne_prone: "For acne-prone skin, pore-clogging ingredients and film-formers are the main risks — watch the Congestion section after scanning.",
+  acne_prone: "For acne skin, pore-clogging ingredients and film-formers are the main risks — watch the Congestion section after scanning.",
   mature: "Mature skin benefits most from peptides, ceramides, and emollients, and is more sensitive to the retinoid adjustment period — start at the lowest available concentration.",
   hyperpigmentation_prone: "For hyperpigmentation-prone skin, UV exposure directly undoes progress — many brightening actives also increase UV sensitivity, making daily SPF essential.",
   fungal_acne: "Fungal acne (Malassezia folliculitis) is caused by yeast, not bacteria — it looks like regular acne but doesn't respond to antibiotics or most OTC acne treatments. Many 'safe' moisturizing oils and fatty acid esters feed Malassezia. Scanning every formula matters more here than for almost any other skin type.",
@@ -414,6 +414,8 @@ const SENSORY_PROFILE_MAP: Partial<Record<string, SkinType[]>> = {
   "Cooling": ["reactive", "rosacea"],
   "Warming": ["reactive", "rosacea"],
   "Iodine": ["acne_prone", "fungal_acne"],
+  "Pilling": ["reactive", "acne_prone", "damaged_barrier"],
+  "Astringent": ["reactive", "dry", "damaged_barrier", "eczema"],
 };
 
 const STEP_TAG_CONFIG: Record<string, { label: string; desc: string; className: string }> = {
@@ -471,6 +473,7 @@ function getIngredientConcernLevel(
       (activeSkinTypes.has("dry") || activeSkinTypes.has("damaged_barrier") ||
         activeClimates.has("dry_climate") || activeClimates.has("cold"))
     ) return "profile-matched";
+    if (sc === "Pilling" && (activeClimates.has("hot") || activeClimates.has("humid"))) return "profile-matched";
     return "non-matching";
   }
 
@@ -714,6 +717,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [newIngListName, setNewIngListName] = useState("");
   const [newIngListType, setNewIngListType] = useState<"avoid" | "want">("avoid");
   const [addItemInputs, setAddItemInputs] = useState<Record<string, string>>({});
+  const [addToListMenu, setAddToListMenu] = useState<string | null>(null);
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
+  const [bulkAddListId, setBulkAddListId] = useState<string | null>(null);
+  const [pasteListId, setPasteListId] = useState<string | null>(null);
+  const [pasteTexts, setPasteTexts] = useState<Record<string, string>>({});
+  const [ingSuggestions, setIngSuggestions] = useState<Record<string, string[]>>({});
+  const [browseSearch, setBrowseSearch] = useState("");
   const [imageUploadOpen, setImageUploadOpen] = useState(false);
   const [imageUploadUrl, setImageUploadUrl] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
@@ -782,7 +792,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [routineProducts, setRoutineProducts] = useState<RoutineProduct[]>([]);
   const [routineOpen, setRoutineOpen] = useState(false);
   const [addedToRoutine, setAddedToRoutine] = useState(false);
+  const [routinePanelOpen, setRoutinePanelOpen] = useState(false);
+  const [addRoutinePickerOpen, setAddRoutinePickerOpen] = useState(false);
   const stickySearchRef = useRef<HTMLInputElement>(null);
+  const ingSuggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const initialProductIdRef = useRef(initialProductId);
   const scrollToProductRef = useRef(false);
@@ -1446,7 +1459,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setTimeout(() => { setSaveListOpen(false); setSavedTo(null); }, 1800);
   }
 
-  function addToRoutine() {
+  function addToRoutine(timeOfDay?: "am" | "pm" | null) {
     if (!result?.product) return;
     const newEntry: RoutineProduct = {
       routineId: Date.now().toString(),
@@ -1455,6 +1468,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       step_tags: result.step_tags ?? [],
       ingredients: result.originalItems,
       flaggedCategories: result.flagged.map((f) => f.ingredient.flagged_category ?? "").filter(Boolean),
+      timeOfDay: timeOfDay ?? null,
     };
     setRoutineProducts((prev) => [...prev, newEntry]);
     setAddedToRoutine(true);
@@ -1537,6 +1551,132 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     : tab === "paste" ? ingredients.trim().length > 0
     : tab === "add" ? addTabUrlCount === 1
     : false;
+
+  function getPostWashNote(skinTypes: Set<SkinType>, climates: Set<ClimateType>): string | null {
+    const hardOrChlorinated = climates.has("hard_water") || climates.has("chlorinated_water") || climates.has("iron_water");
+    const acneOrOily = skinTypes.has("acne_prone") || skinTypes.has("oily");
+    const malassezia = skinTypes.has("fungal_acne") || skinTypes.has("seborrheic");
+    const barrier = skinTypes.has("damaged_barrier") || skinTypes.has("reactive");
+    if (!acneOrOily && !malassezia && !barrier) return null;
+    const parts: string[] = [];
+    if (hardOrChlorinated) {
+      parts.push("Hard or chlorinated water temporarily raises skin pH above 7 — the acid mantle (normally 4.5–5.5) takes 20–30 minutes to recover on its own.");
+    } else {
+      parts.push("After washing, the acid mantle takes up to 20–30 minutes to recover its normal pH of 4.5–5.5.");
+    }
+    if (acneOrOily) parts.push("During this window, C. acnes proliferates at elevated pH and fresh sebum replenishment begins immediately — applying a low-pH product within 30 seconds of patting dry closes this window fastest.");
+    if (malassezia) parts.push("Malassezia recolonizes most rapidly in the first minutes after cleansing, when the skin surface is warm and freshly sebum-coated. A low-pH toner or essence applied immediately helps suppress this.");
+    if (barrier) parts.push("With a damaged barrier, transepidermal water loss (TEWL) peaks in the first minutes post-wash — applying any film-forming or occlusive layer promptly traps moisture before evaporation sets in.");
+    parts.push("The highest-impact habit for your profile: apply your first product within 30 seconds of patting dry, before the skin surface dries completely.");
+    return parts.join(" ");
+  }
+
+  function fetchIngSuggestions(listId: string, val: string) {
+    if (ingSuggestTimerRef.current) clearTimeout(ingSuggestTimerRef.current);
+    if (val.length < 2) { setIngSuggestions(m => ({ ...m, [listId]: [] })); return; }
+    ingSuggestTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/ingredients/search?q=${encodeURIComponent(val)}`);
+        const json = await res.json() as { suggestions: string[] };
+        setIngSuggestions(m => ({ ...m, [listId]: json.suggestions }));
+      } catch { /* ignore */ }
+    }, 200);
+  }
+
+  function renderRoutinePanel() {
+    const routineWarns = detectRoutineWarnings(routineProducts);
+    const dupMap = new Map<string, string[]>();
+    for (const p of routineProducts) {
+      for (const ing of p.ingredients) {
+        const key = ing.toLowerCase();
+        const others = routineProducts.filter(q => q.routineId !== p.routineId && q.ingredients.some(i => i.toLowerCase() === key));
+        if (others.length > 0) {
+          if (!dupMap.has(p.routineId)) dupMap.set(p.routineId, []);
+          dupMap.get(p.routineId)!.push(ing);
+        }
+      }
+    }
+    const amProducts = routineProducts.filter(p => p.timeOfDay === "am");
+    const pmProducts = routineProducts.filter(p => p.timeOfDay === "pm");
+    const untaggedProducts = routineProducts.filter(p => !p.timeOfDay);
+    const totalConcerns = routineProducts.reduce((n, p) => n + p.flaggedCategories.length, 0);
+
+    const renderProduct = (p: RoutineProduct) => (
+      <div key={p.routineId} className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
+            {(dupMap.get(p.routineId) ?? []).length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700" title={`Shared: ${(dupMap.get(p.routineId) ?? []).join(", ")}`}>duplicate ingredient</span>
+            )}
+          </div>
+          {p.brand && <p className="text-[10px] text-gray-400">{p.brand}</p>}
+          {p.step_tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {p.step_tags.map((tag) => {
+                const cfg = STEP_TAG_CONFIG[tag];
+                if (!cfg) return null;
+                return <span key={tag} title={cfg.desc} className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-default ${cfg.className}`}>{cfg.label}</span>;
+              })}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0 mt-0.5">
+          <button type="button" onClick={() => {
+            const tod = p.timeOfDay === "am" ? "pm" : p.timeOfDay === "pm" ? null : "am";
+            setRoutineProducts(prev => prev.map(q => q.routineId === p.routineId ? { ...q, timeOfDay: tod } : q));
+          }} className="text-[10px] text-gray-400 hover:text-teal-600 border border-gray-200 rounded-full px-1.5 py-0.5 transition-colors">
+            {p.timeOfDay === "am" ? "AM" : p.timeOfDay === "pm" ? "PM" : "—"}
+          </button>
+          <button type="button" onClick={() => removeFromRoutine(p.routineId)} className="text-[10px] text-gray-300 hover:text-rose-400">Remove</button>
+        </div>
+      </div>
+    );
+
+    const renderGroup = (label: string, products: RoutineProduct[]) => products.length === 0 ? null : (
+      <div>
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
+        <div className="space-y-2.5">{products.map(renderProduct)}</div>
+      </div>
+    );
+
+    return (
+      <div className="space-y-3">
+        {routineProducts.length === 0 ? (
+          <p className="text-xs text-gray-400">No products yet. Scan a product and tap &quot;+ Add to routine&quot; to start building.</p>
+        ) : (
+          <>
+            {totalConcerns > 0 && (
+              <p className="text-[10px] text-gray-500">{totalConcerns} flagged ingredient{totalConcerns !== 1 ? "s" : ""} across routine</p>
+            )}
+            <div className="space-y-3">
+              {amProducts.length > 0 || pmProducts.length > 0 ? (
+                <>
+                  {renderGroup("AM", amProducts)}
+                  {renderGroup("PM", pmProducts)}
+                  {renderGroup("Untagged", untaggedProducts)}
+                </>
+              ) : (
+                <div className="space-y-2.5">{routineProducts.map(renderProduct)}</div>
+              )}
+            </div>
+            {routineWarns.length > 0 && (
+              <div className="space-y-2 border-t border-gray-100 pt-2">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Interactions</p>
+                {routineWarns.map((w, i) => (
+                  <div key={i} className={`rounded-lg border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : "border-teal-100 bg-teal-50"}`}>
+                    <p className={`text-[10px] font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : "✦ "}{w.title}</p>
+                    <p className={`text-[10px] leading-relaxed ${w.type === "danger" ? "text-amber-700" : "text-teal-700"}`}>{w.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button type="button" onClick={() => setRoutineProducts([])} className="text-[10px] text-gray-300 hover:text-rose-400">Clear routine</button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -1900,6 +2040,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         <p className="text-xs text-gray-400 pt-0.5">Flags: {watches.join(" · ")}.</p>
                       ) : null;
                     })()}
+                    {(() => {
+                      const note = getPostWashNote(activeSkinTypes, activeClimates);
+                      return note ? (
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
+                          <p className="text-xs font-semibold text-blue-800 mb-0.5">Post-wash window</p>
+                          <p className="text-xs leading-relaxed text-blue-700">{note}</p>
+                        </div>
+                      ) : null;
+                    })()}
                     <p className="text-xs text-gray-400">Matching profile notes replace the generic explanation when you expand each ingredient.</p>
                   </div>
                 )}
@@ -1940,22 +2089,80 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         </span>
                       ))}
                     </div>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const val = (addItemInputs[list.id] ?? "").trim().toLowerCase();
-                      if (!val || list.items.includes(val)) return;
-                      setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
-                      setAddItemInputs(m => ({ ...m, [list.id]: "" }));
-                    }} className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={addItemInputs[list.id] ?? ""}
-                        onChange={(e) => setAddItemInputs(m => ({ ...m, [list.id]: e.target.value }))}
-                        placeholder="Add ingredient…"
-                        className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
-                      />
-                      <button type="submit" className="text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600">Add</button>
-                    </form>
+                    {pasteListId === list.id ? (
+                      <div className="space-y-1.5 pt-1 border-t border-gray-100">
+                        <p className="text-[10px] text-gray-400 pt-0.5">Paste names — one per line or comma-separated</p>
+                        <textarea
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 resize-none"
+                          rows={3}
+                          value={pasteTexts[list.id] ?? ""}
+                          onChange={(e) => setPasteTexts(m => ({ ...m, [list.id]: e.target.value }))}
+                          placeholder="niacinamide, fragrance, alcohol denat…"
+                          autoFocus
+                        />
+                        <div className="flex gap-1.5">
+                          <button type="button" className="text-xs px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700"
+                            onClick={() => {
+                              const raw = pasteTexts[list.id] ?? "";
+                              const items = raw.split(/[,\n]+/).map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+                              if (items.length > 0) setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...new Set([...l.items, ...items])] } : l));
+                              setPasteTexts(m => ({ ...m, [list.id]: "" }));
+                              setPasteListId(null);
+                            }}>
+                            Add {(pasteTexts[list.id] ?? "").split(/[,\n]+/).filter((s: string) => s.trim()).length || ""}
+                          </button>
+                          <button type="button" className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            onClick={() => { setPasteListId(null); setPasteTexts(m => ({ ...m, [list.id]: "" })); }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <form onSubmit={(e) => {
+                          e.preventDefault();
+                          const val = (addItemInputs[list.id] ?? "").trim().toLowerCase();
+                          if (!val || list.items.includes(val)) return;
+                          setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
+                          setAddItemInputs(m => ({ ...m, [list.id]: "" }));
+                          setIngSuggestions(m => ({ ...m, [list.id]: [] }));
+                        }} className="flex gap-1.5 relative">
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={addItemInputs[list.id] ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setAddItemInputs(m => ({ ...m, [list.id]: v }));
+                                fetchIngSuggestions(list.id, v);
+                              }}
+                              onBlur={() => setTimeout(() => setIngSuggestions(m => ({ ...m, [list.id]: [] })), 150)}
+                              placeholder="Add ingredient…"
+                              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
+                            />
+                            {(ingSuggestions[list.id] ?? []).length > 0 && (
+                              <ul className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden text-xs">
+                                {(ingSuggestions[list.id] ?? []).map((s) => (
+                                  <li key={s}>
+                                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
+                                      const val = s.toLowerCase();
+                                      if (!list.items.includes(val)) setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
+                                      setAddItemInputs(m => ({ ...m, [list.id]: "" }));
+                                      setIngSuggestions(m => ({ ...m, [list.id]: [] }));
+                                    }} className="w-full text-left px-2 py-1.5 hover:bg-gray-50 truncate">{s}</button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                          <button type="submit" className="text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600">Add</button>
+                        </form>
+                        <button type="button" className="text-[10px] text-gray-400 hover:text-gray-600"
+                          onClick={() => setPasteListId(list.id)}>
+                          + Paste multiple
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {newIngListOpen ? (
@@ -1989,8 +2196,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             )}
           </section>
 
-          {/* Routine panel — idle state */}
-          <section className="mb-6">
+          {/* Routine panel — idle state (inline collapsible, hidden on md+ where the side panel is used) */}
+          <section className="mb-6 md:hidden">
             <button
               type="button"
               onClick={() => setRoutineOpen((v) => !v)}
@@ -2005,49 +2212,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <span className="text-gray-300 ml-auto">{routineOpen ? "▲" : "▼"}</span>
             </button>
             {routineOpen && (
-              <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3">
-                {routineProducts.length === 0 ? (
-                  <p className="text-xs text-gray-400">No products yet. Scan a product and tap &quot;+ Add to routine&quot; to start building.</p>
-                ) : (
-                  <>
-                    <div className="space-y-2.5">
-                      {routineProducts.map((p) => (
-                        <div key={p.routineId} className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
-                            {p.brand && <p className="text-[10px] text-gray-400">{p.brand}</p>}
-                            {p.step_tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {p.step_tags.map((tag) => {
-                                  const cfg = STEP_TAG_CONFIG[tag];
-                                  if (!cfg) return null;
-                                  return <span key={tag} title={cfg.desc} className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-default ${cfg.className}`}>{cfg.label}</span>;
-                                })}
-                              </div>
-                            )}
-                          </div>
-                          <button type="button" onClick={() => removeFromRoutine(p.routineId)} className="text-[10px] text-gray-300 hover:text-rose-400 shrink-0 mt-0.5">Remove</button>
-                        </div>
-                      ))}
-                    </div>
-                    {(() => {
-                      const routineWarns = detectRoutineWarnings(routineProducts);
-                      if (!routineWarns.length) return null;
-                      return (
-                        <div className="space-y-2 border-t border-gray-100 pt-2">
-                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Interactions</p>
-                          {routineWarns.map((w, i) => (
-                            <div key={i} className={`rounded-lg border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : "border-teal-100 bg-teal-50"}`}>
-                              <p className={`text-[10px] font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : "✦ "}{w.title}</p>
-                              <p className={`text-[10px] leading-relaxed ${w.type === "danger" ? "text-amber-700" : "text-teal-700"}`}>{w.body}</p>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                    <button type="button" onClick={() => setRoutineProducts([])} className="text-[10px] text-gray-300 hover:text-rose-400">Clear routine</button>
-                  </>
-                )}
+              <div className="mt-2 border border-gray-100 rounded-xl p-3">
+                {renderRoutinePanel()}
               </div>
             )}
           </section>
@@ -2103,7 +2269,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <button
-                  onClick={() => { setBrowseSelectedType(null); setBrowseProducts([]); }}
+                  onClick={() => { setBrowseSelectedType(null); setBrowseProducts([]); setBrowseSearch(""); }}
                   className="text-xs text-gray-400 hover:text-gray-700"
                 >
                   ← All types
@@ -2111,13 +2277,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 <span className="text-xs text-gray-300">·</span>
                 <span className="text-sm font-medium text-gray-700">{browseSelectedType}</span>
               </div>
-              {/* Browse filter chips */}
+              {/* Browse search + filter chips */}
               {!browseLoading && browseProducts.length > 0 && (() => {
                 const ingText = (p: BrowseProduct) => (p.ingredient_list ?? "").toLowerCase();
                 const avoidLists = ingredientLists.filter(l => l.type === "avoid" && l.items.length > 0);
                 const wantLists = ingredientLists.filter(l => l.type === "want" && l.items.length > 0);
                 const profileCats = profileMatchedCategories(activeSkinTypes, activeClimates);
+                const searchLower = browseSearch.trim().toLowerCase();
                 const filtered = browseProducts.filter(p => {
+                  if (searchLower && !p.name.toLowerCase().includes(searchLower) && !(p.brand ?? "").toLowerCase().includes(searchLower)) return false;
                   if (browsePhotosafe && p.photoCount > 0) return false;
                   if (browseProfileLinked && (p.profileFlaggedCount ?? 0) > 0) return false;
                   const txt = ingText(p);
@@ -2125,9 +2293,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   if (wantLists.length > 0 && !wantLists.every(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
                   return true;
                 });
-                const activeFilterCount = (browsePhotosafe ? 1 : 0) + (browseProfileLinked ? 1 : 0) + avoidLists.length + wantLists.length;
+                const activeFilterCount = (searchLower ? 1 : 0) + (browsePhotosafe ? 1 : 0) + (browseProfileLinked ? 1 : 0) + avoidLists.length + wantLists.length;
                 return (
                   <>
+                    <input
+                      type="text"
+                      value={browseSearch}
+                      onChange={(e) => setBrowseSearch(e.target.value)}
+                      placeholder={`Search ${browseSelectedType ?? "products"}…`}
+                      className="w-full text-sm border border-gray-200 rounded-xl px-3 py-1.5 mb-3 focus:outline-none focus:border-gray-400"
+                    />
                     <div className="flex flex-wrap gap-1.5 mb-3">
                       <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Photo-safe</button>
                       {profileCats.length > 0 && (
@@ -2161,16 +2336,40 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             <p className="text-sm font-medium text-gray-800 truncate" title={p.name}>{p.name}</p>
                             {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                             {p.flaggedCount === 0 && p.sensoryCount === 0 && p.photoCount === 0 ? (
                               <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe</span>
-                            ) : (
-                              <>
-                                {p.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{p.flaggedCount} flagged</span>}
-                                {p.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{p.sensoryCount} sensory</span>}
-                                {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photo</span>}
-                              </>
-                            )}
+                            ) : (() => {
+                              const hasProf = activeSkinTypes.size > 0 || activeClimates.size > 0;
+                              const pfc = p.profileFlaggedCount;
+                              if (hasProf && pfc !== undefined) {
+                                if (pfc > 0) {
+                                  return (
+                                    <>
+                                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{pfc} for you</span>
+                                      {p.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{p.sensoryCount} sensory</span>}
+                                      {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photo</span>}
+                                      {p.flaggedCount > pfc && <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-400">{p.flaggedCount} total</span>}
+                                    </>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe for your profile</span>
+                                    {p.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500">{p.sensoryCount} sensory</span>}
+                                    {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500">{p.photoCount} photo</span>}
+                                    {p.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-400">{p.flaggedCount} flagged</span>}
+                                  </>
+                                );
+                              }
+                              return (
+                                <>
+                                  {p.flaggedCount > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-md ${hasProf ? "bg-gray-100 text-gray-500" : "bg-rose-50 text-rose-700"}`}>{p.flaggedCount} flagged</span>}
+                                  {p.sensoryCount > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-md ${hasProf ? "bg-gray-100 text-gray-500" : "bg-amber-50 text-amber-700"}`}>{p.sensoryCount} sensory</span>}
+                                  {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photo</span>}
+                                </>
+                              );
+                            })()}
                           </div>
                         </button>
                       ))}
@@ -2520,29 +2719,47 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 )}
 
                 {/* Add to routine */}
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
                   {(() => {
                     const inRoutine = routineProducts.some((p) => p.name === result.product?.name);
+                    if (inRoutine) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const id = routineProducts.find((p) => p.name === result.product?.name)?.routineId;
+                            if (id) removeFromRoutine(id);
+                          }}
+                          className="text-xs px-3 py-1 rounded-full border border-gray-300 text-gray-400 hover:border-rose-400 hover:text-rose-500 transition-colors"
+                        >
+                          In routine · Remove
+                        </button>
+                      );
+                    }
+                    if (addedToRoutine) {
+                      return <span className="text-xs px-3 py-1 rounded-full border border-teal-600 text-teal-600">Added to routine ✓</span>;
+                    }
+                    if (addRoutinePickerOpen) {
+                      return (
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="text-gray-500">Add as:</span>
+                          {(["am", "pm", null] as const).map((t) => (
+                            <button key={String(t)} type="button"
+                              onClick={() => { addToRoutine(t); setAddRoutinePickerOpen(false); }}
+                              className="px-2 py-0.5 rounded-full border border-gray-200 text-gray-600 hover:border-teal-600 hover:text-teal-600 transition-colors"
+                            >{t === "am" ? "AM" : t === "pm" ? "PM" : "Untagged"}</button>
+                          ))}
+                          <button type="button" onClick={() => setAddRoutinePickerOpen(false)} className="text-gray-300 hover:text-gray-500 ml-0.5">✕</button>
+                        </div>
+                      );
+                    }
                     return (
                       <button
                         type="button"
-                        onClick={() => {
-                          if (inRoutine) {
-                            const id = routineProducts.find((p) => p.name === result.product?.name)?.routineId;
-                            if (id) removeFromRoutine(id);
-                          } else {
-                            addToRoutine();
-                          }
-                        }}
-                        className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                          addedToRoutine
-                            ? "border-teal-600 text-teal-600"
-                            : inRoutine
-                            ? "border-gray-300 text-gray-400 hover:border-rose-400 hover:text-rose-500"
-                            : "border-gray-200 text-gray-500 hover:border-teal-600 hover:text-teal-600"
-                        }`}
+                        onClick={() => setAddRoutinePickerOpen(true)}
+                        className="text-xs px-3 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-teal-600 hover:text-teal-600 transition-colors"
                       >
-                        {addedToRoutine ? "Added to routine ✓" : inRoutine ? "In routine · Remove" : "+ Add to routine"}
+                        + Add to routine
                       </button>
                     );
                   })()}
@@ -2863,14 +3080,46 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
           {/* Summary line + safe alternatives group */}
           <div className="space-y-2">
-          {(result.flagged.length + result.safe.length + result.unreviewed.length) > 0 && (
+          {(result.flagged.length + result.safe.length + result.unreviewed.length) > 0 && (() => {
+            const totalItems = result.flagged.length + result.safe.length + result.unreviewed.length;
+            const scrollToConcern = () => document.getElementById("section-by-concern")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
+
+            if (hasProfile) {
+              let profileCount = 0;
+              let totalConcernCount = 0;
+              for (const item of result.originalItems) {
+                const m = getItemMatch(item, result.safe, result.flagged);
+                const si = (result.sensoryTrigger ?? []).find(s => normalizeForMatch(s.rawName) === normalizeForMatch(item)) ?? null;
+                const pi = (result.photosensitive ?? []).find(p => normalizeForMatch(p.rawName) === normalizeForMatch(item)) ?? null;
+                const lv = getIngredientConcernLevel(m, si, pi, activeSkinTypes, activeClimates);
+                if (lv === "universal" || lv === "profile-matched") profileCount++;
+                if (lv !== "neutral" && lv !== "skip") totalConcernCount++;
+              }
+              const qualLabel = profileCount === 0 ? "No concerns" : profileCount <= 2 ? "Low concern" : profileCount <= 5 ? "Some concerns" : "High concern";
+              const qualColor = profileCount === 0 ? "text-green-700" : profileCount <= 2 ? "text-yellow-700" : profileCount <= 5 ? "text-amber-700" : "text-rose-700";
+              return (
+                <p className="text-xs -mt-2">
+                  <span className="text-gray-700">{totalItems} ingredient{totalItems !== 1 ? "s" : ""} scanned</span>
+                  {" · "}
+                  <button type="button" className={`${qualColor} font-medium hover:underline underline-offset-2`} onClick={scrollToConcern}>{qualLabel} for your profile</button>
+                  {" · "}
+                  <button type="button" className="text-gray-500 hover:underline underline-offset-2" onClick={scrollToConcern}>{profileCount} of {totalConcernCount} concern{totalConcernCount !== 1 ? "s" : ""} match</button>
+                  {" · "}
+                  <button type="button" className="text-teal-700 hover:underline underline-offset-2" onClick={scrollToConcern}>{result.safe.length} safe</button>
+                  {result.unreviewed.length > 0 && <>{" · "}<button type="button" className="hover:underline underline-offset-2" onClick={() => { setShowUnreviewed(true); requestAnimationFrame(() => { document.getElementById("section-unreviewed")?.scrollIntoView({ behavior: "smooth", block: "start" }); }); }}>{result.unreviewed.length} unreviewed</button></>}
+                </p>
+              );
+            }
+
+            return (
             <p className="text-xs -mt-2">
-              <span className="text-gray-700">{result.flagged.length + result.safe.length + result.unreviewed.length} ingredient{(result.flagged.length + result.safe.length + result.unreviewed.length) !== 1 ? "s" : ""} scanned</span>
+              <span className="text-gray-700">{totalItems} ingredient{totalItems !== 1 ? "s" : ""} scanned</span>
               {" · "}
               <button
                 type="button"
                 className={`${result.flagged.length > 0 ? "text-rose-700" : "text-gray-400"} hover:underline underline-offset-2`}
-                onClick={() => document.getElementById("section-by-concern")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                onClick={scrollToConcern}
               >
                 {result.flagged.length} flagged
               </button>
@@ -2880,7 +3129,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <button
                     type="button"
                     className="text-amber-700 hover:underline underline-offset-2"
-                    onClick={() => document.getElementById("section-by-concern")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    onClick={scrollToConcern}
                   >
                     {result.sensoryTrigger.length} sensory trigger{result.sensoryTrigger.length !== 1 ? "s" : ""}
                   </button>
@@ -2892,7 +3141,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <button
                     type="button"
                     className="text-yellow-700 hover:underline underline-offset-2"
-                    onClick={() => document.getElementById("section-by-concern")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    onClick={scrollToConcern}
                   >
                     {result.photosensitive.length} photosensitive
                   </button>
@@ -2902,7 +3151,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <button
                 type="button"
                 className="text-teal-700 hover:underline underline-offset-2"
-                onClick={() => document.getElementById("section-by-concern")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                onClick={scrollToConcern}
               >
                 {result.safe.length} safe
               </button>
@@ -2924,6 +3173,49 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 </>
               )}
             </p>
+            );
+          })()}
+
+          {/* Bulk add flagged to list */}
+          {result.flagged.length > 0 && ingredientLists.filter(l => l.type === "avoid").length > 0 && (
+            <div>
+              {!bulkAddOpen ? (
+                <button type="button" className="text-xs text-gray-400 hover:text-rose-700 hover:underline underline-offset-2"
+                  onClick={() => setBulkAddOpen(true)}>
+                  Save {result.flagged.length} flagged to avoid list →
+                </button>
+              ) : (
+                <div className="text-xs border border-rose-100 rounded-xl p-2.5 bg-rose-50/50 space-y-2">
+                  <p className="text-rose-700 font-medium">Save {result.flagged.length} flagged ingredients to:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ingredientLists.filter(l => l.type === "avoid").map(lst => (
+                      <button key={lst.id} type="button"
+                        className={`text-xs px-2 py-1 rounded-lg border transition-colors ${bulkAddListId === lst.id ? "bg-rose-600 text-white border-rose-600" : "bg-white border-rose-200 text-rose-700 hover:border-rose-400"}`}
+                        onClick={() => setBulkAddListId(bulkAddListId === lst.id ? null : lst.id)}>
+                        {lst.name}
+                      </button>
+                    ))}
+                  </div>
+                  {bulkAddListId && (
+                    <div className="flex gap-1.5 pt-0.5">
+                      <button type="button" className="text-xs px-2.5 py-1 rounded-lg bg-rose-600 text-white hover:bg-rose-700"
+                        onClick={() => {
+                          const names = result.flagged.map(f => f.displayName.toLowerCase());
+                          setIngredientLists(ls => ls.map(l => l.id === bulkAddListId ? { ...l, items: [...new Set([...l.items, ...names])] } : l));
+                          setBulkAddOpen(false);
+                          setBulkAddListId(null);
+                        }}>
+                        Add all
+                      </button>
+                      <button type="button" className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        onClick={() => { setBulkAddOpen(false); setBulkAddListId(null); }}>
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Safe alternatives */}
@@ -3127,6 +3419,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         <p className="text-xs text-gray-400 pt-0.5">Flags: {watches.join(" · ")}.</p>
                       ) : null;
                     })()}
+                    {(() => {
+                      const note = getPostWashNote(activeSkinTypes, activeClimates);
+                      return note ? (
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
+                          <p className="text-xs font-semibold text-blue-800 mb-0.5">Post-wash window</p>
+                          <p className="text-xs leading-relaxed text-blue-700">{note}</p>
+                        </div>
+                      ) : null;
+                    })()}
                     <p className="text-xs text-gray-400">Matching profile notes replace the generic explanation when you expand each ingredient.</p>
                   </div>
                 )}
@@ -3167,22 +3468,80 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         </span>
                       ))}
                     </div>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const val = (addItemInputs[list.id] ?? "").trim().toLowerCase();
-                      if (!val || list.items.includes(val)) return;
-                      setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
-                      setAddItemInputs(m => ({ ...m, [list.id]: "" }));
-                    }} className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={addItemInputs[list.id] ?? ""}
-                        onChange={(e) => setAddItemInputs(m => ({ ...m, [list.id]: e.target.value }))}
-                        placeholder="Add ingredient…"
-                        className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
-                      />
-                      <button type="submit" className="text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600">Add</button>
-                    </form>
+                    {pasteListId === list.id ? (
+                      <div className="space-y-1.5 pt-1 border-t border-gray-100">
+                        <p className="text-[10px] text-gray-400 pt-0.5">Paste names — one per line or comma-separated</p>
+                        <textarea
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 resize-none"
+                          rows={3}
+                          value={pasteTexts[list.id] ?? ""}
+                          onChange={(e) => setPasteTexts(m => ({ ...m, [list.id]: e.target.value }))}
+                          placeholder="niacinamide, fragrance, alcohol denat…"
+                          autoFocus
+                        />
+                        <div className="flex gap-1.5">
+                          <button type="button" className="text-xs px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700"
+                            onClick={() => {
+                              const raw = pasteTexts[list.id] ?? "";
+                              const items = raw.split(/[,\n]+/).map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+                              if (items.length > 0) setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...new Set([...l.items, ...items])] } : l));
+                              setPasteTexts(m => ({ ...m, [list.id]: "" }));
+                              setPasteListId(null);
+                            }}>
+                            Add {(pasteTexts[list.id] ?? "").split(/[,\n]+/).filter((s: string) => s.trim()).length || ""}
+                          </button>
+                          <button type="button" className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            onClick={() => { setPasteListId(null); setPasteTexts(m => ({ ...m, [list.id]: "" })); }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <form onSubmit={(e) => {
+                          e.preventDefault();
+                          const val = (addItemInputs[list.id] ?? "").trim().toLowerCase();
+                          if (!val || list.items.includes(val)) return;
+                          setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
+                          setAddItemInputs(m => ({ ...m, [list.id]: "" }));
+                          setIngSuggestions(m => ({ ...m, [list.id]: [] }));
+                        }} className="flex gap-1.5 relative">
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={addItemInputs[list.id] ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setAddItemInputs(m => ({ ...m, [list.id]: v }));
+                                fetchIngSuggestions(list.id, v);
+                              }}
+                              onBlur={() => setTimeout(() => setIngSuggestions(m => ({ ...m, [list.id]: [] })), 150)}
+                              placeholder="Add ingredient…"
+                              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
+                            />
+                            {(ingSuggestions[list.id] ?? []).length > 0 && (
+                              <ul className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden text-xs">
+                                {(ingSuggestions[list.id] ?? []).map((s) => (
+                                  <li key={s}>
+                                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
+                                      const val = s.toLowerCase();
+                                      if (!list.items.includes(val)) setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
+                                      setAddItemInputs(m => ({ ...m, [list.id]: "" }));
+                                      setIngSuggestions(m => ({ ...m, [list.id]: [] }));
+                                    }} className="w-full text-left px-2 py-1.5 hover:bg-gray-50 truncate">{s}</button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                          <button type="submit" className="text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600">Add</button>
+                        </form>
+                        <button type="button" className="text-[10px] text-gray-400 hover:text-gray-600"
+                          onClick={() => setPasteListId(list.id)}>
+                          + Paste multiple
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {newIngListOpen ? (
@@ -3216,8 +3575,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             )}
           </section>
 
-          {/* Routine panel — results state */}
-          <section className="mt-4">
+          {/* Routine panel — results state (inline collapsible, hidden on md+ where the side panel is used) */}
+          <section className="mt-4 md:hidden">
             <button
               type="button"
               onClick={() => setRoutineOpen((v) => !v)}
@@ -3232,49 +3591,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <span className="text-gray-300 ml-auto">{routineOpen ? "▲" : "▼"}</span>
             </button>
             {routineOpen && (
-              <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3">
-                {routineProducts.length === 0 ? (
-                  <p className="text-xs text-gray-400">No products yet. Tap &quot;+ Add to routine&quot; on this product&apos;s card above to start building.</p>
-                ) : (
-                  <>
-                    <div className="space-y-2.5">
-                      {routineProducts.map((p) => (
-                        <div key={p.routineId} className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
-                            {p.brand && <p className="text-[10px] text-gray-400">{p.brand}</p>}
-                            {p.step_tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {p.step_tags.map((tag) => {
-                                  const cfg = STEP_TAG_CONFIG[tag];
-                                  if (!cfg) return null;
-                                  return <span key={tag} title={cfg.desc} className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-default ${cfg.className}`}>{cfg.label}</span>;
-                                })}
-                              </div>
-                            )}
-                          </div>
-                          <button type="button" onClick={() => removeFromRoutine(p.routineId)} className="text-[10px] text-gray-300 hover:text-rose-400 shrink-0 mt-0.5">Remove</button>
-                        </div>
-                      ))}
-                    </div>
-                    {(() => {
-                      const routineWarns = detectRoutineWarnings(routineProducts);
-                      if (!routineWarns.length) return null;
-                      return (
-                        <div className="space-y-2 border-t border-gray-100 pt-2">
-                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Interactions</p>
-                          {routineWarns.map((w, i) => (
-                            <div key={i} className={`rounded-lg border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : "border-teal-100 bg-teal-50"}`}>
-                              <p className={`text-[10px] font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : "✦ "}{w.title}</p>
-                              <p className={`text-[10px] leading-relaxed ${w.type === "danger" ? "text-amber-700" : "text-teal-700"}`}>{w.body}</p>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                    <button type="button" onClick={() => setRoutineProducts([])} className="text-[10px] text-gray-300 hover:text-rose-400">Clear routine</button>
-                  </>
-                )}
+              <div className="mt-2 border border-gray-100 rounded-xl p-3">
+                {renderRoutinePanel()}
               </div>
             )}
           </section>
@@ -3526,11 +3844,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 (n) => n.sentiment === "caution" || n.sentiment === "strong_caution"
               );
 
+              const itemKey = item.toLowerCase();
+              const inList = addToListMenu === itemKey;
               return (
                 <div key={rowKey} id={rowKey} className="overflow-hidden">
+                  <div className="flex items-center">
                   <button
                     type="button"
-                    className="w-full flex items-center justify-between px-3 py-2 text-left"
+                    className="flex-1 flex items-center justify-between px-3 py-2 text-left"
                     onClick={toggle}
                   >
                     <span className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
@@ -3548,6 +3869,41 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     </span>
                     <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                   </button>
+                  {ingredientLists.length > 0 && (
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        title="Add to list"
+                        className={`px-2 py-2 text-sm leading-none transition-colors ${inList ? "text-gray-700" : "text-gray-300 hover:text-gray-500"}`}
+                        onClick={() => setAddToListMenu(inList ? null : itemKey)}
+                      >
+                        +
+                      </button>
+                      {inList && (
+                        <div className="absolute right-0 top-full z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-1.5 min-w-[130px]">
+                          {ingredientLists.map((lst) => {
+                            const already = lst.items.includes(itemKey);
+                            return (
+                              <button
+                                key={lst.id}
+                                type="button"
+                                className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-50 rounded-lg flex items-center gap-1.5"
+                                onClick={() => {
+                                  if (!already) setIngredientLists(ls => ls.map(l => l.id === lst.id ? { ...l, items: [...l.items, itemKey] } : l));
+                                  setAddToListMenu(null);
+                                }}
+                              >
+                                <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${lst.type === "avoid" ? "bg-rose-400" : "bg-teal-500"}`} />
+                                <span className="flex-1 truncate">{lst.name}</span>
+                                {already && <span className="text-teal-600 shrink-0">✓</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  </div>
                   {isOpen && (
                     <div className="px-3 pb-3 space-y-2">
                       {/* Formula role stripe — gray */}
@@ -3787,6 +4143,60 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
         </div>
       )}
+
+      {/* ── Routine side panel (desktop right drawer + mobile bottom sheet) ── */}
+      {/* Backdrop */}
+      {routinePanelOpen && (
+        <div className="fixed inset-0 z-30 bg-black/20" onClick={() => setRoutinePanelOpen(false)} aria-hidden />
+      )}
+
+      {/* Desktop: fixed right drawer (hidden on mobile) */}
+      <div className={`hidden md:flex fixed top-0 right-0 h-full z-40 flex-col bg-white border-l border-gray-200 shadow-xl transition-transform duration-300 w-72 ${routinePanelOpen ? "translate-x-0" : "translate-x-full"}`}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Routine</span>
+          <button type="button" onClick={() => setRoutinePanelOpen(false)} className="text-gray-400 hover:text-gray-700 text-sm">✕</button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {renderRoutinePanel()}
+        </div>
+      </div>
+
+      {/* Desktop: collapsed tab strip on right edge */}
+      {!routinePanelOpen && (
+        <button
+          type="button"
+          onClick={() => setRoutinePanelOpen(true)}
+          className={`hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-40 flex-col items-center gap-1 py-3 px-2 rounded-l-xl border border-r-0 border-gray-200 bg-white shadow-md text-xs font-medium transition-colors ${detectRoutineWarnings(routineProducts).length > 0 ? "text-amber-700 border-amber-200" : "text-gray-600 hover:text-gray-900"}`}
+        >
+          <span style={{ writingMode: "vertical-rl", textOrientation: "mixed", transform: "rotate(180deg)" }}>Routine</span>
+          {routineProducts.length > 0 && (
+            <span className={`text-[10px] font-bold rounded-full px-1 ${detectRoutineWarnings(routineProducts).length > 0 ? "text-amber-700" : "text-teal-600"}`}>{routineProducts.length}</span>
+          )}
+        </button>
+      )}
+
+      {/* Mobile: floating pill at bottom */}
+      {routineProducts.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setRoutinePanelOpen(v => !v)}
+          className={`md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2 rounded-full shadow-lg text-sm font-medium border transition-colors ${detectRoutineWarnings(routineProducts).length > 0 ? "bg-amber-50 border-amber-300 text-amber-800" : "bg-white border-gray-200 text-gray-700"}`}
+        >
+          Routine {routinePanelOpen ? "▼" : "▲"} · {routineProducts.length}
+        </button>
+      )}
+
+      {/* Mobile: bottom sheet */}
+      <div className={`md:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-gray-200 rounded-t-2xl shadow-xl transition-transform duration-300 ${routinePanelOpen ? "translate-y-0" : "translate-y-full"}`}
+        style={{ maxHeight: "65vh", display: "flex", flexDirection: "column" }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Routine</span>
+          <button type="button" onClick={() => setRoutinePanelOpen(false)} className="text-gray-400 hover:text-gray-700 text-sm">✕</button>
+        </div>
+        <div className="overflow-y-auto px-4 py-4">
+          {renderRoutinePanel()}
+        </div>
+      </div>
     </div>
   );
 }

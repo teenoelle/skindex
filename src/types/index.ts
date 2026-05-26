@@ -91,6 +91,7 @@ export type RoutineProduct = {
   step_tags: string[];
   ingredients: string[];
   flaggedCategories: string[];
+  timeOfDay?: "am" | "pm" | null;
 };
 
 export type ScanResult = {
