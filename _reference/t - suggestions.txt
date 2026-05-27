@@ -29185,6 +29185,75 @@ product lists - the did you mean, alternatives, and browse product lists still s
 
 
 
+● Pushed. Summary of what changed:
+
+  Product list chips (browse):
+
+  ┌───────────┬──────────────────────────────────────────┐
+  │    Was    │                   Now                    │
+  ├───────────┼──────────────────────────────────────────┤
+  │ (missing) │ 🌹 X universal — rose chip for universal │
+  │           │  concerns                                │
+  ├───────────┼──────────────────────────────────────────┤
+  │           │ 🟡  X profile concerns — amber, covers    │
+  │ X for you │ profile-matched flagged + profile        │
+  │           │ sensory                                  │
+  ├───────────┼──────────────────────────────────────────┤
+  │ X sensory │ (removed — was double-counting what's    │
+  │           │ already in profile concerns)             │
+  ├───────────┼──────────────────────────────────────────┤
+  │ X total   │ (removed — was confusing "total flagged" │
+  │           │  fallback)                               │
+  ├───────────┼──────────────────────────────────────────┤
+  │ X photo   │ 🟡  X photo — unchanged                   │
+  └───────────┴──────────────────────────────────────────┘
+
+  Interaction card colors: The code is already correct
+  (border-amber-800/border-teal-800). If you're still seeing
+   old colors on the deployed site, a hard refresh
+  (Ctrl+Shift+R) after Vercel finishes building should clear
+   it — the new build will regenerate the Tailwind CSS with
+  those classes included.
+
+
+
+
+
+
+why do "high glycemic foods and dairy + acne-prone skin" and "post-wash timing conflict" show yellow backgrounds, but "high-dose b12 + acne-prone skin" and "alcohol + dry / barrier-compromised skin" show white backgrounds? i like the white backgrounds better.
+
+why does collagen support stack show a light blue background? can we make it white?
+
+what other note or card styles aren't updated?
+
+
+
+
+
+
+● Let me search for collagen and read the full notes/warning   sections to map every colored card:
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+● Now I see it all clearly:
+  - danger → bg-amber-100 = visibly yellow
+  - caution → bg-amber-50 = near-white (what the user
+  prefers)
+  - synergy → bg-teal-100 = visibly blue-green ("collagen
+  support stack")
+  - Post-wash → bg-amber-100 = yellow
+
+  The fix is to drop all colored fills and use bg-white
+  everywhere. Let me also check every other colored card I
+  might have missed:
+
+
+
+
+
+instead of white maybe just no fill
+
+
 
 
 
@@ -29204,6 +29273,12 @@ product lists - the did you mean, alternatives, and browse product lists still s
 
 
 product types - some of the body areas and product types don't have an icon in admin, and none of them display their icon in browse. what ideas do you have for them?
+
+
+
+
+
+
 
 supplements - what ideas do you have if the user doesn't know which supplements profiles to click but do know the name of their supplements? 
 
