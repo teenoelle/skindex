@@ -29090,7 +29090,27 @@ formula interactions - what colors are used here? what alternative ideas do you 
 
 
 
+> let's go with idea 3       
 
+formula interactions - synergy - make it teal 200
+device interactions - danger - make it amber 200
+device interactions - synergy - make it teal 200
+profile panel - supplement / diet warnings - caution - make it amber 200
+profile panel - post-wash  note - make it amber 200
+
+
+
+
+● Pushed. The unified color rule is now live — orange for
+  all interaction conflicts, teal for all synergies, across
+  formula warnings, device interactions, and routine
+  interactions.
+
+
+
+
+
+> instead of orange can we do dark amber, and instead of      any light teal can we do dark teal     
 
 
 
