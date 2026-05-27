@@ -28968,6 +28968,10 @@ let's go with idea 1 to reduce row padding.
 
 
 
+● Done — py-2 → py-1.5 on both the row button and the + list   button so they stay vertically aligned. That trims 4px
+  off each row (2px top, 2px bottom), which adds up
+  noticeably on a long Universal Concerns list.
+
 
 
 
@@ -28979,6 +28983,130 @@ let's go with idea 1 to reduce row padding.
 
 
 formula interactions - what colors are used here? what alternative ideas do you have? currently if the note is a high sensitizer load, it shows up as amber with a yellow border, but sensitizers usually surface as universal concerns in dark rose. what ideas do you have for the formula interactions note to make the color system less confusing?
+
+
+
+
+
+● Now I can see the full current system. Let me map it all
+  out:
+
+  Current color map
+
+  ┌───────────────────────┬────────────────────┬────────┐
+  │        Section        │        Type        │ Color  │
+  ├───────────────────────┼────────────────────┼────────┤
+  │ Formula interactions  │ border-amber-200   │ Amber  │
+  │ — danger              │ bg-amber-50        │        │
+  ├───────────────────────┼────────────────────┼────────┤
+  │ Formula interactions  │ border-teal-100    │ Teal   │
+  │ — synergy             │ bg-teal-50         │        │
+  ├───────────────────────┼────────────────────┼────────┤
+  │ Device interactions — │ border-blue-200    │ Blue   │
+  │  danger               │ bg-blue-50         │        │
+  ├───────────────────────┼────────────────────┼────────┤
+  │ Device interactions — │ border-amber-100   │ Amber  │
+  │  synergy              │ bg-amber-50        │        │
+  ├───────────────────────┼────────────────────┼────────┤
+  │ By concern —          │ Rose               │ Rose   │
+  │ Universal             │                    │        │
+  ├───────────────────────┼────────────────────┼────────┤
+  │ By concern —          │ Amber              │ Amber  │
+  │ Profile-matched       │                    │        │
+  ├───────────────────────┼────────────────────┼────────┤
+  │ Profile panel —       │                    │        │
+  │ supplement/diet       │ Amber              │ Amber  │
+  │ warnings — danger     │                    │        │
+  ├───────────────────────┼────────────────────┼────────┤
+  │ Profile panel —       │                    │        │
+  │ supplement/diet       │ Orange             │ Orange │
+  │ warnings — caution    │                    │        │
+  ├───────────────────────┼────────────────────┼────────┤
+  │ Profile panel —       │ Blue               │ Blue   │
+  │ post-wash note        │                    │        │
+  └───────────────────────┴────────────────────┴────────┘
+
+  The collision: Formula danger = amber = profile-matched
+  concerns. So "High sensitizer load (danger)" looks the
+  same as a profile-matched ingredient, even though it's
+  categorically more serious. Also device synergy = amber,
+  which adds to the confusion.
+
+  ---
+  Ideas
+
+  1. Orange for formula danger — orange sits between amber
+  (profile concern) and rose (universal concern) on the
+  severity scale. Formula-level dangers are generally more
+  serious than a single profile-matched ingredient, so
+  orange is semantically right and doesn't collide with
+  anything:
+  - Formula danger → border-orange-200 bg-orange-50
+  text-orange-800
+  - Formula synergy → teal (keep)
+
+  2. Rose for formula danger, purple for synergy — align
+  formula danger with universal severity (rose), and make
+  synergy visually distinct from the profile notes system by
+   using purple instead of teal:
+  - Formula danger → rose (matches the weight of "high
+  sensitizer load")
+  - Formula synergy → border-purple-100 bg-purple-50
+  text-purple-800
+  - Frees teal for purely beneficial contexts
+
+  3. Consistent interaction palette — orange danger, teal
+  synergy everywhere — apply the same pair to both formula
+  and device interactions, replacing the current
+  inconsistency (formula danger = amber, device danger =
+  blue, device synergy = amber):
+  - All interaction danger → orange
+  - All interaction synergy → teal
+  - Clean rule: orange = things that conflict, teal = things
+   that amplify each other
+
+  4. Left-border card style instead of filled backgrounds —
+  give interaction warnings a white background with a
+  colored left border stripe (like a callout), visually
+  separating them from the filled ingredient concern pills.
+  Danger → rose left border, synergy → teal left border. The
+   different card shape alone distinguishes formula
+  interactions from ingredient concerns regardless of color.
+
+  ---
+  My recommendation is 3 — orange for all interaction
+  dangers, teal for all synergies. It fixes the amber
+  collision, makes device and formula interactions
+  consistent with each other, and creates a memorable rule:
+  orange = ingredients fighting each other, teal =
+  ingredients helping each other. Simple to apply, no new
+  color tokens needed.
+
+  Want me to implement that, or a different option?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 product lists - the did you mean, alternatives, and browse product lists still show number flagged, sensory, photo and not updated information by concern instead. what ideas do you have to fix this?
 
