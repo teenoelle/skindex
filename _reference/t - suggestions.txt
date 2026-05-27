@@ -28762,10 +28762,39 @@ regarding chelating, what about adding water-protective as the beneficial catego
 
 
 
+● Good results — 34 ingredients categorized. The
+  skin-repairing/sebum-regulating/photo-protective/soothing
+  ingredients returned 0 because they already have
+  categories in the DB (allantoin, panthenol, bisabolol etc.   were pre-categorized). The new assignees are the ones
+  that mattered most: all 7 chelating agents (including
+  Disodium EDTA), 26 emollient derivatives, and Inulin
+  Lauryl Carbamate.
 
 
+● Done and pushed. Summary of what's live:
 
+  Five new teal badge labels:
+  - Skin-repairing — allantoin, panthenol, centella asiatica   derivatives; fires notes for damaged_barrier, eczema,
+  fast_shedding, reactive
+  - Sebum-regulating — zinc PCA; fires notes for oily,
+  acne_prone, and hot/humid
+  - Prebiotic — inulin and derivatives; fires notes for
+  acne_prone, fungal_acne, seborrheic, reactive, eczema
+  - Photo-protective — ferulic acid, ergothioneine,
+  resveratrol; fires notes for high_uv,
+  hyperpigmentation_prone, chlorinated/iron water
+  - Water-protective — all chelating agents (Disodium EDTA
+  et al.); only shows the teal badge when hard_water,
+  iron_water, or heavy_metal_water is active in your profile
+   — invisible otherwise
 
+  DB audit fills:
+  - 26 emollient-structural ingredients now show "Emollient"
+   badge (shea butter derivatives, ethylhexyl palmitate,
+  etc.)
+  - 7 chelating agents now show "Water-protective" badge
+  (conditionally)
+  - 1 inulin derivative now shows "Prebiotic" badge
 
 
 
@@ -28779,6 +28808,104 @@ regarding chelating, what about adding water-protective as the beneficial catego
 
 
 fragrance sensitizers - i see that some ingredients with structural category fragrance and concern category sensitizer show up in both universal concerns and your profile. for example, citrus grandis (grapefruit) peel oil and citrus limon (lemon) peel oil show up in the universal concerns list, but lavandula hybrida oil, pelargonium graveolens flower oil, citrus nobilis (mandarin orange) peel oil, and juniperus mexicana oil show up in your profile concerns list. is there a reason for this difference? does this discrepancy happen for other ingredients with structural category fragrance and concern category sensitizer? 
+
+
+
+
+
+
+
+● Now I can see the full picture clearly.
+
+  Why the discrepancy
+
+  The classification is driven by
+  getIngredientConcernLevel(). An ingredient becomes
+  universal through one of two paths:
+  1. Its flagged_category is in CONCERN_UNIVERSAL_CATEGORIES
+   — which includes "fragrance-allergen" but not
+  "sensitizer"
+  2. It has a photo item with sunLevel === "avoid" — which
+  fires for phototoxic ingredients
+
+  Grapefruit and lemon peel oils are both fc = "sensitizer"
+  AND match PHOTO_PATTERNS for photo-botanical
+  (furanocoumarins in citrus). The photo flag makes them
+  universal — not their sensitizer status.
+
+  Lavender, geranium, mandarin, juniper are fc =
+  "sensitizer" only, with no photo flag. So they fall
+  through to the profile-matching block, which requires
+  reactive / damaged_barrier / eczema / rosacea / psoriasis
+  to be active.
+
+  The underlying classification distinction is:
+  - "fragrance-allergen" = the specific EU 26 individual
+  allergen molecules (limonene, linalool, geraniol, etc.) —
+  always universal
+  - "sensitizer" = botanical fragrance oils that contain
+  those allergens but are complex mixtures — profile-matched
+
+  So it's internally consistent, but produces confusing UX:
+  two ingredients that look identical to a user (structural
+  = Fragrance, concern = Sensitizer) end up in completely
+  different buckets depending on whether one happens to also
+   be phototoxic.
+
+  Does this happen for other ingredients?
+
+  Yes — any fragrance oil with fc = "sensitizer" that
+  doesn't also hit the photo pattern will show as
+  profile-matched, not universal. That includes most common
+  botanical fragrance oils: rose, jasmine, ylang ylang,
+  patchouli, sandalwood, neroli, bergamot (non-FCF),
+  vetiver, etc.
+
+  The real question
+
+  Should Fragrance + sensitizer be treated as universal?
+  Arguments:
+
+  - For universal: Fragrance sensitization is one of the
+  most common contact dermatology issues across the general
+  population — not a reactive/eczema-specific concern. A
+  user with no skin type set currently sees zero concern for
+   lavender oil.
+  - Against universal: "sensitizer" is also used for
+  non-fragrance ingredients (preservatives, certain
+  actives). Making all sensitizers universal would pull in
+  those too.
+
+  The clean fix is narrow: in getIngredientConcernLevel(),
+  add one line — if fc === "sensitizer" and
+  structural_category === "Fragrance", treat as universal.
+  That targets exactly this case without touching
+  non-fragrance sensitizers.
+
+  Want me to implement that?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 what ideas do you have to reduce the spacing between ingredients in by concern ingredient lists? 
 

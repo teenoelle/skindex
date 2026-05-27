@@ -460,6 +460,7 @@ function getIngredientConcernLevel(
 
   if (CONCERN_UNIVERSAL_CATEGORIES.has(fc)) return "universal";
   if (photoItem?.sunLevel === "avoid") return "universal";
+  if (fc === "sensitizer" && match?.ingredient.structural_category === "Fragrance") return "universal";
 
   const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
   if (!hasProfile) return "non-matching";
