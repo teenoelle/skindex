@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import {
@@ -444,6 +444,12 @@ export default function AdminPage() {
   const [classifyingAll, setClassifyingAll] = useState(false);
   const [removingFromQueue, setRemovingFromQueue] = useState<string | null>(null);
   const [classifyAllResult, setClassifyAllResult] = useState<{ classified: number; skipped: number } | null>(null);
+  const [queueSelected, setQueueSelected] = useState<Set<string>>(new Set());
+  const [removingMany, setRemovingMany] = useState(false);
+  const [editingQueueId, setEditingQueueId] = useState<string | null>(null);
+  const [editingQueueName, setEditingQueueName] = useState("");
+  const [savingQueueName, setSavingQueueName] = useState(false);
+  const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [upgradeStats, setUpgradeStats] = useState<{ weak: number; total: number } | null>(null);
   const [upgradeRunning, setUpgradeRunning] = useState(false);
 
@@ -483,6 +489,8 @@ export default function AdminPage() {
 
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [typesLoading, setTypesLoading] = useState(false);
+  const [dragOverTypeId, setDragOverTypeId] = useState<string | null>(null);
+  const dragTypeIdRef = useRef<string | null>(null);
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeBodyArea, setNewTypeBodyArea] = useState("Face");
   const [typeAdding, setTypeAdding] = useState(false);
@@ -549,7 +557,7 @@ export default function AdminPage() {
     if (!isSignedIn) { setLoading(false); return; }
     fetch("/api/admin/submissions")
       .then((r) => {
-        if (r.status === 403) { setForbidden(true); setLoading(false); return null; }
+        if (r.status === 403) { setForbidden(true); setLoading(false); setSubmissionsLoading(false); return null; }
         return r.json();
       })
       .then((d) => {
@@ -557,6 +565,7 @@ export default function AdminPage() {
         setSubmissions(d.submissions ?? []);
         setRecentCount(d.recentCount ?? 0);
         setLoading(false);
+        setSubmissionsLoading(false);
         loadAllProducts();
         loadBrands();
         loadTypes();
@@ -696,6 +705,42 @@ export default function AdminPage() {
       setSiteStats((prev) => prev ? { ...prev, queueLength: Math.max(0, prev.queueLength - 1) } : prev);
     } catch { }
     setRemovingFromQueue(null);
+  }
+
+  async function removeSelectedFromQueue() {
+    if (queueSelected.size === 0) return;
+    setRemovingMany(true);
+    const ids = [...queueSelected];
+    try {
+      await fetch("/api/admin/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove-many", ids }),
+      });
+      setQueueItems((prev) => prev.filter((q) => !queueSelected.has(q.id)));
+      setSiteStats((prev) => prev ? { ...prev, queueLength: Math.max(0, prev.queueLength - ids.length) } : prev);
+      setQueueSelected(new Set());
+    } catch { }
+    setRemovingMany(false);
+  }
+
+  async function saveQueueName(item: QueueItem) {
+    if (!editingQueueName.trim() || editingQueueName.trim() === item.name) {
+      setEditingQueueId(null);
+      return;
+    }
+    setSavingQueueName(true);
+    try {
+      const res = await fetch("/api/admin/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rename", queueId: item.id, newName: editingQueueName.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) setQueueItems((prev) => prev.map((q) => q.id === item.id ? { ...q, name: data.name } : q));
+    } catch { }
+    setSavingQueueName(false);
+    setEditingQueueId(null);
   }
 
   async function loadBanners() {
@@ -1180,6 +1225,17 @@ export default function AdminPage() {
     setTypeDeleting(null);
   }
 
+  async function saveTypeOrder(reordered: ProductType[]) {
+    const positions = reordered.map((t, i) => ({ id: t.id, position: i + 1 }));
+    try {
+      await fetch("/api/admin/product-types", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ positions }),
+      });
+    } catch { }
+  }
+
   function toggleGroup(label: string) {
     setOpenGroups((prev) => {
       const next = new Set(prev);
@@ -1426,7 +1482,9 @@ export default function AdminPage() {
             </svg>
           </button>
 
-          {submissionsOpen && (submissions.length === 0 ? (
+          {submissionsOpen && (submissionsLoading ? (
+            <p className="text-sm text-gray-400">Loading…</p>
+          ) : submissions.length === 0 ? (
             <p className="text-sm text-gray-400">No user-submitted products yet.</p>
           ) : (
             <div className="divide-y divide-gray-100">
@@ -2055,7 +2113,7 @@ export default function AdminPage() {
               )}
               {!queueLoading && queueItems.length > 0 && (
                 <>
-                  <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-3 mb-4 flex-wrap">
                     <button
                       type="button"
                       onClick={classifyQueueAll}
@@ -2064,12 +2122,59 @@ export default function AdminPage() {
                     >
                       {classifyingAll ? "Classifying…" : `Classify all (${queueItems.length})`}
                     </button>
+                    {queueSelected.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={removeSelectedFromQueue}
+                        disabled={removingMany}
+                        className="text-xs px-3 py-1.5 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50 disabled:opacity-40"
+                      >
+                        {removingMany ? "Removing…" : `Remove ${queueSelected.size} selected`}
+                      </button>
+                    )}
+                    {queueSelected.size > 0 && (
+                      <button type="button" onClick={() => setQueueSelected(new Set())} className="text-xs text-gray-400 hover:text-gray-700">
+                        Clear selection
+                      </button>
+                    )}
                   </div>
                   <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
                     {queueItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between px-4 py-2.5 gap-4">
+                      <div key={item.id} className={`flex items-center justify-between px-4 py-2.5 gap-4 ${queueSelected.has(item.id) ? "bg-indigo-50" : ""}`}>
+                        <input
+                          type="checkbox"
+                          checked={queueSelected.has(item.id)}
+                          onChange={() => setQueueSelected((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+                            return next;
+                          })}
+                          className="shrink-0 accent-indigo-600"
+                        />
                         <div className="min-w-0 flex-1">
-                          <span className="text-sm text-gray-900 font-mono">{item.name}</span>
+                          {editingQueueId === item.id ? (
+                            <form onSubmit={(e) => { e.preventDefault(); saveQueueName(item); }} className="flex gap-1.5">
+                              <input
+                                autoFocus
+                                value={editingQueueName}
+                                onChange={(e) => setEditingQueueName(e.target.value)}
+                                className="text-sm font-mono border border-indigo-300 rounded px-1.5 py-0.5 focus:outline-none flex-1 min-w-0"
+                              />
+                              <button type="submit" disabled={savingQueueName} className="text-xs text-indigo-600 hover:text-indigo-800 disabled:opacity-40 shrink-0">
+                                {savingQueueName ? "…" : "Save"}
+                              </button>
+                              <button type="button" onClick={() => setEditingQueueId(null)} className="text-xs text-gray-400 hover:text-gray-700 shrink-0">Cancel</button>
+                            </form>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => { setEditingQueueId(item.id); setEditingQueueName(item.name); }}
+                              className="text-sm text-gray-900 font-mono hover:text-indigo-700 text-left"
+                              title="Click to edit name"
+                            >
+                              {item.name}
+                            </button>
+                          )}
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-amber-600 font-medium">×{item.times_seen}</span>
                             {item.found_in && <span className="text-xs text-gray-400 truncate">{item.found_in}</span>}
@@ -2339,7 +2444,28 @@ export default function AdminPage() {
                                     </label>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center gap-3 group">
+                                  <div
+                                    className={`flex items-center gap-3 group rounded-lg transition-colors ${dragOverTypeId === t.id ? "bg-indigo-50" : ""}`}
+                                    draggable
+                                    onDragStart={() => { dragTypeIdRef.current = t.id; }}
+                                    onDragOver={(e) => { e.preventDefault(); setDragOverTypeId(t.id); }}
+                                    onDragLeave={() => setDragOverTypeId(null)}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      const fromId = dragTypeIdRef.current;
+                                      if (!fromId || fromId === t.id) { setDragOverTypeId(null); return; }
+                                      const fromIdx = productTypes.findIndex((x) => x.id === fromId);
+                                      const toIdx = productTypes.findIndex((x) => x.id === t.id);
+                                      const reordered = [...productTypes];
+                                      const [moved] = reordered.splice(fromIdx, 1);
+                                      reordered.splice(toIdx, 0, moved);
+                                      setProductTypes(reordered);
+                                      setDragOverTypeId(null);
+                                      dragTypeIdRef.current = null;
+                                      saveTypeOrder(reordered);
+                                    }}
+                                  >
+                                    <span className="text-gray-300 cursor-grab active:cursor-grabbing select-none shrink-0" title="Drag to reorder">⠿</span>
                                     <input
                                       type="checkbox"
                                       checked={isSelected}

@@ -85,6 +85,24 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Universal concern count — ingredients that are concerns for all skin types
+  const UNIVERSAL_CATS = [
+    "fragrance-allergen", "preservative-allergen", "formaldehyde releaser",
+    "sensitizing preservative", "biocide", "Sulfate Surfactant", "Drying Solvent",
+  ];
+  const { data: universalIngredients } = await supabase
+    .from("ingredients").select("id").in("flagged_category", UNIVERSAL_CATS);
+  const universalIds = (universalIngredients ?? []).map((i) => i.id);
+  const universalCounts = new Map<string, number>();
+  if (universalIds.length > 0) {
+    const { data: universalLinks } = await supabase
+      .from("product_ingredients").select("product_id")
+      .in("product_id", productIds).in("ingredient_id", universalIds);
+    for (const link of universalLinks ?? []) {
+      universalCounts.set(link.product_id, (universalCounts.get(link.product_id) ?? 0) + 1);
+    }
+  }
+
   // Profile-specific sensory count (runtime pattern matches that match the user's skin types)
   const skinTypesParam = req.nextUrl.searchParams.get("skinTypes");
   const climatesParam = req.nextUrl.searchParams.get("climates");
@@ -100,6 +118,7 @@ export async function GET(req: NextRequest) {
     flaggedCount: (dbCounts.get(p.id) ?? 0) + (p.ingredient_list ? countComedogenicPatternMatches(p.ingredient_list) : 0),
     sensoryCount: p.ingredient_list ? countSensoryPatternMatches(p.ingredient_list) : 0,
     photoCount: p.ingredient_list ? countPhotoPatternMatches(p.ingredient_list) : 0,
+    universalConcernCount: universalCounts.get(p.id) ?? 0,
     profileFlaggedCount: concerns.length > 0 ? (profileCounts.get(p.id) ?? 0) : undefined,
     profileSensoryCount: skinTypes.length > 0 || climates.length > 0
       ? (p.ingredient_list ? countProfileSensoryMatches(p.ingredient_list, skinTypes, climates) : 0)

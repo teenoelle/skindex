@@ -15,7 +15,7 @@ type UserList = {
 type IngredientList = {
   id: string;
   name: string;
-  type: "avoid" | "want";
+  type?: "avoid" | "want";
   items: string[];
 };
 
@@ -68,8 +68,13 @@ export default function ListsPage() {
   // Ingredient lists (localStorage)
   const [ingredientLists, setIngredientLists] = useState<IngredientList[]>([]);
   const [newIngListName, setNewIngListName] = useState("");
-  const [newIngListType, setNewIngListType] = useState<"avoid" | "want">("avoid");
   const [newIngListOpen, setNewIngListOpen] = useState(false);
+  // type field is no longer set on new lists; browse-time include/exclude toggle replaces it
+  const [smartCounts, setSmartCounts] = useState<{
+    universalConcerns: { count: number };
+    neutralBeneficial: { count: number; neutral: number; beneficial: number };
+    mySensitivities: { count: number } | null;
+  } | null>(null);
   const [addItemInputs, setAddItemInputs] = useState<Record<string, string>>({});
   const [ingSuggestions, setIngSuggestions] = useState<Record<string, string[]>>({});
   const [pasteListId, setPasteListId] = useState<string | null>(null);
@@ -87,6 +92,13 @@ export default function ListsPage() {
       if (st) setSkinTypes(JSON.parse(st) as string[]);
       const il = localStorage.getItem("skindex:ingredientLists");
       if (il) setIngredientLists(JSON.parse(il) as IngredientList[]);
+
+      const parsed = st ? JSON.parse(st) as string[] : [];
+      const stParam = parsed.length > 0 ? `?skinTypes=${parsed.join(",")}` : "";
+      fetch(`/api/ingredient-lists${stParam}`)
+        .then((r) => r.json())
+        .then((d) => setSmartCounts(d))
+        .catch(() => {});
     } catch {}
   }, []);
 
@@ -302,7 +314,12 @@ export default function ListsPage() {
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Built-in</p>
               <div className="space-y-2">
-                {SMART_LISTS.map((sl) => (
+                {SMART_LISTS.map((sl) => {
+                const count = sl.id === "universal-concerns" ? smartCounts?.universalConcerns.count
+                  : sl.id === "my-sensitivities" ? smartCounts?.mySensitivities?.count
+                  : sl.id === "neutral-beneficial" ? smartCounts?.neutralBeneficial.count
+                  : undefined;
+                return (
                   <div key={sl.id} className="border border-gray-200 rounded-xl px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -313,16 +330,25 @@ export default function ListsPage() {
                             {sl.type === "avoid" ? "Avoid" : "Want"}
                           </span>
                           <p className="text-sm font-medium text-gray-900 leading-snug">{sl.name}</p>
+                          {count !== undefined && (
+                            <span className="text-[10px] text-gray-400 ml-auto shrink-0">{count.toLocaleString()} ingredients</span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-400 leading-relaxed">
                           {sl.requiresProfile && skinTypes.length === 0
                             ? "Set your skin profile on the home page to activate this list."
                             : sl.description}
                         </p>
+                        {sl.id === "neutral-beneficial" && smartCounts && (
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {smartCounts.neutralBeneficial.neutral.toLocaleString()} neutral · {smartCounts.neutralBeneficial.beneficial.toLocaleString()} beneficial
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             </div>
 
@@ -347,7 +373,7 @@ export default function ListsPage() {
                     if (!newIngListName.trim()) return;
                     setIngredientLists((ls) => [
                       ...ls,
-                      { id: crypto.randomUUID(), name: newIngListName.trim(), type: newIngListType, items: [] },
+                      { id: crypto.randomUUID(), name: newIngListName.trim(), items: [] },
                     ]);
                     setNewIngListName("");
                     setNewIngListOpen(false);
@@ -362,45 +388,22 @@ export default function ListsPage() {
                     autoFocus
                     className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-gray-400"
                   />
-                  <div className="flex items-center gap-2">
+                  <p className="text-[11px] text-gray-400">Choose include or exclude when browsing.</p>
+                  <div className="flex gap-1.5">
                     <button
-                      type="button"
-                      onClick={() => setNewIngListType("avoid")}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                        newIngListType === "avoid"
-                          ? "bg-rose-600 text-white border-rose-600"
-                          : "text-gray-500 border-gray-200 hover:border-gray-400"
-                      }`}
+                      type="submit"
+                      disabled={!newIngListName.trim()}
+                      className="ml-auto text-xs px-3 py-1.5 bg-gray-900 text-white rounded-lg disabled:opacity-40"
                     >
-                      Avoid
+                      Create
                     </button>
                     <button
                       type="button"
-                      onClick={() => setNewIngListType("want")}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                        newIngListType === "want"
-                          ? "bg-teal-700 text-white border-teal-700"
-                          : "text-gray-500 border-gray-200 hover:border-gray-400"
-                      }`}
+                      onClick={() => { setNewIngListOpen(false); setNewIngListName(""); }}
+                      className="text-xs px-3 py-1.5 text-gray-400 hover:text-gray-700"
                     >
-                      Want
+                      Cancel
                     </button>
-                    <div className="flex gap-1.5 ml-auto">
-                      <button
-                        type="submit"
-                        disabled={!newIngListName.trim()}
-                        className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-lg disabled:opacity-40"
-                      >
-                        Create
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setNewIngListOpen(false); setNewIngListName(""); }}
-                        className="text-xs px-3 py-1.5 text-gray-400 hover:text-gray-700"
-                      >
-                        Cancel
-                      </button>
-                    </div>
                   </div>
                 </form>
               )}

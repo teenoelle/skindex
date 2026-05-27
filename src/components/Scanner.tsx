@@ -63,8 +63,8 @@ type ImportResult = {
 type UserList = { id: string; name: string; is_public: boolean; itemCount: number };
 
 type BrowseType = { name: string; count: number };
-type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; ingredient_list: string | null; flaggedCount: number; sensoryCount: number; photoCount: number; profileFlaggedCount?: number; profileSensoryCount?: number };
-type IngredientList = { id: string; name: string; type: "avoid" | "want"; items: string[] };
+type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; ingredient_list: string | null; flaggedCount: number; sensoryCount: number; photoCount: number; universalConcernCount?: number; profileFlaggedCount?: number; profileSensoryCount?: number };
+type IngredientList = { id: string; name: string; type?: "avoid" | "want"; items: string[] };
 
 const CATEGORY_LABELS: Record<string, string> = {
   // kebab-case (newer workflow)
@@ -706,6 +706,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browsePhotosafe, setBrowsePhotosafe] = useState(false);
   const [browseProfileLinked, setBrowseProfileLinked] = useState(false);
+  const [browseNoUniversal, setBrowseNoUniversal] = useState(false);
+  const [browseCleanOnly, setBrowseCleanOnly] = useState(false);
+  const [listModes, setListModes] = useState<Record<string, "include" | "exclude" | "off">>({});
   const [ingredientLists, setIngredientLists] = useState<IngredientList[]>([]);
   const [ingListsOpen, setIngListsOpen] = useState(false);
   const [newIngListOpen, setNewIngListOpen] = useState(false);
@@ -2183,7 +2186,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     if (!newIngListName.trim()) return;
-                    setIngredientLists(ls => [...ls, { id: crypto.randomUUID(), name: newIngListName.trim(), type: newIngListType, items: [] }]);
+                    setIngredientLists(ls => [...ls, { id: crypto.randomUUID(), name: newIngListName.trim(), items: [] }]);
                     setNewIngListName("");
                     setNewIngListOpen(false);
                   }} className="space-y-1.5 pt-1 border-t border-gray-100">
@@ -2197,8 +2200,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       autoFocus
                     />
                     <div className="flex gap-1.5">
-                      <button type="button" onClick={() => setNewIngListType("avoid")} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${newIngListType === "avoid" ? "bg-rose-600 text-white border-rose-600" : "text-gray-500 border-gray-200"}`}>Avoid</button>
-                      <button type="button" onClick={() => setNewIngListType("want")} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${newIngListType === "want" ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200"}`}>Want</button>
                       <button type="submit" className="ml-auto text-xs px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700">Create</button>
                       <button type="button" onClick={() => setNewIngListOpen(false)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200">Cancel</button>
                     </div>
@@ -2303,20 +2304,24 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               {/* Browse search + filter chips */}
               {!browseLoading && browseProducts.length > 0 && (() => {
                 const ingText = (p: BrowseProduct) => (p.ingredient_list ?? "").toLowerCase();
-                const avoidLists = ingredientLists.filter(l => l.type === "avoid" && l.items.length > 0);
-                const wantLists = ingredientLists.filter(l => l.type === "want" && l.items.length > 0);
+                const avoidLists = ingredientLists.filter(l => (l.type === "avoid" || listModes[l.id] === "exclude") && l.items.length > 0);
+                const wantLists = ingredientLists.filter(l => (l.type === "want" || listModes[l.id] === "include") && l.items.length > 0);
+                const newLists = ingredientLists.filter(l => !l.type && l.items.length > 0);
                 const profileCats = profileMatchedCategories(activeSkinTypes, activeClimates);
                 const searchLower = browseSearch.trim().toLowerCase();
                 const filtered = browseProducts.filter(p => {
                   if (searchLower && !p.name.toLowerCase().includes(searchLower) && !(p.brand ?? "").toLowerCase().includes(searchLower)) return false;
                   if (browsePhotosafe && p.photoCount > 0) return false;
                   if (browseProfileLinked && ((p.profileFlaggedCount ?? 0) + (p.profileSensoryCount ?? 0)) > 0) return false;
+                  if (browseNoUniversal && (p.universalConcernCount ?? 0) > 0) return false;
+                  if (browseCleanOnly && (p.flaggedCount > 0 || p.sensoryCount > 0)) return false;
                   const txt = ingText(p);
                   if (avoidLists.some(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
                   if (wantLists.length > 0 && !wantLists.every(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
                   return true;
                 });
-                const activeFilterCount = (searchLower ? 1 : 0) + (browsePhotosafe ? 1 : 0) + (browseProfileLinked ? 1 : 0) + avoidLists.length + wantLists.length;
+                const activeModes = newLists.filter(l => listModes[l.id] && listModes[l.id] !== "off").length;
+                const activeFilterCount = (searchLower ? 1 : 0) + (browsePhotosafe ? 1 : 0) + (browseProfileLinked ? 1 : 0) + (browseNoUniversal ? 1 : 0) + (browseCleanOnly ? 1 : 0) + avoidLists.filter(l => l.type === "avoid").length + wantLists.filter(l => l.type === "want").length + activeModes;
                 return (
                   <>
                     <input
@@ -2331,12 +2336,32 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {profileCats.length > 0 && (
                         <button type="button" onClick={() => setBrowseProfileLinked(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseProfileLinked ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Profile-safe</button>
                       )}
-                      {avoidLists.map(l => (
+                      <button type="button" onClick={() => setBrowseNoUniversal(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseNoUniversal ? "bg-rose-600 text-white border-rose-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>No universal concerns</button>
+                      <button type="button" onClick={() => setBrowseCleanOnly(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseCleanOnly ? "bg-green-700 text-white border-green-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Clean only</button>
+                      {avoidLists.filter(l => l.type === "avoid").map(l => (
                         <span key={l.id} className="text-xs px-2 py-0.5 rounded-full border bg-rose-50 text-rose-700 border-rose-200">✗ {l.name}</span>
                       ))}
-                      {wantLists.map(l => (
+                      {wantLists.filter(l => l.type === "want").map(l => (
                         <span key={l.id} className="text-xs px-2 py-0.5 rounded-full border bg-teal-50 text-teal-700 border-teal-100">✓ {l.name}</span>
                       ))}
+                      {newLists.map(l => {
+                        const mode = listModes[l.id] ?? "off";
+                        return (
+                          <button
+                            key={l.id}
+                            type="button"
+                            onClick={() => setListModes(prev => ({ ...prev, [l.id]: mode === "off" ? "include" : mode === "include" ? "exclude" : "off" }))}
+                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                              mode === "include" ? "bg-teal-50 text-teal-700 border-teal-100" :
+                              mode === "exclude" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                              "text-gray-500 border-gray-200 hover:border-gray-400"
+                            }`}
+                            title={`Click to cycle: off → include → exclude`}
+                          >
+                            {mode === "include" ? "✓" : mode === "exclude" ? "✗" : "○"} {l.name}
+                          </button>
+                        );
+                      })}
                       {activeFilterCount > 0 && filtered.length !== browseProducts.length && (
                         <span className="text-xs text-gray-400 self-center">{filtered.length} of {browseProducts.length}</span>
                       )}
@@ -3585,7 +3610,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     if (!newIngListName.trim()) return;
-                    setIngredientLists(ls => [...ls, { id: crypto.randomUUID(), name: newIngListName.trim(), type: newIngListType, items: [] }]);
+                    setIngredientLists(ls => [...ls, { id: crypto.randomUUID(), name: newIngListName.trim(), items: [] }]);
                     setNewIngListName("");
                     setNewIngListOpen(false);
                   }} className="space-y-1.5 pt-1 border-t border-gray-100">
@@ -3599,8 +3624,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       autoFocus
                     />
                     <div className="flex gap-1.5">
-                      <button type="button" onClick={() => setNewIngListType("avoid")} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${newIngListType === "avoid" ? "bg-rose-600 text-white border-rose-600" : "text-gray-500 border-gray-200"}`}>Avoid</button>
-                      <button type="button" onClick={() => setNewIngListType("want")} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${newIngListType === "want" ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200"}`}>Want</button>
                       <button type="submit" className="ml-auto text-xs px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700">Create</button>
                       <button type="button" onClick={() => setNewIngListOpen(false)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200">Cancel</button>
                     </div>

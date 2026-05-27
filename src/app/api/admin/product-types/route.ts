@@ -17,11 +17,29 @@ export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("product_types")
     .select("id, name, body_area, is_rinse_off")
+    .order("position", { ascending: true, nullsFirst: false })
     .order("body_area")
     .order("name");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ types: data ?? [] });
+}
+
+export async function PATCH(req: NextRequest) {
+  const { userId } = await auth();
+  if (!(await isAdmin(userId))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { positions } = await req.json() as { positions: { id: string; position: number }[] };
+  if (!Array.isArray(positions) || positions.length === 0) {
+    return NextResponse.json({ error: "positions array required" }, { status: 400 });
+  }
+
+  const updates = positions.map(({ id, position }) =>
+    supabaseAdmin.from("product_types").update({ position }).eq("id", id)
+  );
+  await Promise.all(updates);
+
+  return NextResponse.json({ ok: true });
 }
 
 export async function POST(req: NextRequest) {

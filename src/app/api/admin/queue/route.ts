@@ -79,7 +79,19 @@ export async function POST(req: NextRequest) {
   const err = await guard();
   if (err) return NextResponse.json({ error: err.error }, { status: err.status });
 
-  const { action, queueId } = await req.json();
+  const { action, queueId, newName, ids } = await req.json();
+
+  if (action === "rename") {
+    if (!queueId || !newName?.trim()) return NextResponse.json({ error: "Missing queueId or newName" }, { status: 400 });
+    await supabaseAdmin.from("ingredient_queue").update({ name: newName.trim() }).eq("id", queueId);
+    return NextResponse.json({ ok: true, name: newName.trim() });
+  }
+
+  if (action === "remove-many") {
+    if (!Array.isArray(ids) || ids.length === 0) return NextResponse.json({ error: "Missing ids array" }, { status: 400 });
+    await supabaseAdmin.from("ingredient_queue").delete().in("id", ids);
+    return NextResponse.json({ ok: true, removed: ids.length });
+  }
 
   if (action === "remove") {
     if (!queueId) return NextResponse.json({ error: "Missing queueId" }, { status: 400 });
