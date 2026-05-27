@@ -31,6 +31,7 @@ export async function GET() {
     brand: p.brand ?? null,
     type: p.type ?? null,
     submitted_at: p.submitted_at,
+    ingredient_list: p.ingredient_list ?? null,
     ingredient_count: p.ingredient_list
       ? p.ingredient_list.split(",").filter((s: string) => s.trim().length > 0).length
       : 0,

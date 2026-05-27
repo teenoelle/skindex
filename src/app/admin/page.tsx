@@ -18,6 +18,7 @@ type Submission = {
   brand: string | null;
   type: string | null;
   submitted_at: string;
+  ingredient_list: string | null;
   ingredient_count: number;
 };
 
@@ -436,6 +437,10 @@ export default function AdminPage() {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [queueLoading, setQueueLoading] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<"all" | "queue" | "submitted" | "suspicious">("all");
+  const [reviewSort, setReviewSort] = useState<"priority" | "date" | "name">("priority");
+  const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
   const [searchMisses, setSearchMisses] = useState<SearchMiss[]>([]);
   const [searchMissesLoading, setSearchMissesLoading] = useState(false);
   const [searchMissesOpen, setSearchMissesOpen] = useState(false);
@@ -1463,6 +1468,245 @@ export default function AdminPage() {
             </div>
           </section>
         )}
+
+        {/* Review New Ingredients */}
+        <section>
+          <button
+            type="button"
+            onClick={() => {
+              const opening = !reviewOpen;
+              setReviewOpen(opening);
+              if (opening && queueItems.length === 0) loadQueue();
+            }}
+            className="flex items-center gap-3 mb-4 group"
+          >
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">Review New Ingredients</h2>
+            {(() => {
+              const total = (siteStats?.queueLength ?? 0) + (siteStats?.pendingSubmissions ?? 0);
+              return total > 0 ? (
+                <span className="text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full px-2.5 py-0.5">{total}</span>
+              ) : null;
+            })()}
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${reviewOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {reviewOpen && (() => {
+            type ReviewRow =
+              | { kind: "queue"; id: string; item: QueueItem }
+              | { kind: "submission"; id: string; item: Submission };
+
+            const allRows: ReviewRow[] = [
+              ...queueItems.map((q) => ({ kind: "queue" as const, id: `q:${q.id}`, item: q })),
+              ...submissions.map((s) => ({ kind: "submission" as const, id: `s:${s.id}`, item: s })),
+            ];
+
+            const filtered = allRows.filter((r) => {
+              if (reviewFilter === "queue") return r.kind === "queue";
+              if (reviewFilter === "submitted") return r.kind === "submission";
+              if (reviewFilter === "suspicious") return r.kind === "submission" && hasSuspiciousIngredients((r.item as Submission).ingredient_list ?? null);
+              return true;
+            });
+
+            const sorted = [...filtered].sort((a, b) => {
+              if (reviewSort === "priority") {
+                const ap = a.kind === "queue" ? (a.item as QueueItem).times_seen : (a.item as Submission).ingredient_count;
+                const bp = b.kind === "queue" ? (b.item as QueueItem).times_seen : (b.item as Submission).ingredient_count;
+                return bp - ap;
+              }
+              if (reviewSort === "date") {
+                const ad = a.kind === "queue" ? ((a.item as QueueItem).last_seen ?? "") : (a.item as Submission).submitted_at;
+                const bd = b.kind === "queue" ? ((b.item as QueueItem).last_seen ?? "") : (b.item as Submission).submitted_at;
+                return bd.localeCompare(ad);
+              }
+              return a.item.name.localeCompare(b.item.name);
+            });
+
+            const selectedQueueIds = [...reviewSelected].filter(id => id.startsWith("q:")).map(id => id.slice(2));
+            const selectedSubmissionIds = [...reviewSelected].filter(id => id.startsWith("s:")).map(id => id.slice(2));
+
+            return (
+              <div className="space-y-3">
+                {/* Controls */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Filter chips */}
+                  <div className="flex gap-1">
+                    {(["all", "queue", "submitted", "suspicious"] as const).map((f) => (
+                      <button key={f} type="button" onClick={() => setReviewFilter(f)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${reviewFilter === f ? "bg-gray-900 text-white border-gray-900" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                        {f === "all" ? `All (${allRows.length})` : f === "queue" ? `Queue (${queueItems.length})` : f === "submitted" ? `Submitted (${submissions.length})` : "Suspicious"}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Sort */}
+                  <div className="flex gap-1 ml-auto">
+                    <span className="text-xs text-gray-400 self-center">Sort:</span>
+                    {(["priority", "date", "name"] as const).map((s) => (
+                      <button key={s} type="button" onClick={() => setReviewSort(s)}
+                        className={`text-xs px-2 py-0.5 rounded border transition-colors ${reviewSort === s ? "bg-gray-100 text-gray-800 border-gray-300" : "text-gray-400 border-gray-100 hover:border-gray-300"}`}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Batch actions */}
+                {reviewSelected.size > 0 && (
+                  <div className="flex items-center gap-3 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-xs">
+                    <span className="text-indigo-700 font-medium">{reviewSelected.size} selected</span>
+                    {selectedQueueIds.length > 0 && (
+                      <button type="button" disabled={classifyingAll}
+                        onClick={async () => {
+                          for (const qid of selectedQueueIds) {
+                            const item = queueItems.find((q) => q.id === qid);
+                            if (item) await classifyQueueOne(item);
+                          }
+                          setReviewSelected(new Set());
+                        }}
+                        className="text-indigo-700 underline underline-offset-2 hover:text-indigo-900">
+                        Classify {selectedQueueIds.length} queued
+                      </button>
+                    )}
+                    {selectedQueueIds.length > 0 && (
+                      <button type="button" disabled={removingMany}
+                        onClick={async () => {
+                          setQueueSelected(new Set(selectedQueueIds));
+                          await removeSelectedFromQueue();
+                          setReviewSelected(new Set());
+                        }}
+                        className="text-rose-600 underline underline-offset-2 hover:text-rose-800">
+                        Remove {selectedQueueIds.length} queued
+                      </button>
+                    )}
+                    {selectedSubmissionIds.length > 0 && (
+                      <button type="button"
+                        onClick={async () => {
+                          for (const sid of selectedSubmissionIds) {
+                            await handleArchive(sid);
+                          }
+                          setReviewSelected(new Set());
+                        }}
+                        className="text-gray-500 underline underline-offset-2 hover:text-gray-700">
+                        Archive {selectedSubmissionIds.length} submitted
+                      </button>
+                    )}
+                    <button type="button" onClick={() => setReviewSelected(new Set())} className="text-gray-400 hover:text-gray-600 ml-auto">Clear</button>
+                  </div>
+                )}
+
+                {/* Loading states */}
+                {(queueLoading || submissionsLoading) && <p className="text-sm text-gray-400">Loading…</p>}
+
+                {/* Empty state */}
+                {!queueLoading && !submissionsLoading && sorted.length === 0 && (
+                  <p className="text-sm text-gray-400">Nothing to review — all clear.</p>
+                )}
+
+                {/* Combined list */}
+                {sorted.length > 0 && (
+                  <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                    {sorted.map((row) => {
+                      const isChecked = reviewSelected.has(row.id);
+                      const toggleCheck = () => setReviewSelected((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
+                        return next;
+                      });
+
+                      if (row.kind === "queue") {
+                        const item = row.item as QueueItem;
+                        return (
+                          <div key={row.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors">
+                            <input type="checkbox" checked={isChecked} onChange={toggleCheck} className="shrink-0 accent-indigo-600" />
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium shrink-0">Q</span>
+                            <div className="flex-1 min-w-0">
+                              {editingQueueId === item.id ? (
+                                <form onSubmit={(e) => { e.preventDefault(); saveQueueName(item); }} className="flex gap-1.5">
+                                  <input autoFocus value={editingQueueName} onChange={(e) => setEditingQueueName(e.target.value)}
+                                    className="flex-1 text-xs border border-gray-200 rounded px-2 py-0.5 focus:outline-none focus:border-indigo-400" />
+                                  <button type="submit" disabled={savingQueueName} className="text-xs text-indigo-600 hover:underline">{savingQueueName ? "…" : "Save"}</button>
+                                  <button type="button" onClick={() => setEditingQueueId(null)} className="text-xs text-gray-400 hover:underline">Cancel</button>
+                                </form>
+                              ) : (
+                                <button type="button" onClick={() => { setEditingQueueId(item.id); setEditingQueueName(item.name); }}
+                                  className="text-sm text-gray-800 hover:underline truncate max-w-xs text-left">
+                                  {item.name}
+                                </button>
+                              )}
+                              <p className="text-xs text-gray-400">
+                                ×{item.times_seen}{item.found_in ? ` · found in ${item.found_in}` : ""}
+                                {item.last_seen ? ` · ${new Date(item.last_seen).toLocaleDateString()}` : ""}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <button type="button" disabled={classifyingOne === item.id} onClick={() => classifyQueueOne(item)}
+                                className="text-xs text-indigo-600 hover:underline disabled:opacity-50">
+                                {classifyingOne === item.id ? "…" : "Classify"}
+                              </button>
+                              <button type="button" disabled={removingFromQueue === item.id} onClick={async () => {
+                                setRemovingFromQueue(item.id);
+                                try {
+                                  await fetch("/api/admin/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "remove", queueId: item.id }) });
+                                  setQueueItems((prev) => prev.filter((q) => q.id !== item.id));
+                                  setSiteStats((prev) => prev ? { ...prev, queueLength: Math.max(0, prev.queueLength - 1) } : prev);
+                                } catch { }
+                                setRemovingFromQueue(null);
+                              }} className="text-xs text-rose-500 hover:underline disabled:opacity-50">
+                                {removingFromQueue === item.id ? "…" : "Remove"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // submission row
+                      const item = row.item as Submission;
+                      return (
+                        <div key={row.id} className="flex items-start gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors">
+                          <input type="checkbox" checked={isChecked} onChange={toggleCheck} className="shrink-0 accent-indigo-600 mt-0.5" />
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium shrink-0 mt-0.5">S</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-800 truncate">{item.name}</p>
+                            <p className="text-xs text-gray-400">
+                              {item.brand && <>{item.brand} · </>}
+                              {item.type && <>{item.type} · </>}
+                              {item.ingredient_count} ingredient{item.ingredient_count !== 1 ? "s" : ""}
+                              {hasSuspiciousIngredients((item as unknown as { ingredient_list?: string | null }).ingredient_list ?? null) && (
+                                <span className="ml-1.5 text-amber-600">⚠ suspicious</span>
+                              )}
+                              {" · "}{new Date(item.submitted_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex gap-2 shrink-0 mt-0.5">
+                            <Link href={`/?q=${encodeURIComponent(item.name)}`} target="_blank" className="text-xs text-gray-500 hover:underline">Scan</Link>
+                            <button type="button" disabled={archiving === item.id} onClick={() => handleArchive(item.id)}
+                              className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50">
+                              {archiving === item.id ? "…" : "Archive"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Classify all queued */}
+                {queueItems.length > 0 && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <button type="button" disabled={classifyingAll} onClick={classifyQueueAll}
+                      className="text-xs text-indigo-600 hover:underline disabled:opacity-40">
+                      {classifyingAll ? "Classifying all…" : `Classify all ${queueItems.length} queued`}
+                    </button>
+                    {classifyAllResult && (
+                      <span className="text-xs text-teal-600">{classifyAllResult.classified} classified, {classifyAllResult.skipped} skipped</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </section>
 
         {/* Submissions */}
         <section>
