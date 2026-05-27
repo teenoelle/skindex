@@ -215,7 +215,7 @@ const RINSE_OFF_TYPES = new Set([
   "Clay Mask", "Rinse-Off Mask",
 ]);
 
-type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash" | "keratosis_pilaris" | "body_acne";
+type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash" | "keratosis_pilaris" | "body_acne" | "fast_shedding";
 type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water" | "red_nir" | "blue_light" | "amber_light" | "vibration_sonic" | "heat_steam" | "microcurrent" | "iodine_load" | "phytoestrogen_load" | "anti_androgenic" | "vasodilating_supps" | "immune_stimulating" | "insulin_sensitizing" | "anabolic_dht" | "high_dose_b12" | "collagen_support" | "high_glycemic" | "dairy_regular" | "gluten_sensitive" | "histamine_foods" | "alcohol_regular" | "spicy_foods" | "high_iodine_diet" | "sulfites_diet" | "benzoates_diet" | "nitrites_diet" | "bha_bht_diet" | "propionates_diet" | "carmine_diet";
 
 const SKIN_TYPES: { value: SkinType; label: string }[] = [
@@ -234,6 +234,7 @@ const SKIN_TYPES: { value: SkinType; label: string }[] = [
   { value: "lupus_rash", label: "Lupus rash" },
   { value: "keratosis_pilaris", label: "Keratosis pilaris" },
   { value: "body_acne", label: "Body acne" },
+  { value: "fast_shedding", label: "Fast-shedding" },
 ];
 
 const CLIMATE_TYPES: { value: ClimateType; label: string }[] = [
@@ -306,6 +307,7 @@ const SKIN_TYPE_NOTES: Record<SkinType, string> = {
   lupus_rash: "The malar (butterfly) rash of lupus is highly photosensitive — UV exposure triggers flares. Chemical UV filters can also cause reactions; mineral-only sunscreens (zinc oxide, titanium dioxide) are strongly preferred. Photosensitizing ingredients carry significantly higher risk here than for any other type.",
   keratosis_pilaris: "Keratosis pilaris (the rough, bumpy texture on upper arms and thighs) is caused by keratin plugging follicles. Gentle chemical exfoliants — urea, lactic acid, salicylic acid — dissolve plugs; physical scrubs and harsh stripping cleansers worsen the inflammation that keeps follicles blocked. Heavy occlusives can trap keratin and worsen congestion.",
   body_acne: "Body acne is driven by the same pore-clogging and bacterial mechanisms as face acne, but friction and sweat occlusion under clothing are major amplifiers. Fabric softener residue, heavy emollients in body wash, and thick lotions all contribute. The same pore-clogger flags that matter on face apply here — watch the Congestion and Occlusive sections.",
+  fast_shedding: "Fast-shedding skin renews quickly — new cells reach the surface before they've fully cornified, leaving them more fragile and sensitive. Chemical exfoliants and retinoids are more likely to over-process this skin type since the barrier is already cycling fast. Thick emollients and barrier-supporting ingredients are more important than usual. Products that leave visible flaking on the skin surface can adhere to loose cells and clump, creating a pilling sensation that worsens when scratched off and can cause micro-tearing on immature cells.",
 };
 
 const CLIMATE_NOTES: Record<ClimateType, string> = {
@@ -380,6 +382,7 @@ function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateT
   if (skinTypes.has("lupus_rash")) cats.push("Chemical sunscreens", "Photosensitizers", "AHA exfoliants");
   if (skinTypes.has("keratosis_pilaris")) cats.push("Heavy occlusives", "Physical exfoliants", "Sulfate surfactants");
   if (skinTypes.has("body_acne")) cats.push("Occlusives", "Waxes", "Film-formers", "Pore-cloggers");
+  if (skinTypes.has("fast_shedding")) cats.push("AHA exfoliants", "BHA exfoliants", "Retinoids", "Drying solvents", "Physical exfoliants");
   if (climates.has("hard_water")) cats.push("Chelating agents", "High-pH cleansers");
   if (climates.has("chlorinated_water")) cats.push("Vitamin C", "Antioxidants");
   if (climates.has("iron_water")) cats.push("Chelating agents", "Antioxidants");
@@ -466,7 +469,11 @@ function getIngredientConcernLevel(
         (activeSkinTypes.has("rosacea") || activeSkinTypes.has("lupus_rash"))) ||
       (fc === "Drying Solvent" && (activeSkinTypes.has("rosacea") || activeClimates.has("heavy_metal_water"))) ||
       (["photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical"].includes(fc) &&
-        (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv") || activeSkinTypes.has("lupus_rash")));
+        (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv") || activeSkinTypes.has("lupus_rash"))) ||
+      (["photo-retinoid", "photo-AHA", "photo-BHA"].includes(fc) && activeSkinTypes.has("fast_shedding")) ||
+      (fc === "sensitizer" && activeSkinTypes.has("fast_shedding")) ||
+      (fc === "fragrance-allergen" && activeSkinTypes.has("fast_shedding")) ||
+      (fc === "Drying Solvent" && activeSkinTypes.has("fast_shedding"));
     return isMatch ? "profile-matched" : "non-matching";
   }
 
@@ -477,6 +484,7 @@ function getIngredientConcernLevel(
     if (
       sc === "Stripping" &&
       (activeSkinTypes.has("dry") || activeSkinTypes.has("damaged_barrier") ||
+        activeSkinTypes.has("fast_shedding") ||
         activeClimates.has("dry_climate") || activeClimates.has("cold"))
     ) return "profile-matched";
     if (sc === "Pilling" && (activeClimates.has("hot") || activeClimates.has("humid"))) return "profile-matched";
@@ -583,6 +591,27 @@ function detectRoutineWarnings(products: RoutineProduct[]): { type: "danger" | "
     const names = nameList([...acidStepProds.map(p => p.name), ...niacinamideWho]);
     warnings.push({ type: "danger", title: "Low pH + Niacinamide: wait 20 min between steps", body: `${names} — niacinamide doesn't absorb effectively immediately after a low-pH formula. Wait at least 20 min.` });
   }
+
+  // Double-dose: same high-concern active across multiple products
+  const activePat = /retinol|retinyl|retinaldehyde|tretinoin|glycolic acid|lactic acid|mandelic acid|malic acid|salicylic acid|benzoyl peroxide|azelaic acid/;
+  const activeByIng = new Map<string, string[]>();
+  for (const p of products) {
+    for (const ing of p.ingredients) {
+      const lc = ing.toLowerCase();
+      if (activePat.test(lc)) {
+        if (!activeByIng.has(lc)) activeByIng.set(lc, []);
+        activeByIng.get(lc)!.push(p.name);
+      }
+    }
+  }
+  for (const [ing, prods] of activeByIng) {
+    const uniqueProds = [...new Set(prods)];
+    if (uniqueProds.length >= 2) {
+      const displayName = ing.replace(/(^\w|\s\w)/g, c => c.toUpperCase());
+      warnings.push({ type: "danger", title: `Double dose: ${displayName}`, body: `${uniqueProds.join(" and ")} both contain ${ing} — stacking the same active doubles the dose and compounds irritation risk. Use only one at a time or stagger them to separate sessions.` });
+    }
+  }
+
   return warnings;
 }
 
@@ -792,10 +821,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [stickyQuery, setStickyQuery] = useState("");
   const [hamburgerOpen, setHamburgerOpen] = useState(false);
   const [routineProducts, setRoutineProducts] = useState<RoutineProduct[]>([]);
-  const [routineOpen, setRoutineOpen] = useState(false);
   const [addedToRoutine, setAddedToRoutine] = useState(false);
   const [routinePanelOpen, setRoutinePanelOpen] = useState(false);
   const [addRoutinePickerOpen, setAddRoutinePickerOpen] = useState(false);
+  const [quickListProductId, setQuickListProductId] = useState<string | null>(null);
+  const [quickListSaving, setQuickListSaving] = useState<string | null>(null);
   const [skinTypeHint, setSkinTypeHint] = useState<SkinType | null>(null);
   const [climateHint, setClimateHint] = useState<ClimateType | null>(null);
   const [waterHint, setWaterHint] = useState<ClimateType | null>(null);
@@ -1490,6 +1520,42 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setRoutineProducts((prev) => prev.filter((p) => p.routineId !== routineId));
   }
 
+  function addBareToRoutine(name: string, brand: string | null, ingredients: string[]) {
+    const newEntry: RoutineProduct = {
+      routineId: Date.now().toString(),
+      name,
+      brand,
+      step_tags: [],
+      ingredients,
+      flaggedCategories: [],
+      timeOfDay: null,
+    };
+    setRoutineProducts((prev) => [...prev, newEntry]);
+    setRoutinePanelOpen(true);
+  }
+
+  async function openQuickList(productId: string) {
+    setQuickListProductId((prev) => (prev === productId ? null : productId));
+    if (!userListsLoaded) {
+      const res = await fetch("/api/lists");
+      const data = await res.json();
+      setUserLists(data.lists ?? []);
+      setUserListsLoaded(true);
+    }
+  }
+
+  async function quickAddToList(listId: string, listName: string, productId: string) {
+    setQuickListSaving(listId);
+    await fetch(`/api/lists/${listId}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId }),
+    });
+    setQuickListSaving(null);
+    setUserLists((prev) => prev.map((l) => l.id === listId ? { ...l, itemCount: l.itemCount + 1 } : l));
+    setQuickListProductId(null);
+  }
+
   function toggleSkinType(t: SkinType) {
     setActiveSkinTypes((prev) => {
       const next = new Set(prev);
@@ -1607,9 +1673,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
-            {(dupMap.get(p.routineId) ?? []).length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700" title={`Shared: ${(dupMap.get(p.routineId) ?? []).join(", ")}`}>duplicate ingredient</span>
-            )}
+            {(dupMap.get(p.routineId) ?? []).length > 0 && (() => {
+              const dups = dupMap.get(p.routineId) ?? [];
+              const highConcernPat = /retinol|retinyl|retinaldehyde|tretinoin|glycolic|lactic|mandelic|salicylic|benzoyl/i;
+              const highConcern = dups.some(d => highConcernPat.test(d));
+              const label = dups.length === 1 ? dups[0] : `${dups.slice(0, 2).join(", ")}${dups.length > 2 ? ` +${dups.length - 2}` : ""}`;
+              return (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${highConcern ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                  {label} × {dups.length > 1 ? `${dups.length} shared` : "shared"}
+                </span>
+              );
+            })()}
           </div>
           {p.brand && <p className="text-[10px] text-gray-400">{p.brand}</p>}
           {p.step_tags.length > 0 && (
@@ -2117,28 +2191,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
           </section>
 
-          {/* Routine panel — idle state (inline collapsible, hidden on md+ where the side panel is used) */}
-          <section className="mb-6 md:hidden">
-            <button
-              type="button"
-              onClick={() => setRoutineOpen((v) => !v)}
-              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full"
-            >
-              Routine
-              {routineProducts.length > 0 && (
-                <span className="text-purple-800 font-medium normal-case tracking-normal">
-                  {routineProducts.length} product{routineProducts.length !== 1 ? "s" : ""}
-                </span>
-              )}
-              <span className="text-gray-300 ml-auto">{routineOpen ? "▲" : "▼"}</span>
-            </button>
-            {routineOpen && (
-              <div className="mt-2 border border-gray-100 rounded-xl p-3">
-                {renderRoutinePanel()}
-              </div>
-            )}
-          </section>
-
           {browseLoading && !browseSelectedType && (
             <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
           )}
@@ -2295,12 +2347,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       <p className="text-sm text-gray-400 text-center py-6">No products match your active filters.</p>
                     )}
                     <div className="space-y-2">
-                      {filtered.map((p) => (
-                        <button
-                          key={p.id}
+                      {filtered.map((p) => {
+                        const browseInRoutine = routineProducts.some(rp => rp.name === p.name);
+                        const browseQuickListOpen = quickListProductId === p.id;
+                        const browseIngredients = (p.ingredient_list ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+                        return (
+                        <div key={p.id} className="border border-gray-300 rounded-xl overflow-hidden hover:border-gray-400 transition-colors">
+                          <button
                           type="button"
                           onClick={() => { resetTab("search"); setQuery(p.name); handleScan({ tab: "search", query: p.name }); }}
-                          className="w-full flex items-center gap-3 border border-gray-300 rounded-xl p-3 text-left hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                          className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 transition-colors"
                         >
                           {p.image_url && (
                             <img src={`/api/image-proxy?url=${encodeURIComponent(p.image_url)}`} alt={p.name} className="w-10 h-10 object-contain rounded-lg bg-gray-50 shrink-0" />
@@ -2346,7 +2402,31 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             })()}
                           </div>
                         </button>
-                      ))}
+                          <div className="flex gap-2 px-3 pb-2 border-t border-gray-100">
+                            <button type="button" onClick={() => { if (browseInRoutine) { const id = routineProducts.find(rp => rp.name === p.name)?.routineId; if (id) removeFromRoutine(id); } else addBareToRoutine(p.name, p.brand, browseIngredients); }} className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${browseInRoutine ? "border-teal-200 text-teal-600" : "border-gray-200 text-gray-400 hover:border-teal-400 hover:text-teal-600"}`}>{browseInRoutine ? "In routine ✓" : "+ Routine"}</button>
+                            {isSignedIn && <button type="button" onClick={() => openQuickList(p.id)} className="text-[10px] px-2 py-0.5 rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors">+ List</button>}
+                          </div>
+                          {browseQuickListOpen && (
+                            <div className="px-3 pb-3 border-t border-gray-100">
+                              {!userListsLoaded ? (
+                                <p className="text-xs text-gray-400 py-2">Loading…</p>
+                              ) : userLists.length === 0 ? (
+                                <p className="text-xs text-gray-400 py-2">No lists yet — <a href="/lists" className="underline">create one</a>.</p>
+                              ) : (
+                                <div className="divide-y divide-gray-100">
+                                  {userLists.map((l) => (
+                                    <button key={l.id} type="button" onClick={() => quickAddToList(l.id, l.name, p.id)} disabled={quickListSaving === l.id} className="w-full flex justify-between items-center py-1.5 text-xs text-gray-700 hover:text-teal-700 disabled:opacity-40 text-left">
+                                      <span>{l.name}</span>
+                                      <span className="text-gray-400">{quickListSaving === l.id ? "Adding…" : l.itemCount}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        );
+                      })}
                     </div>
                   </>
                 );
@@ -2505,13 +2585,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {dymOpen && <div className="flex flex-col space-y-2">
             {[pinnedTopProduct, ...pinnedVariants].map((v) => {
               const isActive = v.id === activeVariantId;
+              const dymInRoutine = routineProducts.some(rp => rp.name === v.name);
+              const dymQuickListOpen = quickListProductId === v.id;
               return (
-                <button
+                <div
                   key={v.id}
-                  type="button"
-                  onClick={() => handleDymVariantClick(v.id)}
-                  className={`flex gap-3 p-3 text-left w-full transition-colors rounded-xl border${isActive ? " bg-gray-100 border-gray-400" : " border-gray-300 hover:border-gray-400 hover:bg-gray-50"}`}
+                  className={`rounded-xl border transition-colors overflow-hidden${isActive ? " bg-gray-100 border-gray-400" : " border-gray-300 hover:border-gray-400"}`}
                 >
+                  <button
+                    type="button"
+                    onClick={() => handleDymVariantClick(v.id)}
+                    className="flex gap-3 p-3 text-left w-full hover:bg-gray-50 transition-colors"
+                  >
                   <div className="w-12 shrink-0">
                     {v.image_url ? (
                       <img
@@ -2546,7 +2631,30 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {isActive && <span className="text-xs text-gray-500">↓ viewing</span>}
                     </div>
                   </div>
-                </button>
+                  </button>
+                  <div className="flex gap-2 px-3 pb-2 border-t border-gray-100">
+                    <button type="button" onClick={() => { if (dymInRoutine) { const id = routineProducts.find(rp => rp.name === v.name)?.routineId; if (id) removeFromRoutine(id); } else addBareToRoutine(v.name, v.brand ?? null, []); }} className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${dymInRoutine ? "border-teal-200 text-teal-600" : "border-gray-200 text-gray-400 hover:border-teal-400 hover:text-teal-600"}`}>{dymInRoutine ? "In routine ✓" : "+ Routine"}</button>
+                    {isSignedIn && <button type="button" onClick={() => openQuickList(v.id)} className="text-[10px] px-2 py-0.5 rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors">+ List</button>}
+                  </div>
+                  {dymQuickListOpen && (
+                    <div className="px-3 pb-3 border-t border-gray-100">
+                      {!userListsLoaded ? (
+                        <p className="text-xs text-gray-400 py-2">Loading…</p>
+                      ) : userLists.length === 0 ? (
+                        <p className="text-xs text-gray-400 py-2">No lists yet — <a href="/lists" className="underline">create one</a>.</p>
+                      ) : (
+                        <div className="divide-y divide-gray-100">
+                          {userLists.map((l) => (
+                            <button key={l.id} type="button" onClick={() => quickAddToList(l.id, l.name, v.id)} disabled={quickListSaving === l.id} className="w-full flex justify-between items-center py-1.5 text-xs text-gray-700 hover:text-teal-700 disabled:opacity-40 text-left">
+                              <span>{l.name}</span>
+                              <span className="text-gray-400">{quickListSaving === l.id ? "Adding…" : l.itemCount}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>}
@@ -3219,12 +3327,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </button>
                   {alternativesOpen && <div className="space-y-2">
                     {alternatives.map((alt) => {
+                      const altInRoutine = routineProducts.some(rp => rp.name === alt.name);
+                      const altQuickListOpen = quickListProductId === alt.id;
                       return (
-                        <Fragment key={alt.id}>
+                        <div key={alt.id} className="border border-gray-300 rounded-xl overflow-hidden hover:border-gray-400 transition-colors">
                           <button
                             type="button"
                             onClick={() => scanVariant({ productId: alt.id })}
-                            className="w-full text-left border border-gray-300 rounded-xl p-3 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                            className="w-full text-left p-3 hover:bg-gray-50 transition-colors"
                           >
                             <div className="flex gap-3">
                               {alt.image_url ? (
@@ -3265,7 +3375,29 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               </div>
                             </div>
                           </button>
-                        </Fragment>
+                          <div className="flex gap-2 px-3 pb-2 border-t border-gray-100">
+                            <button type="button" onClick={() => { if (altInRoutine) { const id = routineProducts.find(rp => rp.name === alt.name)?.routineId; if (id) removeFromRoutine(id); } else addBareToRoutine(alt.name, alt.brand, []); }} className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${altInRoutine ? "border-teal-200 text-teal-600" : "border-gray-200 text-gray-400 hover:border-teal-400 hover:text-teal-600"}`}>{altInRoutine ? "In routine ✓" : "+ Routine"}</button>
+                            {isSignedIn && <button type="button" onClick={() => openQuickList(alt.id)} className="text-[10px] px-2 py-0.5 rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors">+ List</button>}
+                          </div>
+                          {altQuickListOpen && (
+                            <div className="px-3 pb-3 border-t border-gray-100">
+                              {!userListsLoaded ? (
+                                <p className="text-xs text-gray-400 py-2">Loading…</p>
+                              ) : userLists.length === 0 ? (
+                                <p className="text-xs text-gray-400 py-2">No lists yet — <a href="/lists" className="underline">create one</a>.</p>
+                              ) : (
+                                <div className="divide-y divide-gray-100">
+                                  {userLists.map((l) => (
+                                    <button key={l.id} type="button" onClick={() => quickAddToList(l.id, l.name, alt.id)} disabled={quickListSaving === l.id} className="w-full flex justify-between items-center py-1.5 text-xs text-gray-700 hover:text-teal-700 disabled:opacity-40 text-left">
+                                      <span>{l.name}</span>
+                                      <span className="text-gray-400">{quickListSaving === l.id ? "Adding…" : l.itemCount}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>}
@@ -3464,28 +3596,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               )}
               <a href="/lists" className="ml-auto text-[10px] font-normal normal-case tracking-normal text-gray-400 hover:text-gray-700 underline underline-offset-2">Manage in My Lists →</a>
             </div>
-          </section>
-
-          {/* Routine panel — results state (inline collapsible, hidden on md+ where the side panel is used) */}
-          <section className="mt-4 md:hidden">
-            <button
-              type="button"
-              onClick={() => setRoutineOpen((v) => !v)}
-              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full"
-            >
-              Routine
-              {routineProducts.length > 0 && (
-                <span className="text-purple-800 font-medium normal-case tracking-normal">
-                  {routineProducts.length} product{routineProducts.length !== 1 ? "s" : ""}
-                </span>
-              )}
-              <span className="text-gray-300 ml-auto">{routineOpen ? "▲" : "▼"}</span>
-            </button>
-            {routineOpen && (
-              <div className="mt-2 border border-gray-100 rounded-xl p-3">
-                {renderRoutinePanel()}
-              </div>
-            )}
           </section>
 
           {/* Ingredients parent section */}
@@ -4011,51 +4121,27 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         </div>
       )}
 
-      {/* ── Routine side panel (desktop right drawer + mobile bottom sheet) ── */}
-      {/* Backdrop */}
+      {/* ── Routine bottom sheet (all breakpoints) ── */}
       {routinePanelOpen && (
         <div className="fixed inset-0 z-30 bg-black/20" onClick={() => setRoutinePanelOpen(false)} aria-hidden />
       )}
 
-      {/* Desktop: fixed right drawer (hidden on mobile) */}
-      <div className={`hidden md:flex fixed top-0 right-0 h-full z-40 flex-col bg-white border-l border-gray-200 shadow-xl transition-transform duration-300 w-72 ${routinePanelOpen ? "translate-x-0" : "translate-x-full"}`}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Routine</span>
-          <button type="button" onClick={() => setRoutinePanelOpen(false)} className="text-gray-400 hover:text-gray-700 text-sm">✕</button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          {renderRoutinePanel()}
-        </div>
-      </div>
-
-      {/* Desktop: collapsed tab strip on right edge */}
-      {!routinePanelOpen && (
-        <button
-          type="button"
-          onClick={() => setRoutinePanelOpen(true)}
-          className={`hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-40 flex-col items-center gap-1 py-3 px-2 rounded-l-xl border border-r-0 border-gray-200 bg-white shadow-md text-xs font-medium transition-colors ${detectRoutineWarnings(routineProducts).length > 0 ? "text-amber-700 border-amber-200" : "text-gray-600 hover:text-gray-900"}`}
-        >
-          <span style={{ writingMode: "vertical-rl", textOrientation: "mixed", transform: "rotate(180deg)" }}>Routine</span>
-          {routineProducts.length > 0 && (
-            <span className={`text-[10px] font-bold rounded-full px-1 ${detectRoutineWarnings(routineProducts).length > 0 ? "text-amber-700" : "text-teal-600"}`}>{routineProducts.length}</span>
-          )}
-        </button>
-      )}
-
-      {/* Mobile: floating pill at bottom */}
+      {/* Floating trigger button */}
       {routineProducts.length > 0 && (
         <button
           type="button"
           onClick={() => setRoutinePanelOpen(v => !v)}
-          className={`md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2 rounded-full shadow-lg text-sm font-medium border transition-colors ${detectRoutineWarnings(routineProducts).length > 0 ? "bg-amber-50 border-amber-300 text-amber-800" : "bg-white border-gray-200 text-gray-700"}`}
+          className={`fixed bottom-4 right-4 z-40 flex items-center gap-2 px-4 py-2 rounded-full shadow-lg text-sm font-medium border transition-colors ${detectRoutineWarnings(routineProducts).length > 0 ? "bg-amber-50 border-amber-300 text-amber-800" : "bg-white border-gray-200 text-gray-700"}`}
         >
           Routine {routinePanelOpen ? "▼" : "▲"} · {routineProducts.length}
         </button>
       )}
 
-      {/* Mobile: bottom sheet */}
-      <div className={`md:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-gray-200 rounded-t-2xl shadow-xl transition-transform duration-300 ${routinePanelOpen ? "translate-y-0" : "translate-y-full"}`}
-        style={{ maxHeight: "65vh", display: "flex", flexDirection: "column" }}>
+      {/* Bottom sheet */}
+      <div
+        className={`fixed inset-x-0 bottom-0 md:inset-x-auto md:right-4 md:bottom-16 md:w-80 z-40 bg-white border-t md:border border-gray-200 rounded-t-2xl md:rounded-2xl shadow-xl transition-transform duration-300 ${routinePanelOpen ? "translate-y-0" : "translate-y-[110%]"}`}
+        style={{ maxHeight: "65vh", display: "flex", flexDirection: "column" }}
+      >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Routine</span>
           <button type="button" onClick={() => setRoutinePanelOpen(false)} className="text-gray-400 hover:text-gray-700 text-sm">✕</button>
