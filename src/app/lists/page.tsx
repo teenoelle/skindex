@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
+import SiteHeader from "@/components/SiteHeader";
 
 type UserList = {
   id: string;
@@ -140,8 +141,8 @@ export default function ListsPage() {
   if (!isLoaded || loading) {
     return (
       <div className="min-h-screen bg-white">
-        <Header />
-        <main className="max-w-2xl mx-auto px-6 py-16">
+        <SiteHeader />
+        <main className="max-w-2xl mx-auto px-6 py-16 pt-[4.5rem]">
           <p className="text-sm text-gray-400">Loading…</p>
         </main>
       </div>
@@ -151,8 +152,8 @@ export default function ListsPage() {
   if (!isSignedIn) {
     return (
       <div className="min-h-screen bg-white">
-        <Header />
-        <main className="max-w-2xl mx-auto px-6 py-16 text-center">
+        <SiteHeader />
+        <main className="max-w-2xl mx-auto px-6 py-16 pt-[4.5rem] text-center">
           <p className="text-gray-500 mb-4">Sign in to create and view your lists.</p>
           <SignInButton mode="modal">
             <button className="text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2 hover:border-gray-500 transition-colors">
@@ -166,9 +167,9 @@ export default function ListsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header />
+      <SiteHeader />
 
-      <main className="max-w-2xl mx-auto px-6 py-10">
+      <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-10">
         {/* Page title + skin profile row */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
@@ -624,15 +625,3 @@ export default function ListsPage() {
   );
 }
 
-function Header() {
-  return (
-    <header className="border-b border-gray-100 px-6 py-4">
-      <div className="max-w-2xl mx-auto flex items-center justify-between">
-        <Link href="/" className="text-xl tracking-tight select-none">
-          <span className="font-black">SKIN</span>
-          <span className="font-light text-gray-500">dex</span>
-        </Link>
-      </div>
-    </header>
-  );
-}

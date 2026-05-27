@@ -30131,6 +30131,265 @@ let's go with option a, but without the background colors.
 
 
 
+● Done and pushed. Here's what was completed:
+
+  All product lists now show full concern breakdown (no
+  background colors):
+  - 🌹 rose text — # universal concerns (fragrance allergens,   preservative allergens, etc.)
+  - 🟡  amber text — # your concerns (profile-matched, only
+  when user has a skin profile)
+  - 🟡  yellow text — # other concerns (flagged but not your
+  profile)
+  - 🟢  teal text — Neutral (zero concerns)
+
+  What changed across all 4 lists:
+
+  ┌───────────────────┬───────────────┬─────────────────┐
+  │     Location      │   What it     │    Now shows    │
+  │                   │ showed before │                 │
+  ├───────────────────┼───────────────┼─────────────────┤
+  │ DYM (Did You Mean │ # concerns    │ ConcernChips    │
+  │  variants)        │ amber bg      │ breakdown       │
+  ├───────────────────┼───────────────┼─────────────────┤
+  │ Alternatives      │ # concerns    │ ConcernChips    │
+  │                   │ amber bg      │ breakdown       │
+  ├───────────────────┼───────────────┼─────────────────┤
+  │ Browse            │ IIFE with bg  │ ConcernChips    │
+  │                   │ colors        │ breakdown       │
+  ├───────────────────┼───────────────┼─────────────────┤
+  │ Saved Lists       │ Nothing       │ ConcernChips    │
+  │                   │               │ breakdown       │
+  └───────────────────┴───────────────┴─────────────────┘
+
+  Server-side enrichment wired end-to-end:
+  - handleScan, scanVariant, fetchAlternatives all now pass
+  profileConcerns to their APIs
+  - Scan API enriches DYM variants with universalConcernCount
+   + profileMatchedCount
+  - Alternatives API computes the full breakdown per
+  candidate product
+  - Lists GET API accepts ?concerns= param and computes
+  breakdown per listed product
+  - Lists page reads the profile from localStorage and passes
+   the correct category strings to the API
+
+
+
+
+
+
+
+
+in the user created product lists, the products still say "# concern" not "# universal concerns" "# your concerns" "# other concerns" "# neutral". also, the # concerns don't align with the concern types when scanned. what ideas do you have to fix this?
+
+"scan your skincare" shows up in the header when i scroll down, but it disappears when i'm at the top of the page - what ideas do you have to fix this?
+
+
+
+
+
+
+● Now I have a clear picture of both issues. Let me present
+  ideas:
+
+  ---
+  Issue 1: Lists showing "# concern" instead of the full
+  breakdown
+
+  Root cause (bug): The lists page reads from
+  localStorage.getItem("selectedSkinTypes") and
+  "selectedClimates", but Scanner actually saves under
+  "skindex:skinTypes" and "skindex:climates". So the profile
+  is never found → hasProfile = false → ConcernChips falls
+  into the no-profile path and shows plain "# concerns"
+  instead of your/other/universal splits. Easy one-line fix.
+
+  Root cause (count mismatch): The lists API counts concern
+  ingredients via the product_ingredients database table,
+  while the scan counts via name/alias text matching against
+  the live ingredients list. If a product's DB links are
+  incomplete, the totals can differ. Options:
+  - A. Accept the difference — list chips are approximate,
+  scan is exact
+  - B. Display counts from the last scan result when the
+  product was just scanned (store them in the list item)
+  - C. No change needed if fixing the localStorage key
+  resolves the apparent mismatch (might have been the same
+  product showing 0 concerns in lists = "Neutral" vs the
+  actual scan count)
+
+  ---
+  Issue 2: "Scan your skincare" disappears at the top
+
+  What's happening: The page has two headers. The static one
+  in page.tsx (always visible at top) has "Scan your
+  skincare" — but only on sm: screens (≥640px), so it's
+  hidden on mobile. The Scanner's sticky header only shows
+  after scrolling 56px. On mobile, "Scan your skincare" is
+  invisible at the top of the page.
+
+  Options:
+
+  A
+  Option: Remove the sm: breakpoint from "Scan your skincare"
+
+    in LogoButton — show it at all screen sizes in the static    header
+  Trade-off: Simplest; text always visible; the sticky still
+    appears on scroll too
+  ────────────────────────────────────────
+  B
+  Option: Make the page.tsx static header sticky top-0 z-50
+    bg-white — it stays at the top when scrolling, no need
+  for the duplicate Scanner sticky header
+  Trade-off: Clean — one header always there, but Scanner's
+    sticky would need to be removed to avoid doubling up
+  ────────────────────────────────────────
+  C
+  Option: Show the Scanner sticky from the start
+    (showStickyHeader = true always) and remove the static
+    header from page.tsx entirely
+  Trade-off: Scanner owns the header fully — consistent, but
+    requires Scanner to also render the <NavAuth> component
+  at the top
+
+  My recommendation is A — it's a one-word change (remove
+  hidden from the span in LogoButton) and makes "Scan your
+  skincare" visible at all screen sizes in the static header.
+   What do you think?
+
+
+
+
+
+
+
+issue 1 - none of these options fix the issue. what alternative ideas do you have in mind?
+
+issue 2 - i'm unsure what option to choose. i'd like the "scan your skincare" to show up on mobile at all times but if there's not enough room for that and the admin and my lists buttons then the buttons should go to the hamburger on mobile even when not scrolling down in the page. also, on my lists and admin pages - i dont see any of the header buttons except for skindex on desktop and mobile - what ideas do you have to fix this?
+
+
+
+
+
+
+
+● Now I have the full picture. Let me lay out what's actually   happening and offer clean options for both:
+
+  ---
+  Issue 1: Concern breakdown in saved lists
+
+  The real problem: The lists API computes concerns by
+  looking up the product_ingredients database table (FK links
+   between products and ingredients). The scanner computes
+  concerns by text-parsing the ingredient list string against
+   the ingredients table. If a product's product_ingredients
+  links are incomplete — which is common — the list counts
+  will be lower or totally different from the scan.
+
+  Alternative ideas:
+
+  A
+  Option: Run the same ingredient text-matching as scan — in
+    the lists API, parse each product's ingredient_list text
+    the same way the scan does (token → ingredient lookup)
+  and
+     categorize each match
+  How it works: Identical results to scanning;
+  computationally
+    heavier but batchable
+  ────────────────────────────────────────
+  B
+  Option: Add a "refresh" action per product — show a small
+  "↻
+     Refresh" button next to each product in the list that
+    hits the scan API for that product ID and stores the
+    returned counts in the list item
+  How it works: Accurate on demand; scan counts are always
+  the
+    source of truth
+  ────────────────────────────────────────
+  C
+  Option: Don't compute in lists at all — replace concern
+    chips in lists with a "Scan ↗" link that opens the
+  scanner
+     pre-loaded with the product; no stale/mismatched counts
+    ever
+  How it works: Simplest; lists become a navigation tool
+    rather than a summary
+
+  ---
+  Issue 2: Header — "Scan your skincare" on mobile +
+  consistent nav on all pages
+
+  What's happening across pages:
+
+  ┌─────────────────┬──────────────────┬────────────────┐
+  │      Page       │      Header      │ Has nav links? │
+  ├─────────────────┼──────────────────┼────────────────┤
+  │                 │ Static           │ ✅  desktop, ❌  │
+  │ Home (/)        │ LogoButton +     │  mobile        │
+  │                 │ NavAuth in       │ (hidden sm:)   │
+  │                 │ page.tsx         │                │
+  ├─────────────────┼──────────────────┼────────────────┤
+  │                 │ Scanner sticky   │ ✅  via         │
+  │ Home (scrolled) │ header with      │ hamburger      │
+  │                 │ hamburger        │                │
+  ├─────────────────┼──────────────────┼────────────────┤
+  │ Lists (/lists)  │ Inline Header()  │ ❌  nowhere     │
+  │                 │ — logo only      │                │
+  ├─────────────────┼──────────────────┼────────────────┤
+  │ List detail     │ Inline Header()  │ ❌  nowhere     │
+  │ (/lists/[id])   │ — logo only      │                │
+  ├─────────────────┼──────────────────┼────────────────┤
+  │                 │ Inline header —  │ ❌  no My Lists │
+  │ Admin (/admin)  │ logo + "←        │  / user        │
+  │                 │ Scanner"         │                │
+  └─────────────────┴──────────────────┴────────────────┘
+
+  Options:
+
+  A
+  Option: Shared SiteHeader component — one component used on
+
+    all pages; logo + "Scan your skincare" always visible;
+  nav
+     links (My Lists, Admin, UserButton) visible on desktop;
+    hamburger on mobile containing those same links. Replace
+    page.tsx static header, both lists headers, admin header,
+
+    AND Scanner's sticky. One source of truth everywhere.
+  What changes: Most consistent; biggest one-time change
+  ────────────────────────────────────────
+  B
+  Option: Quick patch each page — add NavAuth to the Header
+    functions in lists/admin; remove hidden sm: from "Scan
+    your skincare" in LogoButton; accept two separate header
+    systems (one for home, one for sub-pages)
+  What changes: Faster; but still two code paths
+  ────────────────────────────────────────
+  C
+  Option: Next.js layout.tsx — move the site header into the
+    root layout; it auto-appears on every page; Scanner
+    removes its own sticky header since the layout header can
+
+    be made sticky
+  What changes: Architecturally cleanest; Scanner needs
+    cleanup
+
+  I'd recommend A — one SiteHeader component with a hamburger
+   for mobile, used everywhere. "Scan your skincare" always
+  shows on all screen sizes, nav collapses to hamburger on
+  mobile, and every page is consistent. Want me to build it?
+
+
+
+
+
+
+
+issue 1 - let's try option a.
+
+issue 2 - let's go with option a.
 
 
 
@@ -30147,7 +30406,12 @@ let's go with option a, but without the background colors.
 
 
 
-can you help me find as many mists, toners, serums, and concentrates as possible on iherb that are neutral or beneficial for my skin profile: oily, reactive, damaged barrier, acne, hyperpigmentation, fungal acne, seborrheic, psoriasis, keratosis pilaris, fast-shed, humid, hot, high uv, and poor water quality? 
+
+
+
+
+
+can you help me find as many mists, sprays, toners, serums, and concentrates as possible on iherb that are neutral or beneficial for my skin profile: oily, reactive, damaged barrier, acne, hyperpigmentation, fungal acne, seborrheic, psoriasis, keratosis pilaris, fast-shed, humid, hot, high uv, and poor water quality? each product has an ignredient section where you can find the full ingredient list.
 
 in my lists, i dont see the concerns show up in the saved product cards. how can we fix this?
 

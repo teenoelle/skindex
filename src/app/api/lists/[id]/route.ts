@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { UNIVERSAL_CONCERN_SET } from "@/lib/concern-breakdown";
-import { countComedogenicPatternMatches } from "@/lib/comedogenic";
+import { COMEDOGENIC_PATTERNS, countComedogenicPatternMatches } from "@/lib/comedogenic";
 import { countSensoryPatternMatches } from "@/lib/sensory";
 import { countPhotoPatternMatches } from "@/lib/photo";
 
@@ -43,66 +43,102 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .order("added_at", { ascending: true });
 
   const items = rawItems ?? [];
-  const productIds = items.map((it) => it.product_id).filter(Boolean);
 
-  // Fetch all flagged ingredients (id + category) for breakdown
-  const { data: allFlagged } = await supabaseAdmin
+  // Fetch ALL ingredients once — same as matchIngredients() in @/lib/scanner
+  const { data: ingredientsDb } = await supabaseAdmin
     .from("ingredients")
-    .select("id, flagged_category")
-    .eq("status", "flagged");
+    .select("id, name, inci_name, status, flagged_category");
+  const allIngredients = ingredientsDb ?? [];
 
-  const allFlaggedIds = (allFlagged ?? []).map((i) => i.id);
-  const allFlaggedCatMap = new Map((allFlagged ?? []).map((i) => [i.id, i.flagged_category as string | null]));
-
-  // Fetch product-ingredient links for listed products × flagged ingredients
-  const { data: flaggedLinks } = productIds.length > 0
-    ? await supabaseAdmin
-        .from("product_ingredients")
-        .select("product_id, ingredient_id")
-        .in("product_id", productIds)
-        .in("ingredient_id", allFlaggedIds)
-    : { data: [] };
-
-  const dbCounts = new Map<string, number>();
-  const universalCounts = new Map<string, number>();
-  const profileCounts = new Map<string, number>();
-
-  for (const link of flaggedLinks ?? []) {
-    dbCounts.set(link.product_id, (dbCounts.get(link.product_id) ?? 0) + 1);
-    const cat = allFlaggedCatMap.get(link.ingredient_id ?? "");
-    if (cat && UNIVERSAL_CONCERN_SET.has(cat))
-      universalCounts.set(link.product_id, (universalCounts.get(link.product_id) ?? 0) + 1);
-    if (cat && profileConcernsSet.has(cat))
-      profileCounts.set(link.product_id, (profileCounts.get(link.product_id) ?? 0) + 1);
+  // Parse ingredient list the same way scanner.ts does
+  function parseIngredientTokens(raw: string): string[] {
+    return raw
+      .split(/,(?![^(]*\))/)
+      .map((s) =>
+        s
+          .replace(/\([^)]*\)/g, "")
+          .replace(/[​‌‍﻿]/g, "")
+          .trim()
+          .replace(/\s+/g, " ")
+      )
+      .filter((s) => s.length > 1);
   }
 
   type ProductRow = { id: string; name: string; brand: string | null; image_url: string | null; type: string | null; ingredient_list: string | null };
 
-  // Strip ingredient_list from products in response, add concern fields
+  // For each product, text-match ingredients — same logic as scanner.ts matchIngredients()
   const enrichedItems = items.map((item) => {
-    // Supabase types the join as array, but a FK many-to-one returns a single object at runtime
     const p = (item.products as unknown) as (ProductRow | null);
     if (!p) return item;
-    const pid = item.product_id;
     const ingredientList = p.ingredient_list ?? null;
-    const dbCount = dbCounts.get(pid) ?? 0;
-    const patternCount = ingredientList ? countComedogenicPatternMatches(ingredientList) : 0;
-    const flaggedCount = dbCount + patternCount;
-    const sensoryCount = ingredientList ? countSensoryPatternMatches(ingredientList) : 0;
-    const photoCount = ingredientList ? countPhotoPatternMatches(ingredientList) : 0;
+
+    if (!ingredientList) {
+      return {
+        ...item,
+        products: {
+          id: p.id, name: p.name, brand: p.brand, image_url: p.image_url, type: p.type,
+          flaggedCount: 0, sensoryCount: 0, photoCount: 0,
+          universalConcernCount: 0,
+          profileMatchedCount: profileConcernsSet.size > 0 ? 0 : undefined,
+        },
+      };
+    }
+
+    const tokens = parseIngredientTokens(ingredientList);
+    const dbFlaggedNames = new Set<string>();
+    let dbFlaggedCount = 0;
+    let universalConcernCount = 0;
+    let profileMatchedCount = 0;
+
+    for (const token of tokens) {
+      const lower = token.toLowerCase();
+      const match = allIngredients.find((ing) => {
+        const n = ing.name.toLowerCase();
+        const i = ing.inci_name?.toLowerCase();
+        const tokenLong = lower.length >= 6;
+        return (
+          lower.includes(n) ||
+          (tokenLong && n.includes(lower)) ||
+          (i && (lower.includes(i) || (tokenLong && i.includes(lower))))
+        );
+      });
+      if (match && match.status === "flagged") {
+        dbFlaggedCount++;
+        dbFlaggedNames.add(lower.trim());
+        const cat = match.flagged_category as string | null;
+        if (cat && UNIVERSAL_CONCERN_SET.has(cat)) universalConcernCount++;
+        if (cat && profileConcernsSet.has(cat)) profileMatchedCount++;
+      }
+    }
+
+    // Comedogenic pattern matches not already caught by DB matching
+    let comedoPatternCount = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      const cleaned = tokens[i].replace(/\([^)]*\)/g, "").trim();
+      if (dbFlaggedNames.has(cleaned.toLowerCase())) continue;
+      for (const rule of COMEDOGENIC_PATTERNS) {
+        if (rule.maxPosition !== undefined && i >= rule.maxPosition) continue;
+        if (rule.pattern.test(cleaned)) {
+          comedoPatternCount++;
+          // pore-clogger category: counts toward profileMatchedCount if profile includes it
+          if (profileConcernsSet.has("pore-clogger")) profileMatchedCount++;
+          break;
+        }
+      }
+    }
+
+    const sensoryCount = countSensoryPatternMatches(ingredientList);
+    const photoCount = countPhotoPatternMatches(ingredientList);
+
     return {
       ...item,
       products: {
-        id: p.id,
-        name: p.name,
-        brand: p.brand,
-        image_url: p.image_url,
-        type: p.type,
-        flaggedCount,
+        id: p.id, name: p.name, brand: p.brand, image_url: p.image_url, type: p.type,
+        flaggedCount: dbFlaggedCount + comedoPatternCount,
         sensoryCount,
         photoCount,
-        universalConcernCount: universalCounts.get(pid) ?? 0,
-        profileMatchedCount: profileConcernsSet.size > 0 ? (profileCounts.get(pid) ?? 0) : undefined,
+        universalConcernCount,
+        profileMatchedCount: profileConcernsSet.size > 0 ? profileMatchedCount : undefined,
       },
     };
   });

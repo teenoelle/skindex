@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import ConcernChips from "@/components/ConcernChips";
+import SiteHeader from "@/components/SiteHeader";
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Ampoule: Pipette, Balm: Sparkles, Blush: Sparkles, "Body Wash": Waves, Chapstick: Pipette,
@@ -94,8 +95,8 @@ export default function ListDetailPage() {
     // Mirrors profileMatchedCategories() in Scanner.tsx — keep in sync
     let concerns: string[] = [];
     try {
-      const skinTypes = new Set<string>(JSON.parse(localStorage.getItem("selectedSkinTypes") ?? "[]"));
-      const climates = new Set<string>(JSON.parse(localStorage.getItem("selectedClimates") ?? "[]"));
+      const skinTypes = new Set<string>(JSON.parse(localStorage.getItem("skindex:skinTypes") ?? "[]"));
+      const climates = new Set<string>(JSON.parse(localStorage.getItem("skindex:climates") ?? "[]"));
       if (skinTypes.size > 0 || climates.size > 0) {
         setHasProfile(true);
         const cats = new Set<string>();
@@ -204,8 +205,8 @@ export default function ListDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-white">
-        <Header />
-        <main className="max-w-2xl mx-auto px-6 py-16">
+        <SiteHeader />
+        <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-16">
           <p className="text-sm text-gray-400">Loading…</p>
         </main>
       </div>
@@ -215,8 +216,8 @@ export default function ListDetailPage() {
   if (notFound || !list) {
     return (
       <div className="min-h-screen bg-white">
-        <Header />
-        <main className="max-w-2xl mx-auto px-6 py-16 text-center">
+        <SiteHeader />
+        <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-16 text-center">
           <p className="text-gray-400 text-sm">List not found.</p>
           <Link href="/lists" className="text-sm text-gray-700 underline underline-offset-2 mt-4 block">
             Back to My Lists
@@ -228,8 +229,8 @@ export default function ListDetailPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header />
-      <main className="max-w-2xl mx-auto px-6 py-16">
+      <SiteHeader />
+      <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-16">
         {/* Back link */}
         <Link href="/lists" className="text-xs text-gray-400 hover:text-gray-700 mb-6 block">
           ← My Lists
@@ -430,17 +431,4 @@ function slugify(text: string): string {
 function productSlug(product: Product): string {
   const parts = [product.brand, product.name].filter(Boolean).join(" ");
   return `${slugify(parts)}-${product.id}`;
-}
-
-function Header() {
-  return (
-    <header className="border-b border-gray-100 px-6 py-4">
-      <div className="max-w-2xl mx-auto">
-        <Link href="/" className="text-xl tracking-tight select-none">
-          <span className="font-black">SKIN</span>
-          <span className="font-light text-gray-500">dex</span>
-        </Link>
-      </div>
-    </header>
-  );
 }

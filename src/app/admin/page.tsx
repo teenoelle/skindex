@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import SiteHeader from "@/components/SiteHeader";
 import {
   Smile, Palette, Heart, PersonStanding, Scissors,
   FlaskConical, Sparkles, Eye, Shield, BrushCleaning,
@@ -1421,25 +1422,12 @@ export default function AdminPage() {
   const totalPages = Math.max(1, Math.ceil(filteredAllProducts.length / PAGE_SIZE));
   const displayedAllProducts = filteredAllProducts.slice((allPage - 1) * PAGE_SIZE, allPage * PAGE_SIZE);
 
-  const header = (
-    <header className="border-b border-gray-100 px-6 py-4">
-      <div className="max-w-3xl mx-auto flex items-center justify-between">
-        <Link href="/" className="text-xl tracking-tight select-none">
-          <span className="font-black">SKIN</span>
-          <span className="font-light text-gray-500">dex</span>
-        </Link>
-        <Link href="/" className="text-sm text-gray-400 hover:text-gray-900 transition-colors">
-          ← Scanner
-        </Link>
-      </div>
-    </header>
-  );
 
   if (!isLoaded || loading) {
     return (
       <div className="min-h-screen bg-white">
-        {header}
-        <main className="max-w-3xl mx-auto px-6 py-16">
+        <SiteHeader />
+        <main className="max-w-3xl mx-auto px-6 pt-[4.5rem] pb-16">
           <p className="text-sm text-gray-400">Loading…</p>
         </main>
       </div>
@@ -1449,8 +1437,8 @@ export default function AdminPage() {
   if (!isSignedIn || forbidden) {
     return (
       <div className="min-h-screen bg-white">
-        {header}
-        <main className="max-w-3xl mx-auto px-6 py-16 text-center">
+        <SiteHeader />
+        <main className="max-w-3xl mx-auto px-6 pt-[4.5rem] pb-16 text-center">
           <p className="text-sm text-gray-500">You don&apos;t have access to this page.</p>
         </main>
       </div>
@@ -1459,8 +1447,8 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {header}
-      <main className="max-w-3xl mx-auto px-6 py-8 space-y-8">
+      <SiteHeader />
+      <main className="max-w-3xl mx-auto px-6 pt-[4.5rem] pb-8 space-y-8">
 
         {/* Stats */}
         {siteStats && (

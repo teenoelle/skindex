@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X, Menu, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater } from "lucide-react";
+import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 import { SENSORY_PROFILE_MAP } from "@/lib/sensory";
@@ -891,11 +891,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [concernExpanded, setConcernExpanded] = useState<Set<string>>(new Set());
   const [neutralGroupOpen, setNeutralGroupOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [showStickyProduct, setShowStickyProduct] = useState(false);
-  const [stickySearchOpen, setStickySearchOpen] = useState(false);
-  const [stickyQuery, setStickyQuery] = useState("");
-  const [hamburgerOpen, setHamburgerOpen] = useState(false);
   const [routineProducts, setRoutineProducts] = useState<RoutineProduct[]>([]);
   const [addedToRoutine, setAddedToRoutine] = useState(false);
   const [routinePanelOpen, setRoutinePanelOpen] = useState(false);
@@ -908,7 +904,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [deviceHint, setDeviceHint] = useState<ClimateType | null>(null);
   const [supplementHint, setSupplementHint] = useState<ClimateType | null>(null);
   const [dietHint, setDietHint] = useState<ClimateType | null>(null);
-  const stickySearchRef = useRef<HTMLInputElement>(null);
 
 
   const initialProductIdRef = useRef(initialProductId);
@@ -960,11 +955,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    const onScroll = () => setShowStickyHeader(window.scrollY > 56);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   useEffect(() => {
     const handler = () => {
@@ -1860,67 +1850,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   return (
     <div>
-      {/* Hamburger backdrop */}
-      {hamburgerOpen && (
-        <div className="fixed inset-0 z-40" onClick={() => setHamburgerOpen(false)} aria-hidden />
-      )}
-      {/* Sticky header */}
-      <div className={`fixed top-0 left-0 right-0 z-50 bg-white transition-transform duration-200 ${showStickyHeader ? "translate-y-0 shadow-sm" : "-translate-y-full"}`}>
-        {/* Row 1: logo + search + auth */}
-        <div className="max-w-2xl mx-auto px-6 h-14 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => resetTab("browse")}
-            className="tracking-tight select-none shrink-0 text-left"
-          >
-            <span className="font-black">SKIN</span>
-            <span className="font-light text-gray-500">dex</span>
-          </button>
-          <span className="hidden sm:block text-sm text-gray-400 shrink-0">Scan your skincare</span>
-          <div className="flex-1" />
-          {stickySearchOpen ? (
-            <form
-              className="flex items-center gap-2 flex-1"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const q = stickyQuery.trim();
-                if (!q) return;
-                setStickySearchOpen(false);
-                setStickyQuery("");
-                setTab("search");
-                setQuery(q);
-                handleScan({ tab: "search", query: q });
-              }}
-            >
-              <input
-                ref={stickySearchRef}
-                value={stickyQuery}
-                onChange={(e) => setStickyQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Escape") { setStickySearchOpen(false); setStickyQuery(""); } }}
-                placeholder="Search products…"
-                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400"
-                autoFocus
-              />
-              <button type="button" onClick={() => { setStickySearchOpen(false); setStickyQuery(""); }} className="text-gray-400 hover:text-gray-700">
-                <X size={16} />
-              </button>
-            </form>
-          ) : (
-            <button type="button" onClick={() => setStickySearchOpen(true)} className="p-1.5 text-gray-400 hover:text-gray-700 transition-colors">
-              <Search size={18} />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setHamburgerOpen((v) => !v)}
-            className="p-1.5 text-gray-400 hover:text-gray-700 transition-colors"
-          >
-            <Menu size={18} />
-          </button>
-        </div>
-        {/* Row 2: product context */}
-        {showStickyProduct && result?.product && (
-          <div className="border-t border-gray-100 max-w-2xl mx-auto px-6 py-2 flex items-center gap-3">
+      {/* Product context strip — slides in below SiteHeader when product card scrolls off screen */}
+      {showStickyProduct && result?.product && (
+        <div className="fixed top-14 left-0 right-0 z-40 bg-white border-b border-gray-100 shadow-sm">
+          <div className="max-w-2xl mx-auto px-6 py-2 flex items-center gap-3">
             {result.product.image_url && (
               <img
                 src={proxyImage(result.product.image_url)!}
@@ -1933,27 +1866,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               {result.product.brand && <p className="text-xs text-gray-400 truncate">{result.product.brand}</p>}
             </div>
           </div>
-        )}
-        {/* Drawer */}
-        {hamburgerOpen && (
-          <div className="border-t border-gray-100 bg-white">
-            <div className="max-w-2xl mx-auto px-6 py-3 space-y-1">
-              {isLoaded && isSignedIn && (
-                <>
-                  <Link href="/lists" onClick={() => setHamburgerOpen(false)} className="block text-sm text-gray-700 hover:text-gray-900 py-1.5">My Lists</Link>
-                  {isAdmin && <Link href="/admin" onClick={() => setHamburgerOpen(false)} className="block text-sm text-gray-700 hover:text-gray-900 py-1.5">Admin</Link>}
-                  <div className="py-1.5">
-                    <UserButton />
-                  </div>
-                </>
-              )}
-              {isLoaded && !isSignedIn && (
-                <Link href="/sign-in" onClick={() => setHamburgerOpen(false)} className="block text-sm text-gray-700 hover:text-gray-900 py-1.5">Sign in</Link>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Mode segmented control */}
       <div className="flex mb-3 rounded-full border border-gray-200 overflow-hidden">
