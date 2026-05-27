@@ -2119,7 +2119,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             {profileOpen && (
               <div className="mt-2 space-y-2 border border-gray-100 rounded-xl p-3">
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Skin type</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Smile size={12} /> Skin type</p>
                   <div className="flex flex-wrap gap-1.5">
                     {SKIN_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -2151,7 +2151,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Climate</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Sun size={12} /> Climate</p>
                   <div className="flex flex-wrap gap-1.5">
                     {CLIMATE_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -2168,7 +2168,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Water quality</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Droplets size={12} /> Water quality</p>
                   <div className="flex flex-wrap gap-1.5">
                     {WATER_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -2185,7 +2185,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Devices</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Sparkles size={12} /> Devices</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DEVICE_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -2202,8 +2202,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Internal factors</p>
-                  <p className="text-[10px] text-gray-400 mb-1">Supplements</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><FlaskConical size={12} /> Internal factors</p>
+                  <p className="text-xs text-gray-400 mb-1.5">Supplements</p>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {SUPPLEMENT_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -2218,7 +2218,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {CLIMATE_NOTES[supplementHint]}
                     </div>
                   )}
-                  <p className="text-[10px] text-gray-400 mb-1">Diet</p>
+                  <p className="text-xs text-gray-400 mb-1.5">Diet</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DIET_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -2269,8 +2269,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {browseLoading && !browseSelectedType && (
             <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
           )}
-          {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
-            <>
+          {!browseLoading && browseTypes.length > 0 && (
             <div className="mb-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Quick filters</p>
               <div className="flex flex-wrap gap-1.5">
@@ -2290,6 +2289,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 </button>
               </div>
             </div>
+          )}
+          {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
+            <>
             <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
             <div className="space-y-5">
               {(() => {
@@ -3512,7 +3514,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             {profileOpen && (
               <div className="mt-2 space-y-2 border border-gray-100 rounded-xl p-3">
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Skin type</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Smile size={12} /> Skin type</p>
                   <div className="flex flex-wrap gap-1.5">
                     {SKIN_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -3544,7 +3546,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Climate</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Sun size={12} /> Climate</p>
                   <div className="flex flex-wrap gap-1.5">
                     {CLIMATE_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -3561,7 +3563,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Water quality</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Droplets size={12} /> Water quality</p>
                   <div className="flex flex-wrap gap-1.5">
                     {WATER_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -3578,7 +3580,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Devices</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Sparkles size={12} /> Devices</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DEVICE_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -3595,8 +3597,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1.5">Internal factors</p>
-                  <p className="text-[10px] text-gray-400 mb-1">Supplements</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><FlaskConical size={12} /> Internal factors</p>
+                  <p className="text-xs text-gray-400 mb-1.5">Supplements</p>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {SUPPLEMENT_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
@@ -3611,7 +3613,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {CLIMATE_NOTES[supplementHint]}
                     </div>
                   )}
-                  <p className="text-[10px] text-gray-400 mb-1">Diet</p>
+                  <p className="text-xs text-gray-400 mb-1.5">Diet</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DIET_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
