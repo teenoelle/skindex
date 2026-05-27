@@ -1747,7 +1747,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <div className="space-y-2 border-t border-gray-100 pt-2">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Interactions</p>
                 {routineWarns.map((w, i) => (
-                  <div key={i} className={`rounded-lg border px-3 py-2 ${w.type === "danger" ? "border-amber-400 bg-amber-100" : "border-teal-300 bg-teal-100"}`}>
+                  <div key={i} className={`rounded-lg border px-3 py-2 ${w.type === "danger" ? "border-amber-800 bg-amber-100" : "border-teal-800 bg-teal-100"}`}>
                     <p className={`text-[10px] font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : "✦ "}{w.title}</p>
                     <p className={`text-[10px] leading-relaxed ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
                   </div>
@@ -2150,9 +2150,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       return allWarns.length > 0 ? (
                         <div className="space-y-1.5">
                           {allWarns.map((w, i) => (
-                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : w.type === "caution" ? "border-amber-400 bg-amber-100" : "border-teal-300 bg-teal-100"}`}>
-                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
-                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-700" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
+                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800 bg-amber-100" : w.type === "caution" ? "border-amber-600 bg-amber-50" : "border-teal-800 bg-teal-100"}`}>
+                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
+                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-700" : "text-teal-800"}`}>{w.body}</p>
                             </div>
                           ))}
                         </div>
@@ -2161,9 +2161,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     {(() => {
                       const note = getPostWashNote(activeSkinTypes, activeClimates);
                       return note ? (
-                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-                          <p className="text-xs font-semibold text-blue-800 mb-0.5">Post-wash window</p>
-                          <p className="text-xs leading-relaxed text-blue-700">{note}</p>
+                        <div className="rounded-xl border border-amber-800 bg-amber-100 px-3 py-2">
+                          <p className="text-xs font-semibold text-amber-900 mb-0.5">⚠ Post-wash timing conflict</p>
+                          <p className="text-xs leading-relaxed text-amber-800">{note}</p>
                         </div>
                       ) : null;
                     })()}
@@ -3531,9 +3531,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       return allWarns.length > 0 ? (
                         <div className="space-y-1.5">
                           {allWarns.map((w, i) => (
-                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : w.type === "caution" ? "border-amber-400 bg-amber-100" : "border-teal-300 bg-teal-100"}`}>
-                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
-                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-700" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
+                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800 bg-amber-100" : w.type === "caution" ? "border-amber-600 bg-amber-50" : "border-teal-800 bg-teal-100"}`}>
+                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
+                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-700" : "text-teal-800"}`}>{w.body}</p>
                             </div>
                           ))}
                         </div>
@@ -3542,9 +3542,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     {(() => {
                       const note = getPostWashNote(activeSkinTypes, activeClimates);
                       return note ? (
-                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-                          <p className="text-xs font-semibold text-blue-800 mb-0.5">Post-wash window</p>
-                          <p className="text-xs leading-relaxed text-blue-700">{note}</p>
+                        <div className="rounded-xl border border-amber-800 bg-amber-100 px-3 py-2">
+                          <p className="text-xs font-semibold text-amber-900 mb-0.5">⚠ Post-wash timing conflict</p>
+                          <p className="text-xs leading-relaxed text-amber-800">{note}</p>
                         </div>
                       ) : null;
                     })()}
@@ -3621,7 +3621,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 {result.formula_warnings!.map((w, i) => (
                   <div
                     key={i}
-                    className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-amber-400 bg-amber-100" : "border-teal-300 bg-teal-100"}`}
+                    className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-amber-800 bg-amber-100" : "border-teal-800 bg-teal-100"}`}
                   >
                     <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-amber-900" : "text-teal-800"}`}>
                       {w.type === "danger" ? "⚠ " : "✦ "}{w.title}
@@ -3641,7 +3641,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Device interactions</p>
                 <div className="space-y-2">
                   {devWarns.map((w, i) => (
-                    <div key={i} className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-amber-400 bg-amber-100" : "border-teal-300 bg-teal-100"}`}>
+                    <div key={i} className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-amber-800 bg-amber-100" : "border-teal-800 bg-teal-100"}`}>
                       <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚡ " : "✦ "}{w.title}</p>
                       <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
                     </div>
@@ -4090,7 +4090,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         <button
           type="button"
           onClick={() => setRoutinePanelOpen(v => !v)}
-          className={`fixed bottom-4 right-4 z-40 flex items-center gap-2 px-4 py-2 rounded-full shadow-lg text-sm font-medium border transition-colors ${detectRoutineWarnings(routineProducts).length > 0 ? "bg-amber-100 border-amber-400 text-amber-900" : "bg-white border-gray-200 text-gray-700"}`}
+          className={`fixed bottom-4 right-4 z-40 flex items-center gap-2 px-4 py-2 rounded-full shadow-lg text-sm font-medium border transition-colors ${detectRoutineWarnings(routineProducts).length > 0 ? "bg-amber-100 border-amber-800 text-amber-900" : "bg-white border-gray-200 text-gray-700"}`}
         >
           Routine {routinePanelOpen ? "▼" : "▲"} · {routineProducts.length}
         </button>

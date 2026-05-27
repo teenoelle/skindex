@@ -29115,6 +29115,41 @@ profile panel - post-wash  note - make it amber 200
 
 
 
+● Done and pushed. The color system across all interaction
+  sections is now:
+
+  ┌─────────────┬────────────┬───────────┬───────────────┐
+  │    State    │ Background │  Border   │     Text      │
+  ├─────────────┼────────────┼───────────┼───────────────┤
+  │ Danger /    │ amber-100  │ amber-400 │ amber-900 /   │
+  │ conflict    │            │           │ amber-800     │
+  ├─────────────┼────────────┼───────────┼───────────────┤
+  │ Synergy     │ teal-100   │ teal-300  │ teal-800      │
+  └─────────────┴────────────┴───────────┴───────────────┘
+
+  The caution type (formula warnings 3-level scale) stays
+  visually distinct from the base danger type —
+  amber-50/amber-200 for the lightest danger,
+  amber-100/amber-400 for the stronger caution above it.
+
+
+
+
+
+
+let's do this but some changes:
+danger/conflict border amber 800 
+syngergy border teal 800
+also, i still see some danger/conflict notes with background yellow why is this?
+post wash window note should be similar colors as danger/conflict and mention the conflict in its header
+
+
+
+
+
+
+
+
 
 
 
