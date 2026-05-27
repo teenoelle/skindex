@@ -40,6 +40,8 @@ export type CommunityVariant = {
   flaggedCount: number;
   sensoryCount: number;
   photoCount: number;
+  universalConcernCount?: number;
+  profileMatchedCount?: number;
 };
 
 export type ObfVariant = {
@@ -76,6 +78,8 @@ export type AlternativeProduct = {
   sensoryCount: number;
   photoCount: number;
   sameType: boolean;
+  universalConcernCount?: number;
+  profileMatchedCount?: number;
 };
 
 export type FormulaWarning = {

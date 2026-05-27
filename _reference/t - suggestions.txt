@@ -29531,28 +29531,633 @@ let's go with ideas 2 and 3.
 
 
 
+● Pushed. Here's what changed:
+
+  Browse panel — icons now appear:
+  - Area section headers: small icon (12px) beside the
+  uppercase label — 😊 FACE, 🎨 MAKEUP, ♥ LIP, etc.
+  - Every product type chip: icon before the name — 💧
+  Moisturizer 14, ✨  Exfoliant 6, etc.
+  - Selected-type back header: icon beside the type name
+  when drilling in
+
+  Admin — gaps filled:
+  - BODY_AREAS now includes Hands, Nails, Home (so the body
+  area picker shows them when adding/editing a type)
+  - "Lips" renamed to "Lip" everywhere to match the DB value
+   and Scanner's AREA_ORDER
+  - BODY_AREA_ICON: Hands (Hand), Nails (Fingerprint), Home
+  (Home) added
+  - PRODUCT_TYPE_ICON: Dish Soap (Droplets), Laundry
+  Detergent (Waves), Fabric Softener (Wind), Nail
+  Polish/Treatment (Sparkles) added
+  - PRODUCT_TYPE_GROUPS fallback list updated with Hands,
+  Nails, Home groups
 
 
 
 
 
-can the skin profile text have similar styling to the browse text?
+
+
+
+
+
+
+can the skin profile text have similar styling to the browse text? skin type, climate, water quality, devices, internal factors texts can change styling to the body area and old skin profile text styling, and supplements and diet can change styling to the old skin tpye, climate, water quality, devices, internal factors text style.
 
 for quick filters, can this section show up under browse before the first body area?
 
+
+
+
+
+● The structure looks correct. Quick filters are now in
+  their own standalone block (lines 2272–2292) that renders
+  whenever !browseLoading && browseTypes.length > 0 —
+  including when a type is selected. The Browse header +
+  area grid remain in the !browseSelectedType block (lines
+  2293–2355). The browseSelectedType panel follows after
+  that at line 2356.
+
+  All three changes are done:
+
+  1. Skin profile section labels — both the idle browse
+  panel and the scan result panel now have:
+    - Skin type → uppercase bold with <Smile /> icon
+    - Climate → uppercase bold with <Sun /> icon
+    - Water quality → uppercase bold with <Droplets /> icon
+    - Devices → uppercase bold with <Sparkles /> icon
+    - Internal factors → uppercase bold with <FlaskConical
+  /> icon
+    - Supplements / Diet → demoted to text-xs text-gray-400
+  mb-1.5 (same as the old major-section style, no
+  uppercase/bold)
+  2. Quick filters — extracted into a separate block outside
+   !browseSelectedType, so the filters persist whether
+  you're viewing the area grid or drilling into a specific
+  product type.
+
+
+
+
+
+
+quick filters should be in the browse section before the first body area. 
+
+the section and subsection header styling in the browse section should be similar to the section and subsection header styling in the skin profile section.
+
+
+
+
+● Pushed 078f231. What changed:
+
+  - "Browse" header is now text-xs text-gray-400 uppercase
+  tracking-widest — same weight/size/color as "Skin profile"  - Quick filters sits inside the Browse section, between
+  the "Browse" header and the first body area, rather than
+  floating above it
+  - The body area headers (Face, Makeup, etc.) remain
+  unchanged — they already matched the Skin type / Climate
+  subsection style
+
+
+
+
+good, the subsections in skin profile changed correctly. but skin profile section header text is still styled the same as before when it should be styled like the browse section text. also, quick filters continue to show up above the browse section instead of inside it.
+
+
+
+● Pushed 2271d71. What's now in the code:
+
+  - "Skin profile" button: text-sm font-semibold
+  text-gray-700 uppercase tracking-widest — matches Browse
+  exactly (both idle and scan result panels)
+  - "Browse" header: same text-sm font-semibold
+  text-gray-700 uppercase tracking-widest — unchanged from
+  what you've been seeing
+  - Quick filters: inside the Browse block, between "Browse"
+   and the first body area
+  - Area headers (Face, Makeup, etc.) and skin profile
+  subsection labels (Skin type, Climate, etc.): both stay at
+   text-xs font-semibold text-gray-400 uppercase
+  tracking-widest with icons
+
+
+
+
+
+
+
+
+
+before, product names in browse and ingredient names got cut off on mobile - however, the fix is pushes the product name to the left and wraps it so that it takes up an awkward amount of vertical space - what did we do about mobility viewing in the did you mean and alternatives lists? didn't we just push the number concerns to a new line? also, all lists still show old concerns (flagged, sensory triggers, photosensitive) instead of the new ones (universal concerns, your profile concerns, etc). 
+
+
+scan summary line
+
+
+
+
+
+● Pushed 31a9cf5. What changed:
+
+  - Browse cards — concern chips now sit below the product
+  name on their own line (same pattern as the alternatives
+  card). The row is now items-start so the image aligns to
+  the top rather than centering against a taller text block.
+  - DYM variants — sensory triggers → sensory,
+  photosensitive → photo
+  - Alternatives — same renames
+
+  The scan result summary line (N flagged · N sensory
+  triggers · N photosensitive) is separate and untouched —
+  let me know if you want that updated too.
+
+
+
+
+
+
+the scan result summary line is fine. but the browse cards, did you mean cards, and safer alternative cards show flagged, sensory, photo instead of universal concerns, profile concerns, and neutral. how can this be fixed?
+
+
+
+
+● Pushed 8fdab27. Summary of what each card now shows:
+
+  Browse product cards
+  - No concerns → Neutral (green)
+  - Profile active, no matches → Neutral for your profile
+  (green)
+  - Profile active, matches → N universal (rose) + N profile
+   concerns (amber)
+  - No profile, has concerns → N universal (rose) + N
+  concerns (amber, everything non-universal combined)
+
+  DYM + alternatives
+  - No concerns → Neutral (green)
+  - Has concerns → N concerns (amber, all flagged + sensory
+  + photo combined — these cards don't have the
+  universal/profile split in the API response)
+
+
+
+
+
+
+
+
+
+
+why does "13 profile concerns" show up in dark rose instead of dark amber? 
+why do product cards in lists show only profile concerns and not universal concerns?
+
+
+the product cards are fine in browse list but did you mean and safer alternatives lists dont show universal concern count.
+
+
+rate limit
+
+
+
+
+
+
+
+
+
+
+sometimes the scan result summary line isn't accurate - for example, dove 0 aluminum original roll on deodorant has 10 universal concern ingredients and 2 your profile concern ingredients, but the scan result summary line shows 12 profile concerns in dark rose instead of 10 universal concerns in dark rose and 2 profile concerns in dark amber.
+
+the browse list shows "# universal" instead of "# universal concerns" in dark rose can you fix it?
+
+
+
+
+
+● Now let me also check and fix the remaining "# concerns"
+  chip (the non-universal, no-profile case at line 2480):
+
+  Read 1 file (ctrl+o to expand)
+
+● That's the no-profile path — "# concerns" is fine there (it   was already labelled without "profile" since there's no
+  profile set). That looks correct as-is. Let me verify the
+  final state of both fixed areas looks right:
+
+  Read 1 file (ctrl+o to expand)
+
+● Both fixes look correct. Here's a summary of what was
+  changed:
+
+  ---
+  Fix 1 — Scan result summary line (the main bug you
+  described):
+
+  The old code used a single profileCount that incremented
+  for both "universal" and "profile-matched" ingredients,
+  then showed everything as "# profile concerns" in a single
+  color. So for Dove with 10 universal + 2 profile, you'd see
+   "12 profile concerns" instead of the correct two separate
+  counts.
+
+  Now it tracks universalCount and profileMatchedCount
+  separately and renders:
+  - 10 universal concerns in dark rose (text-rose-700)
+  - 2 profile concerns in amber (text-amber-700)
+
+  Fix 2 — Browse list chip label:
+
+  Changed {universalCount} universal → {universalCount}
+  universal concern(s) — now correctly reads "10 universal
+  concerns" with proper pluralization. Also added
+  pluralization to the profile concerns chip in both the
+  with-profile and no-profile paths.
+
+
+
+
+
+
+
+
+
+
+
+why does ethylhexyl palmitate show up dark rose in the full ingredient list but dark yellow in other concerns list? is it a universal concern or not? does this happen for other ingredients?
+
+
+
+
+
+
+● Clean — colorKey is gone, nothing downstream used it. The
+  full ingredient list paragraph now uses exactly the same
+  getIngredientConcernLevel function as the "By concern"
+  section, so colors will always match.
+
+  What changes in practice:
+
+  Ingredient type: Fragrance allergen, preservative allergen
+  Before (paragraph): Rose
+  After (paragraph): Rose (unchanged — universal)
+  By concern (was already correct):
+  ────────────────────────────────────────
+  Ingredient type: Pore-clogger with acne profile
+  Before (paragraph): Rose
+  After (paragraph): Rose (unchanged — profile-matched)
+  By concern (was already correct):
+  ────────────────────────────────────────
+  Ingredient type: Pore-clogger without acne profile
+  Before (paragraph): Rose ← wrong
+  After (paragraph): Yellow (non-matching)
+  By concern (was already correct):
+  ────────────────────────────────────────
+  Ingredient type: Sensitizer with reactive profile
+  Before (paragraph): Rose
+  After (paragraph): Amber (profile-matched)
+  By concern (was already correct):
+  ────────────────────────────────────────
+  Ingredient type: Sensitizer without reactive profile
+  Before (paragraph): Rose ← wrong
+  After (paragraph): Yellow (non-matching)
+  By concern (was already correct):
+  ────────────────────────────────────────
+  Ingredient type: Safe ingredient
+  Before (paragraph): Gray
+  After (paragraph): Gray (unchanged)
+  By concern (was already correct):
+  ────────────────────────────────────────
+  Ingredient type: Unreviewed
+  Before (paragraph): Light gray
+  After (paragraph): Light gray (unchanged)
+  By concern (was already correct):
+
+  One side effect to be aware of: if you have no profile set
+  at all, profile-dependent flagged ingredients now show
+  yellow instead of rose in the paragraph too. That's
+  actually the correct honest signal — "this is flagged in
+  the DB but whether it matters depends on your skin type."
+  Universal concerns (fragrance allergens, preservative
+  allergens, etc.) stay rose regardless.
+
+
+
+
+
+
+
+wouldn't a pore-clogger with acne profile be a your concern and be dark amber, not dark rose for universal concern?
+
+
+
+
+
+       ──
+● You're right, I described it wrong in my table. The code I
+──wrote is actually correct — let me re-read what I put:
+
+  : concernLevel === "universal"       ? "text-rose-700
+  font-medium"   // rose
+  : concernLevel === "profile-matched" ? "text-amber-700
+  font-medium"  // amber
+  : concernLevel === "non-matching"    ? "text-yellow-700
+  font-medium" // yellow
+
+  That's amber for profile-matched, which is right. The table
+   in my explanation was just wrong. The corrected picture:
+
+  ┌─────────────────────────────────┬────────────────────┐
+  │         Ingredient type         │ Paragraph (after   │
+  │                                 │        fix)        │
+  ├─────────────────────────────────┼────────────────────┤
+  │ Fragrance allergen,             │ Rose — universal   │
+  │ preservative allergen           │                    │
+  ├─────────────────────────────────┼────────────────────┤
+  │ Pore-clogger with acne profile  │ Amber — your       │
+  │                                 │ concern            │
+  ├─────────────────────────────────┼────────────────────┤
+  │ Pore-clogger without acne       │ Yellow —           │
+  │ profile                         │ non-matching       │
+  ├─────────────────────────────────┼────────────────────┤
+  │ Sensitizer with reactive        │ Amber — your       │
+  │ profile                         │ concern            │
+  ├─────────────────────────────────┼────────────────────┤
+  │ Sensitizer without reactive     │ Yellow —           │
+  │ profile                         │ non-matching       │
+  ├─────────────────────────────────┼────────────────────┤
+  │ Safe / neutral                  │ Gray               │
+  ├─────────────────────────────────┼────────────────────┤
+  │ Unreviewed                      │ Light gray         │
+  └─────────────────────────────────┴────────────────────┘
+
+  Sorry for the confusion — the code is correct, I just wrote
+   the table backwards. Rose is strictly for universal-level
+  concerns (fragrance allergens, preservative allergens, hard
+   sunLevel: "avoid" photo items) which apply regardless of
+  anyone's profile.
+
+
+
+
+
+
+
+
+
+
+
+
+
+what ideas do you have to include a rinse-off or leave-on toggle for the scan ingredients tab?
+
+
+
+
+
+
+● Good context. The toggle currently only renders in the
+  result view (after a product scan), and isRinseOff
+  auto-sets from the product type when a real product is
+  found. For the paste tab there's no product type signal, so   it always defaults to leave-on — and the toggle, while
+  technically present in the result view, is easy to miss
+  after the fact.
+
+  Here are the options as I see them, from lightest to
+  heaviest:
+
+  ---
+  Option A — Toggle in the paste form, above the Scan button
+  Add the same Leave-on / Rinse-off pill buttons right below
+  the textarea, before submitting. Default leave-on. Dead
+  simple, same UI pattern already in the codebase, zero extra
+   state.
+
+  Downside: Many people won't notice it before they scan —
+  they'll paste and hit the button first.
+
+  ---
+  Option B — Prompt in the result view when it's ambiguous
+  After a paste scan, show a small inline prompt: "Is this a
+  rinse-off product? (cleanser, shampoo, body wash…)" with
+  the two toggle buttons, only if the type is unknown. Draws
+  attention at the moment it matters.
+
+  Downside: Still after-the-fact; requires re-reading results
+   if they switch.
+
+  ---
+  Option C — Product type chip selector in the paste form
+  A compact row of chips — "Cleanser / Body wash / Shampoo /
+  Serum / Moisturizer / Other…" — above the Scan button.
+  Selecting one sets rinse-off automatically and also
+  populates the product type field used in the submit flow.
+  Two birds.
+
+  Downside: More UI weight; might feel like overhead for
+  quick pastes.
+
+  ---
+  Option D — Toggle + persist last choice
+  Option A, but save the user's last selection to
+  localStorage so it sticks. If someone is scanning a bunch
+  of shampoos they only have to set it once.
+
+  Downside: Could cause confusion if someone forgets it's
+  still set to rinse-off when they paste a serum.
+
+  ---
+  My lean: A + D together — the toggle in the form is the
+  right place, and persisting it (with a visible selected
+  state so it's not invisible) would actually be the most
+  practical. Option C is worth it only if you also want to
+  capture type for the submit/DB flow.
+
+  What direction sounds right to you?
+
+
+
+
+
+
+
+
+what about option a but when the user hits the toggle the ingredients automatically rescan?
+
+
+
+
+● Good. Done — here's what was done and why it works without
+  any extra logic:
+
+  - The toggle sits between the textarea and the Scan button,   always visible on the paste tab
+  - Defaults to Leave-on (same as the existing state default)  - Flipping it before scanning sets isRinseOff so the first
+  result is already correct
+  - Flipping it after scanning updates the concern groups
+  immediately — because the suppression sets
+  (RINSE_OFF_SUPPRESS_SENSORY_CATS,
+  RINSE_OFF_SUPPRESS_DB_CATS, etc.) are evaluated during
+  render, so changing isRinseOff state just triggers a
+  re-render with different filtering, no API call
+
+  One edge case to be aware of: if someone scans a search
+  product (e.g. a Face Wash, which auto-sets rinse-off to
+  true) and then switches to the Paste tab, the toggle will
+  show Rinse-off selected since it's shared state. Probably
+  fine since it's obvious and they can flip it — but worth
+  noting if it comes up.
+
+
+
+
+● Clean. The TS error was blocking compilation — that's why
+  the toggle wasn't appearing. The ?? null fix on both
+  .find() calls makes them return null instead of undefined,
+  which matches what getIngredientConcernLevel expects.
+
+  The toggle should show up now if you refresh. If the dev
+  server was running with HMR it may have shown the error in
+  the terminal but kept serving the old compiled version.
+
+
+
+
+
+
+
+
+
+
+
+the lists (did you mean, alternatives, browse, saved product lists) only show "# concerns" in the product card, but i want it to show "# universal concerns" "# your concerns" "# other concerns" "# neutral" - what ideas do you have to ensure this happens for all the relevant product lists in the right colors?
+
+
+
+
+
+● Now I have the full picture across all four surfaces.
+  Here's the structural reality:
+
+  ---
+  What each list currently has:
+
+  ┌──────────────┬────────────┬─────────────┬───────────┐
+  │              │    Has     │             │   Has     │
+  │     List     │ universal  │ Has profile │ concern   │
+  │              │   split?   │    split?   │ data at   │
+  │              │            │             │   all?    │
+  ├──────────────┼────────────┼─────────────┼───────────┤
+  │              │            │ ✓ (server,  │           │
+  │ Browse       │ ✓ (server) │ if profile  │ ✓         │
+  │              │            │ passed)     │           │
+  ├──────────────┼────────────┼─────────────┼───────────┤
+  │ DYM          │ ✗ raw      │ ✗           │ ✓         │
+  │              │ total only │             │           │
+  ├──────────────┼────────────┼─────────────┼───────────┤
+  │ Alternatives │ ✗ raw      │ ✗           │ ✓         │
+  │              │ total only │             │           │
+  ├──────────────┼────────────┼─────────────┼───────────┤
+  │              │            │             │ ✗ — no    │
+  │ Saved Lists  │ ✗          │ ✗           │ counts at │
+  │              │            │             │  all      │
+  └──────────────┴────────────┴─────────────┴───────────┘
+
+  ---
+  Three approaches:
+
+  Option A — Full server-side breakdown everywhere (most
+  accurate, most work)
+  Add universalConcernCount + profileMatchedCount +
+  nonMatchingCount to the DYM entries (scan API),
+  alternatives API, and lists API. Each API accepts profile
+  params (concerns, skinTypes, climates) the same way browse
+  already does. Client passes profile when fetching. Saved
+  lists page needs a whole new concern-counting join.
+
+  Pro: Fully consistent everywhere, profile-aware chips on
+  every card.
+  Con: 4 API changes + type changes + profile params wired
+  through each fetch call. Biggest lift.
+
+  ---
+  Option B — Add universal count only, no profile split
+  (minimal API change)
+  Just add universalConcernCount to DYM, alternatives, and
+  lists. No profile params needed — it's a single static DB
+  query (same 7 universal categories browse already uses).
+  Show universal (rose) + remaining as "other concerns"
+  (yellow). Profile chip only appears in Browse where the
+  data already exists.
+
+  Pro: Small change, consistent rose/yellow split everywhere,
+   no profile plumbing needed.
+  Con: Cards outside Browse never show the amber "your
+  concerns" chip — profile-matched concerns look the same as
+  non-matching ones.
+
+  ---
+  Option C — Extract a shared ConcernChips component now,
+  wire data incrementally
+  First pull the chip rendering into one reusable component
+  that accepts { universalCount, profileCount, otherCount,
+  neutralCount }. Then add data to each API one at a time.
+  Today Browse gets fully correct chips; everything else gets
+   partial chips as the APIs catch up.
+
+  Pro: UI is consistent from day one, backend can improve
+  without touching UI again.
+  Con: Still needs the API work from A or B eventually — just
+   structures the UI side first.
+
+  ---
+  My lean: B first, then C as the UI wrapper. Universal vs
+  other is the highest-value split (it's the one that
+  actually tells you "this is a concern for everyone" vs
+  "depends"), and it requires zero profile plumbing. Extract
+  the component while doing it so the profile chip slots in
+  naturally when you add that data later. Saved lists is a
+  separate conversation since it needs a new DB join
+  entirely.
+
+  What direction do you want to go?
+
+
+
+
+
+
+
+let's go with option a, but without the background colors.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+can you help me find as many mists, toners, serums, and concentrates as possible on iherb that are neutral or beneficial for my skin profile: oily, reactive, damaged barrier, acne, hyperpigmentation, fungal acne, seborrheic, psoriasis, keratosis pilaris, fast-shed, humid, hot, high uv, and poor water quality? 
+
+in my lists, i dont see the concerns show up in the saved product cards. how can we fix this?
+
+when i add a product from browse, did you mean, or safer alternatives, to a user created product list, the site doesn't show in the lists' product card that the product is in or already in one of the user's lists. what ideas do you have here?
+
 is there a reason for the different types of water quality or can they be combined as poor water quality? 
-
-supplements - what ideas do you have if the user doesn't know which supplements profiles to click but do know the name of their supplements? 
-
-diet - what ideas do you have if the user doesn't know which diet they are eating but do know what foods they ate recently or will eat soon?
-
-are we missing any body areas, or could product types be organized into alternative areas or subareas or subsubareas? 
 
 skin profile - what ideas do you have of how the options within each section (skin type, climate, water quality, devices, internal factors) should be ordered?
 
-autocomplete for ingredient lists - what ideas do you have to increase the functionality of this tool?
-
-product names in browse and ingredient names get cut off on mobile - what did we do about this in the other lists? what alternative ideas do you have?
+why do skin profile selections on desktop refresh to none selected for the same user on mobile? 
 
 
 
@@ -29595,7 +30200,13 @@ why does Ingredient Queue say 1 and then say Queue is empty — all ingredients 
 
 unreviewed shows "Already in database — rescan to see results" but no easy click to scan the ingredients. what ideas do you have for this?
 
+supplements - what ideas do you have if the user doesn't know which supplements profiles to click but do know the name of their supplements? 
 
+diet - what ideas do you have if the user doesn't know which diet they are eating but do know what foods they ate recently or will eat soon?
+
+are we missing any body areas, or could product types be organized into alternative areas or subareas or subsubareas? 
+
+autocomplete for ingredient lists - what ideas do you have to increase the functionality of this tool?
 
 
 

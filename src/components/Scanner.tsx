@@ -8,6 +8,7 @@ import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, B
 import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 import { SENSORY_PROFILE_MAP } from "@/lib/sensory";
+import ConcernChips from "@/components/ConcernChips";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -1104,12 +1105,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
     const activeTab = override?.tab ?? tab;
     const activeQuery = override?.query ?? query;
+    const profileConcerns = profileMatchedCategories(activeSkinTypes, activeClimates);
     const body =
       activeTab === "search"
-        ? { type: "search", query: activeQuery }
+        ? { type: "search", query: activeQuery, profileConcerns }
         : activeTab === "paste"
-        ? { type: "paste", ingredients }
-        : { type: "url", url: importUrls.split("\n").map((l) => l.trim()).filter(Boolean)[0] ?? "" };
+        ? { type: "paste", ingredients, profileConcerns }
+        : { type: "url", url: importUrls.split("\n").map((l) => l.trim()).filter(Boolean)[0] ?? "", profileConcerns };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let data: any = {};
@@ -1262,9 +1264,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setSuggestLinkUrl("");
     setSuggestLinkError(null);
 
+    const profileConcerns = profileMatchedCategories(activeSkinTypes, activeClimates);
     const body = opts.productId
-      ? { type: "search", query, productId: opts.productId }
-      : { type: "paste", ingredients: opts.pasteIngredients };
+      ? { type: "search", query, productId: opts.productId, profileConcerns }
+      : { type: "paste", ingredients: opts.pasteIngredients, profileConcerns };
 
     const res = await fetch("/api/scan", {
       method: "POST",
@@ -1315,10 +1318,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     if (!result?.flagged.length) return;
     const flaggedIds = result.flagged.map((m) => m.ingredient.id);
     setAlternativesLoading(true);
+    const profileConcerns = profileMatchedCategories(activeSkinTypes, activeClimates);
     const res = await fetch("/api/alternatives", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ flaggedIds, productType: result.product?.type ?? null }),
+      body: JSON.stringify({ flaggedIds, productType: result.product?.type ?? null, profileConcerns }),
     });
     const data = await res.json();
     setAlternatives(data.results ?? []);
@@ -1992,7 +1996,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         />
       )}
       {tab === "paste" && (
-        <div className="flex items-center gap-1 mb-3">
+        <div className="flex items-center justify-center gap-1 mb-3">
           <button
             type="button"
             onClick={() => setIsRinseOff(false)}
@@ -2473,32 +2477,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
                             </div>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              {p.flaggedCount === 0 && p.sensoryCount === 0 && p.photoCount === 0 ? (
-                                <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Neutral</span>
-                              ) : (() => {
-                                const universalCount = p.universalConcernCount ?? 0;
-                                const total = p.flaggedCount + p.sensoryCount + p.photoCount;
-                                const nonUniversal = Math.max(0, total - universalCount);
-                                const hasProf = activeSkinTypes.size > 0 || activeClimates.size > 0;
-                                const pfc = p.profileFlaggedCount;
-                                if (hasProf && pfc !== undefined) {
-                                  if (universalCount === 0 && nonUniversal === 0) {
-                                    return <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Neutral for your profile</span>;
-                                  }
-                                  return (
-                                    <>
-                                      {universalCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700">{universalCount} universal concern{universalCount !== 1 ? "s" : ""}</span>}
-                                      {nonUniversal > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700">{nonUniversal} profile concern{nonUniversal !== 1 ? "s" : ""}</span>}
-                                    </>
-                                  );
-                                }
-                                return (
-                                  <>
-                                    {universalCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700">{universalCount} universal concern{universalCount !== 1 ? "s" : ""}</span>}
-                                    {nonUniversal > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700">{nonUniversal} concerns</span>}
-                                  </>
-                                );
-                              })()}
+                              <ConcernChips
+                                total={p.flaggedCount + p.sensoryCount + p.photoCount}
+                                universalCount={p.universalConcernCount}
+                                profileMatchedCount={(p.profileFlaggedCount ?? 0) + (p.profileSensoryCount ?? 0)}
+                                hasProfile={activeSkinTypes.size > 0 || activeClimates.size > 0}
+                              />
                             </div>
                           </div>
                         </button>
@@ -2719,11 +2703,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      {v.flaggedCount === 0 && v.sensoryCount === 0 && v.photoCount === 0 ? (
-                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Neutral</span>
-                      ) : (
-                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{v.flaggedCount + v.sensoryCount + v.photoCount} concerns</span>
-                      )}
+                      <ConcernChips
+                        total={v.flaggedCount + v.sensoryCount + v.photoCount}
+                        universalCount={v.universalConcernCount}
+                        profileMatchedCount={v.profileMatchedCount}
+                        hasProfile={activeSkinTypes.size > 0 || activeClimates.size > 0}
+                      />
                       {isActive && <span className="text-xs text-gray-500">↓ viewing</span>}
                     </div>
                   </div>
@@ -3457,11 +3442,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                   )}
                                 </div>
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  {alt.flaggedCount === 0 && alt.sensoryCount === 0 && alt.photoCount === 0 ? (
-                                    <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Neutral</span>
-                                  ) : (
-                                    <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{alt.flaggedCount + alt.sensoryCount + alt.photoCount} concerns</span>
-                                  )}
+                                  <ConcernChips
+                                    total={alt.flaggedCount + alt.sensoryCount + alt.photoCount}
+                                    universalCount={alt.universalConcernCount}
+                                    profileMatchedCount={alt.profileMatchedCount}
+                                    hasProfile={activeSkinTypes.size > 0 || activeClimates.size > 0}
+                                  />
                                 </div>
                               </div>
                             </div>

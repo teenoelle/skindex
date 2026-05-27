@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import ConcernChips from "@/components/ConcernChips";
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Ampoule: Pipette, Balm: Sparkles, Blush: Sparkles, "Body Wash": Waves, Chapstick: Pipette,
@@ -32,6 +33,11 @@ type Product = {
   brand: string | null;
   image_url: string | null;
   type: string | null;
+  flaggedCount?: number;
+  sensoryCount?: number;
+  photoCount?: number;
+  universalConcernCount?: number;
+  profileMatchedCount?: number;
 };
 
 type ListItem = {
@@ -79,11 +85,41 @@ export default function ListDetailPage() {
   const [noteLoading, setNoteLoading] = useState(false);
 
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [hasProfile, setHasProfile] = useState(false);
 
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    fetch(`/api/lists/${id}`)
+    // Read skin profile from localStorage to pass concern categories to API
+    // Mirrors profileMatchedCategories() in Scanner.tsx — keep in sync
+    let concerns: string[] = [];
+    try {
+      const skinTypes = new Set<string>(JSON.parse(localStorage.getItem("selectedSkinTypes") ?? "[]"));
+      const climates = new Set<string>(JSON.parse(localStorage.getItem("selectedClimates") ?? "[]"));
+      if (skinTypes.size > 0 || climates.size > 0) {
+        setHasProfile(true);
+        const cats = new Set<string>();
+        if (skinTypes.has("acne_prone") || skinTypes.has("oily") || skinTypes.has("fungal_acne") || skinTypes.has("body_acne") || skinTypes.has("keratosis_pilaris"))
+          ["pore-clogger", "occlusive", "bacteria-trap"].forEach(c => cats.add(c));
+        if (skinTypes.has("reactive") || skinTypes.has("damaged_barrier") || skinTypes.has("eczema") || skinTypes.has("rosacea") || skinTypes.has("psoriasis"))
+          cats.add("sensitizer");
+        if (skinTypes.has("reactive") || skinTypes.has("damaged_barrier") || skinTypes.has("eczema"))
+          cats.add("fragrance-allergen");
+        if (skinTypes.has("rosacea") || skinTypes.has("lupus_rash"))
+          cats.add("Chemical Sunscreen");
+        if (skinTypes.has("hyperpigmentation_prone") || climates.has("high_uv") || skinTypes.has("lupus_rash"))
+          ["photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical"].forEach(c => cats.add(c));
+        concerns = Array.from(cats);
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+
+    const url = concerns.length > 0
+      ? `/api/lists/${id}?concerns=${encodeURIComponent(concerns.join(","))}`
+      : `/api/lists/${id}`;
+
+    fetch(url)
       .then((r) => {
         if (r.status === 404) { setNotFound(true); setLoading(false); return null; }
         return r.json();
@@ -309,6 +345,16 @@ export default function ListDetailPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 leading-snug">{product.name}</p>
                       {product.brand && <p className="text-xs text-gray-400">{product.brand}</p>}
+                      {(product.flaggedCount !== undefined || product.sensoryCount !== undefined) && (
+                        <div className="mt-1">
+                          <ConcernChips
+                            total={(product.flaggedCount ?? 0) + (product.sensoryCount ?? 0) + (product.photoCount ?? 0)}
+                            universalCount={product.universalConcernCount}
+                            profileMatchedCount={product.profileMatchedCount}
+                            hasProfile={hasProfile}
+                          />
+                        </div>
+                      )}
                       <div className="flex items-center gap-3 mt-1.5">
                         <Link
                           href={`/product/${productSlug(product)}`}

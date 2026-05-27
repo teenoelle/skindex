@@ -4,6 +4,7 @@ import { matchIngredients } from "@/lib/scanner";
 import { supabase } from "@/lib/supabase";
 import { anthropic } from "@/lib/anthropic";
 import type { CommunityVariant, ObfVariant, PhotosensitiveItem, SensoryTriggerItem } from "@/types";
+import { UNIVERSAL_CONCERN_SET } from "@/lib/concern-breakdown";
 import { COMEDOGENIC_PATTERNS, countComedogenicPatternMatches } from "@/lib/comedogenic";
 import { SENSORY_PATTERNS, countSensoryPatternMatches } from "@/lib/sensory";
 import { countPhotoPatternMatches } from "@/lib/photo";
@@ -246,7 +247,8 @@ async function getOrCreateUser(clerkId: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const { type, query, ingredients, url, productId } = await req.json();
+  const { type, query, ingredients, url, productId, profileConcerns = [] } = await req.json();
+  const profileConcernsSet = new Set(profileConcerns as string[]);
 
   let rawIngredients = "";
   let autoImportedProductId: string | null = null;
@@ -521,12 +523,18 @@ export async function POST(req: NextRequest) {
       ]);
       const allFlaggedMap = new Map((allFlagged ?? []).map((i) => [i.id, i.flagged_category as string | null]));
       const dbFlaggedCounts = new Map<string, number>();
+      const variantUniversalCounts = new Map<string, number>();
+      const variantProfileCounts = new Map<string, number>();
       for (const link of flaggedLinks ?? []) {
         const ingCat = allFlaggedMap.get(link.ingredient_id ?? "");
         if (ingCat === undefined) continue;
         const variantType = variantTypeMap.get(link.product_id) ?? "";
         if (RINSE_OFF_TYPES_FALLBACK.has(variantType) && ingCat !== null && RINSE_OFF_SUPPRESS.has(ingCat)) continue;
         dbFlaggedCounts.set(link.product_id, (dbFlaggedCounts.get(link.product_id) ?? 0) + 1);
+        if (ingCat && UNIVERSAL_CONCERN_SET.has(ingCat))
+          variantUniversalCounts.set(link.product_id, (variantUniversalCounts.get(link.product_id) ?? 0) + 1);
+        if (ingCat && profileConcernsSet.has(ingCat))
+          variantProfileCounts.set(link.product_id, (variantProfileCounts.get(link.product_id) ?? 0) + 1);
       }
       const listMap = new Map((variantData ?? []).map((p) => [p.id, { list: p.ingredient_list as string | null, image_url: p.image_url as string | null }]));
       communityVariants = communityVariants.map((v) => {
@@ -539,6 +547,8 @@ export async function POST(req: NextRequest) {
           flaggedCount: dbCount + (list ? countComedogenicPatternMatches(list) : 0),
           sensoryCount: list ? countSensoryPatternMatches(list) : 0,
           photoCount: list ? countPhotoPatternMatches(list) : 0,
+          universalConcernCount: variantUniversalCounts.get(v.id) ?? 0,
+          profileMatchedCount: profileConcernsSet.size > 0 ? (variantProfileCounts.get(v.id) ?? 0) : undefined,
         };
       });
     }
