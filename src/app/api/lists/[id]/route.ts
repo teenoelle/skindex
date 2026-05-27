@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { UNIVERSAL_CONCERN_SET } from "@/lib/concern-breakdown";
-import { COMEDOGENIC_PATTERNS, countComedogenicPatternMatches } from "@/lib/comedogenic";
-import { countSensoryPatternMatches } from "@/lib/sensory";
-import { countPhotoPatternMatches } from "@/lib/photo";
+import { computeProductConcerns, type IngredientRow } from "@/lib/compute-concerns";
 
 async function ownedList(id: string, userId: string) {
   const { data } = await supabaseAdmin
@@ -21,8 +18,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   const concernsParam = req.nextUrl.searchParams.get("concerns");
+  const skinTypesParam = req.nextUrl.searchParams.get("skinTypes");
+  const climatesParam = req.nextUrl.searchParams.get("climates");
+
   const profileConcerns: string[] = concernsParam ? concernsParam.split(",").filter(Boolean) : [];
   const profileConcernsSet = new Set(profileConcerns);
+  const skinTypes: string[] = skinTypesParam ? skinTypesParam.split(",").filter(Boolean) : [];
+  const climates: string[] = climatesParam ? climatesParam.split(",").filter(Boolean) : [];
 
   const { data: list } = await supabaseAdmin
     .from("user_lists")
@@ -47,26 +49,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Fetch ALL ingredients once — same as matchIngredients() in @/lib/scanner
   const { data: ingredientsDb } = await supabaseAdmin
     .from("ingredients")
-    .select("id, name, inci_name, status, flagged_category");
-  const allIngredients = ingredientsDb ?? [];
-
-  // Parse ingredient list the same way scanner.ts does
-  function parseIngredientTokens(raw: string): string[] {
-    return raw
-      .split(/,(?![^(]*\))/)
-      .map((s) =>
-        s
-          .replace(/\([^)]*\)/g, "")
-          .replace(/[​‌‍﻿]/g, "")
-          .trim()
-          .replace(/\s+/g, " ")
-      )
-      .filter((s) => s.length > 1);
-  }
+    .select("id, name, inci_name, status, flagged_category, structural_category");
+  const allIngredients = (ingredientsDb ?? []) as IngredientRow[];
 
   type ProductRow = { id: string; name: string; brand: string | null; image_url: string | null; type: string | null; ingredient_list: string | null };
 
-  // For each product, text-match ingredients — same logic as scanner.ts matchIngredients()
   const enrichedItems = items.map((item) => {
     const p = (item.products as unknown) as (ProductRow | null);
     if (!p) return item;
@@ -79,66 +66,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           id: p.id, name: p.name, brand: p.brand, image_url: p.image_url, type: p.type,
           flaggedCount: 0, sensoryCount: 0, photoCount: 0,
           universalConcernCount: 0,
-          profileMatchedCount: profileConcernsSet.size > 0 ? 0 : undefined,
+          profileMatchedCount: (profileConcernsSet.size > 0 || skinTypes.length > 0 || climates.length > 0) ? 0 : undefined,
         },
       };
     }
 
-    const tokens = parseIngredientTokens(ingredientList);
-    const dbFlaggedNames = new Set<string>();
-    let dbFlaggedCount = 0;
-    let universalConcernCount = 0;
-    let profileMatchedCount = 0;
-
-    for (const token of tokens) {
-      const lower = token.toLowerCase();
-      const match = allIngredients.find((ing) => {
-        const n = ing.name.toLowerCase();
-        const i = ing.inci_name?.toLowerCase();
-        const tokenLong = lower.length >= 6;
-        return (
-          lower.includes(n) ||
-          (tokenLong && n.includes(lower)) ||
-          (i && (lower.includes(i) || (tokenLong && i.includes(lower))))
-        );
-      });
-      if (match && match.status === "flagged") {
-        dbFlaggedCount++;
-        dbFlaggedNames.add(lower.trim());
-        const cat = match.flagged_category as string | null;
-        if (cat && UNIVERSAL_CONCERN_SET.has(cat)) universalConcernCount++;
-        if (cat && profileConcernsSet.has(cat)) profileMatchedCount++;
-      }
-    }
-
-    // Comedogenic pattern matches not already caught by DB matching
-    let comedoPatternCount = 0;
-    for (let i = 0; i < tokens.length; i++) {
-      const cleaned = tokens[i].replace(/\([^)]*\)/g, "").trim();
-      if (dbFlaggedNames.has(cleaned.toLowerCase())) continue;
-      for (const rule of COMEDOGENIC_PATTERNS) {
-        if (rule.maxPosition !== undefined && i >= rule.maxPosition) continue;
-        if (rule.pattern.test(cleaned)) {
-          comedoPatternCount++;
-          // pore-clogger category: counts toward profileMatchedCount if profile includes it
-          if (profileConcernsSet.has("pore-clogger")) profileMatchedCount++;
-          break;
-        }
-      }
-    }
-
-    const sensoryCount = countSensoryPatternMatches(ingredientList);
-    const photoCount = countPhotoPatternMatches(ingredientList);
+    const counts = computeProductConcerns(
+      ingredientList,
+      allIngredients,
+      profileConcernsSet,
+      skinTypes,
+      climates,
+      p.type,
+    );
 
     return {
       ...item,
       products: {
         id: p.id, name: p.name, brand: p.brand, image_url: p.image_url, type: p.type,
-        flaggedCount: dbFlaggedCount + comedoPatternCount,
-        sensoryCount,
-        photoCount,
-        universalConcernCount,
-        profileMatchedCount: profileConcernsSet.size > 0 ? profileMatchedCount : undefined,
+        ...counts,
       },
     };
   });

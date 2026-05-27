@@ -4,10 +4,10 @@ import { matchIngredients } from "@/lib/scanner";
 import { supabase } from "@/lib/supabase";
 import { anthropic } from "@/lib/anthropic";
 import type { CommunityVariant, ObfVariant, PhotosensitiveItem, SensoryTriggerItem } from "@/types";
-import { UNIVERSAL_CONCERN_SET } from "@/lib/concern-breakdown";
 import { COMEDOGENIC_PATTERNS, countComedogenicPatternMatches } from "@/lib/comedogenic";
 import { SENSORY_PATTERNS, countSensoryPatternMatches } from "@/lib/sensory";
 import { countPhotoPatternMatches } from "@/lib/photo";
+import { computeProductConcerns } from "@/lib/compute-concerns";
 import { extractIngredientsFromUrl, mapCategoryToType, guessProductType } from "@/lib/extract-ingredients";
 
 function obfFullImage(url: string | null | undefined): string | null {
@@ -247,7 +247,7 @@ async function getOrCreateUser(clerkId: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const { type, query, ingredients, url, productId, profileConcerns = [] } = await req.json();
+  const { type, query, ingredients, url, productId, profileConcerns = [], skinTypes = [], climates = [] } = await req.json();
   const profileConcernsSet = new Set(profileConcerns as string[]);
 
   let rawIngredients = "";
@@ -508,48 +508,18 @@ export async function POST(req: NextRequest) {
     // Enrich communityVariants with images and concern counts
     if (communityVariants?.length) {
       const variantIds = communityVariants.map((v) => v.id);
-      const variantTypeMap = new Map(communityVariants.map((v) => [v.id, v.type ?? ""]));
-      const RINSE_OFF_TYPES_FALLBACK = new Set([
-        "Face Wash", "Cleanser", "Micellar Cleanser", "Micellar Water", "Cleansing Balm",
-        "Makeup Remover", "Body Wash", "Hand Wash", "Shampoo", "Conditioner", "Hair Mask",
-        "Face Mask", "Scalp Scrub", "Exfoliating Scrub", "Facial Scrub", "Body Scrub",
-        "Exfoliant", "Clay Mask", "Rinse-Off Mask",
-      ]);
-      const RINSE_OFF_SUPPRESS = new Set(["pore-clogger", "occlusive", "bacteria-trap"]);
-      const [{ data: variantData }, { data: allFlagged }, { data: flaggedLinks }] = await Promise.all([
+      const [{ data: variantData }, { data: allIngredientsDb }] = await Promise.all([
         supabase.from("products").select("id, image_url, ingredient_list").in("id", variantIds),
-        supabase.from("ingredients").select("id, flagged_category").eq("status", "flagged"),
-        supabase.from("product_ingredients").select("product_id, ingredient_id").in("product_id", variantIds),
+        supabase.from("ingredients").select("id, name, inci_name, status, flagged_category, structural_category"),
       ]);
-      const allFlaggedMap = new Map((allFlagged ?? []).map((i) => [i.id, i.flagged_category as string | null]));
-      const dbFlaggedCounts = new Map<string, number>();
-      const variantUniversalCounts = new Map<string, number>();
-      const variantProfileCounts = new Map<string, number>();
-      for (const link of flaggedLinks ?? []) {
-        const ingCat = allFlaggedMap.get(link.ingredient_id ?? "");
-        if (ingCat === undefined) continue;
-        const variantType = variantTypeMap.get(link.product_id) ?? "";
-        if (RINSE_OFF_TYPES_FALLBACK.has(variantType) && ingCat !== null && RINSE_OFF_SUPPRESS.has(ingCat)) continue;
-        dbFlaggedCounts.set(link.product_id, (dbFlaggedCounts.get(link.product_id) ?? 0) + 1);
-        if (ingCat && UNIVERSAL_CONCERN_SET.has(ingCat))
-          variantUniversalCounts.set(link.product_id, (variantUniversalCounts.get(link.product_id) ?? 0) + 1);
-        if (ingCat && profileConcernsSet.has(ingCat))
-          variantProfileCounts.set(link.product_id, (variantProfileCounts.get(link.product_id) ?? 0) + 1);
-      }
+      const allIngredients = (allIngredientsDb ?? []) as import("@/lib/compute-concerns").IngredientRow[];
       const listMap = new Map((variantData ?? []).map((p) => [p.id, { list: p.ingredient_list as string | null, image_url: p.image_url as string | null }]));
       communityVariants = communityVariants.map((v) => {
         const entry = listMap.get(v.id);
         const list = entry?.list ?? null;
-        const dbCount = dbFlaggedCounts.get(v.id) ?? 0;
-        return {
-          ...v,
-          image_url: entry?.image_url ?? null,
-          flaggedCount: dbCount + (list ? countComedogenicPatternMatches(list) : 0),
-          sensoryCount: list ? countSensoryPatternMatches(list) : 0,
-          photoCount: list ? countPhotoPatternMatches(list) : 0,
-          universalConcernCount: variantUniversalCounts.get(v.id) ?? 0,
-          profileMatchedCount: profileConcernsSet.size > 0 ? (variantProfileCounts.get(v.id) ?? 0) : undefined,
-        };
+        if (!list) return { ...v, image_url: entry?.image_url ?? null };
+        const counts = computeProductConcerns(list, allIngredients, profileConcernsSet, skinTypes as string[], climates as string[], v.type);
+        return { ...v, image_url: entry?.image_url ?? null, ...counts };
       });
     }
 

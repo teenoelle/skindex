@@ -91,14 +91,18 @@ export default function ListDetailPage() {
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    // Read skin profile from localStorage to pass concern categories to API
+    // Read skin profile from localStorage to pass to API for concern classification
     // Mirrors profileMatchedCategories() in Scanner.tsx — keep in sync
     let concerns: string[] = [];
+    let skinTypesArr: string[] = [];
+    let climatesArr: string[] = [];
     try {
       const skinTypes = new Set<string>(JSON.parse(localStorage.getItem("skindex:skinTypes") ?? "[]"));
       const climates = new Set<string>(JSON.parse(localStorage.getItem("skindex:climates") ?? "[]"));
       if (skinTypes.size > 0 || climates.size > 0) {
         setHasProfile(true);
+        skinTypesArr = Array.from(skinTypes);
+        climatesArr = Array.from(climates);
         const cats = new Set<string>();
         if (skinTypes.has("acne_prone") || skinTypes.has("oily") || skinTypes.has("fungal_acne") || skinTypes.has("body_acne") || skinTypes.has("keratosis_pilaris"))
           ["pore-clogger", "occlusive", "bacteria-trap"].forEach(c => cats.add(c));
@@ -116,9 +120,12 @@ export default function ListDetailPage() {
       // ignore localStorage errors
     }
 
-    const url = concerns.length > 0
-      ? `/api/lists/${id}?concerns=${encodeURIComponent(concerns.join(","))}`
-      : `/api/lists/${id}`;
+    const params = new URLSearchParams();
+    if (concerns.length > 0) params.set("concerns", concerns.join(","));
+    if (skinTypesArr.length > 0) params.set("skinTypes", skinTypesArr.join(","));
+    if (climatesArr.length > 0) params.set("climates", climatesArr.join(","));
+    const qs = params.toString();
+    const url = qs ? `/api/lists/${id}?${qs}` : `/api/lists/${id}`;
 
     fetch(url)
       .then((r) => {

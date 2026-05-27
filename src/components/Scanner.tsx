@@ -1096,12 +1096,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     const activeTab = override?.tab ?? tab;
     const activeQuery = override?.query ?? query;
     const profileConcerns = profileMatchedCategories(activeSkinTypes, activeClimates);
+    const skinTypes = [...activeSkinTypes];
+    const climates = [...activeClimates];
     const body =
       activeTab === "search"
-        ? { type: "search", query: activeQuery, profileConcerns }
+        ? { type: "search", query: activeQuery, profileConcerns, skinTypes, climates }
         : activeTab === "paste"
-        ? { type: "paste", ingredients, profileConcerns }
-        : { type: "url", url: importUrls.split("\n").map((l) => l.trim()).filter(Boolean)[0] ?? "", profileConcerns };
+        ? { type: "paste", ingredients, profileConcerns, skinTypes, climates }
+        : { type: "url", url: importUrls.split("\n").map((l) => l.trim()).filter(Boolean)[0] ?? "", profileConcerns, skinTypes, climates };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let data: any = {};
@@ -1255,9 +1257,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setSuggestLinkError(null);
 
     const profileConcerns = profileMatchedCategories(activeSkinTypes, activeClimates);
+    const skinTypes = [...activeSkinTypes];
+    const climates = [...activeClimates];
     const body = opts.productId
-      ? { type: "search", query, productId: opts.productId, profileConcerns }
-      : { type: "paste", ingredients: opts.pasteIngredients, profileConcerns };
+      ? { type: "search", query, productId: opts.productId, profileConcerns, skinTypes, climates }
+      : { type: "paste", ingredients: opts.pasteIngredients, profileConcerns, skinTypes, climates };
 
     const res = await fetch("/api/scan", {
       method: "POST",
@@ -1312,7 +1316,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     const res = await fetch("/api/alternatives", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ flaggedIds, productType: result.product?.type ?? null, profileConcerns }),
+      body: JSON.stringify({ flaggedIds, productType: result.product?.type ?? null, profileConcerns, skinTypes: [...activeSkinTypes], climates: [...activeClimates] }),
     });
     const data = await res.json();
     setAlternatives(data.results ?? []);
@@ -3165,6 +3169,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             if (hasProfile) {
               let universalCount = 0;
               let profileMatchedCount = 0;
+              let nonMatchingCount = 0;
               for (const item of result.originalItems) {
                 const m = getItemMatch(item, result.safe, result.flagged);
                 const si = (result.sensoryTrigger ?? []).find(s => normalizeForMatch(s.rawName) === normalizeForMatch(item)) ?? null;
@@ -3172,12 +3177,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 const lv = getIngredientConcernLevel(m, si, pi, activeSkinTypes, activeClimates);
                 if (lv === "universal") universalCount++;
                 else if (lv === "profile-matched") profileMatchedCount++;
+                else if (lv === "non-matching") nonMatchingCount++;
               }
               return (
                 <p className="text-xs -mt-2">
                   <span className="text-gray-700">{totalItems} ingredient{totalItems !== 1 ? "s" : ""} scanned</span>
                   {universalCount > 0 && <>{" · "}<button type="button" className="text-rose-700 font-medium hover:underline underline-offset-2" onClick={scrollToConcern}>{universalCount} universal concern{universalCount !== 1 ? "s" : ""}</button></>}
                   {profileMatchedCount > 0 && <>{" · "}<button type="button" className="text-amber-700 font-medium hover:underline underline-offset-2" onClick={scrollToConcern}>{profileMatchedCount} profile concern{profileMatchedCount !== 1 ? "s" : ""}</button></>}
+                  {nonMatchingCount > 0 && <>{" · "}<button type="button" className="text-yellow-700 font-medium hover:underline underline-offset-2" onClick={scrollToConcern}>{nonMatchingCount} other concern{nonMatchingCount !== 1 ? "s" : ""}</button></>}
                   {" · "}
                   <button type="button" className="text-teal-700 hover:underline underline-offset-2" onClick={scrollToConcern}>{result.safe.length} neutral</button>
                   {result.unreviewed.length > 0 && <>{" · "}<button type="button" className="text-gray-400 hover:underline underline-offset-2" onClick={() => { setShowUnreviewed(true); requestAnimationFrame(() => { document.getElementById("section-unreviewed")?.scrollIntoView({ behavior: "smooth", block: "start" }); }); }}>{result.unreviewed.length} unreviewed</button></>}
