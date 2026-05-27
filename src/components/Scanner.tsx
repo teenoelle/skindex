@@ -203,13 +203,15 @@ const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
   { label: "Face", types: ["Concentrate", "Exfoliant", "Eye Cream", "Eye Primer", "Face Mask", "Face Wash", "Makeup Remover", "Mist", "Moisturizer", "Oil", "Ointment", "Primer", "Serum", "Sleeping Mask", "Spot Patches", "Sun Screen", "Toner"].sort() },
   { label: "Makeup", types: ["BB Cream", "Blush", "Brow Gel", "CC Cream", "Concealer", "Eyeliner", "Eyeshadow", "Foundation", "Mascara", "Setting Spray"].sort() },
   { label: "Lips", types: ["Lip Balm", "Lip Treatment"] },
-  { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream", "Hand Cream"].sort() },
+  { label: "Hands", types: ["Dish Soap", "Hand Cream", "Hand Sanitizer"].sort() },
+  { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream"].sort() },
   { label: "Hair", types: ["Conditioner", "Hair Styler", "Hair Treatment", "Scalp Treatment", "Shampoo"].sort() },
+  { label: "Home", types: ["Fabric Softener", "Laundry Detergent"].sort() },
 ];
 
 const RINSE_OFF_TYPES = new Set([
   "Face Wash", "Cleanser", "Micellar Cleanser", "Micellar Water",
-  "Body Wash", "Hand Wash", "Makeup Remover",
+  "Body Wash", "Hand Wash", "Dish Soap", "Makeup Remover",
   "Shampoo", "Conditioner", "Hair Mask",
   "Scalp Scrub", "Exfoliating Scrub", "Facial Scrub", "Body Scrub",
   "Clay Mask", "Rinse-Off Mask",
@@ -2121,7 +2123,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <div className="flex flex-wrap gap-1.5">
                     {DIET_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-emerald-700 text-white border-emerald-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
                         <button type="button" onClick={() => setDietHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
                       </span>
                     ))}
@@ -2135,18 +2137,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 </div>
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
                   <div className="space-y-1.5 pt-1">
-                    {[...activeSkinTypes].map((t) => (
-                      <p key={t} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{SKIN_TYPE_NOTES[t]}</p>
-                    ))}
-                    {[...activeClimates].map((c) => (
-                      <p key={c} className={`text-xs rounded-lg px-2.5 py-1.5 leading-relaxed border ${climateNoteStyle(c)}`}>{CLIMATE_NOTES[c]}</p>
-                    ))}
                     {(() => {
                       const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
                       const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
                       const allWarns = [...suppWarns, ...dietWarns];
                       return allWarns.length > 0 ? (
-                        <div className="space-y-1.5 pt-0.5">
+                        <div className="space-y-1.5">
                           {allWarns.map((w, i) => (
                             <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : w.type === "caution" ? "border-orange-200 bg-orange-50" : "border-teal-100 bg-teal-50"}`}>
                               <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-orange-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
@@ -2154,12 +2150,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             </div>
                           ))}
                         </div>
-                      ) : null;
-                    })()}
-                    {(() => {
-                      const watches = profileWatchCategories(activeSkinTypes, activeClimates);
-                      return watches.length > 0 ? (
-                        <p className="text-xs text-gray-400 pt-0.5">Flags: {watches.join(" · ")}.</p>
                       ) : null;
                     })()}
                     {(() => {
@@ -2171,24 +2161,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         </div>
                       ) : null;
                     })()}
-                    <p className="text-xs text-gray-400">Matching profile notes replace the generic explanation when you expand each ingredient.</p>
                   </div>
                 )}
               </div>
             )}
-          </section>
-
-          {/* Ingredient lists — manage in My Lists */}
-          <section className="mb-6">
-            <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full">
-              Ingredient lists
-              {ingredientLists.some(l => l.items.length > 0) && (
-                <span className="text-gray-500 font-medium normal-case tracking-normal">
-                  {ingredientLists.filter(l => l.items.length > 0).length} active
-                </span>
-              )}
-              <a href="/lists" className="ml-auto text-[10px] font-normal normal-case tracking-normal text-gray-400 hover:text-gray-700 underline underline-offset-2">Manage in My Lists →</a>
-            </div>
           </section>
 
           {browseLoading && !browseSelectedType && (
@@ -2218,7 +2194,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
             <div className="space-y-5">
               {(() => {
-                const AREA_ORDER = ["Face", "Makeup", "Lip", "Hands", "Nails", "Hair", "Body"];
+                const AREA_ORDER = ["Face", "Makeup", "Lip", "Hands", "Nails", "Hair", "Body", "Home"];
                 const grouped = new Map<string, BrowseType[]>();
                 const ungrouped: BrowseType[] = [];
                 for (const t of browseTypes) {
@@ -3528,7 +3504,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <div className="flex flex-wrap gap-1.5">
                     {DIET_TYPES.map(({ value, label }) => (
                       <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-emerald-700 text-white border-emerald-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
                         <button type="button" onClick={() => setDietHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
                       </span>
                     ))}
@@ -3542,18 +3518,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 </div>
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
                   <div className="space-y-1.5 pt-1">
-                    {[...activeSkinTypes].map((t) => (
-                      <p key={t} className="text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed border border-gray-100">{SKIN_TYPE_NOTES[t]}</p>
-                    ))}
-                    {[...activeClimates].map((c) => (
-                      <p key={c} className={`text-xs rounded-lg px-2.5 py-1.5 leading-relaxed border ${climateNoteStyle(c)}`}>{CLIMATE_NOTES[c]}</p>
-                    ))}
                     {(() => {
                       const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
                       const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
                       const allWarns = [...suppWarns, ...dietWarns];
                       return allWarns.length > 0 ? (
-                        <div className="space-y-1.5 pt-0.5">
+                        <div className="space-y-1.5">
                           {allWarns.map((w, i) => (
                             <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-200 bg-amber-50" : w.type === "caution" ? "border-orange-200 bg-orange-50" : "border-teal-100 bg-teal-50"}`}>
                               <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-orange-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
@@ -3561,12 +3531,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             </div>
                           ))}
                         </div>
-                      ) : null;
-                    })()}
-                    {(() => {
-                      const watches = profileWatchCategories(activeSkinTypes, activeClimates);
-                      return watches.length > 0 ? (
-                        <p className="text-xs text-gray-400 pt-0.5">Flags: {watches.join(" · ")}.</p>
                       ) : null;
                     })()}
                     {(() => {
@@ -3578,24 +3542,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         </div>
                       ) : null;
                     })()}
-                    <p className="text-xs text-gray-400">Matching profile notes replace the generic explanation when you expand each ingredient.</p>
                   </div>
                 )}
               </div>
             )}
-          </section>
-
-          {/* Ingredient lists — manage in My Lists */}
-          <section className="mb-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full">
-              Ingredient lists
-              {ingredientLists.some(l => l.items.length > 0) && (
-                <span className="text-gray-500 font-medium normal-case tracking-normal">
-                  {ingredientLists.filter(l => l.items.length > 0).length} active
-                </span>
-              )}
-              <a href="/lists" className="ml-auto text-[10px] font-normal normal-case tracking-normal text-gray-400 hover:text-gray-700 underline underline-offset-2">Manage in My Lists →</a>
-            </div>
           </section>
 
           {/* Ingredients parent section */}

@@ -25866,6 +25866,23 @@ ingredient-based product filtering - let's try the user's ingredient lists, the 
 
 
 
+● Done. Here's what shipped in bd8122f:
+
+  Photo-safe filter — toggle chip in browse product list that hides any  product with photoCount > 0 (pattern-matched photosensitive ingredients  like retinoids, AHAs, photobotanicals).
+
+  Profile-safe filter — toggle chip that only appears when a skin profile  is active. Hides products with DB-flagged ingredients in your profile's  concern categories (pore-cloggers for acne-prone, sensitizers for  reactive, chemical sunscreens for rosacea/lupus, etc.). The browse API  now runs a second query with your concern categories when fetching.
+
+  Ingredient lists — collapsible "Ingredient lists" section in the profile   panel (both idle and results views):
+  - Create named Avoid (rose) or Want (teal) lists
+  - Add ingredients by typing → enter; remove with ×; delete whole list
+  - Saved to localStorage (persists across sessions on same device)
+  - Avoid lists: hide browse products containing any listed ingredient
+  - Want lists: only show browse products that contain at least one item from every active want list
+  - Active lists show as filter chips in browse with names
+  - In scan results: ingredients on your avoid lists get a rose background and ⊗ marker in the full ingredient paragraph
+
+  The filter bar in browse shows a count ("4 of 22") when any filters
+  reduce the product set.
 
 
 
@@ -25878,50 +25895,2669 @@ ingredient-based product filtering - let's try the user's ingredient lists, the 
 
 
 
-> run the apply-classifier script to sync the db
 
-before we run the db sync scripts, let's discuss how will the product lists on the site (e.g. browse, did you mean, safer alternatives, other if relevant) show updated info that take into consideration the recent updates to the info on the product pages? what ideas do you have here? what ideas do you have to display it? what questions do you have?
+product list displays - what ideas do you have to update the number of ingredients scanned line and product list display that take into consideration the recent updates? currently the product lists (did you mean, safer alternatives, browse) show the old flags. 
 
-> run the apply-classifier script to sync the db
+other concerns - why does dimethicone show up as other concerns if i have acne-prone, oily, hot, and humid selected in my skin profile? does this happen for other ingredients?
+
+neutral - what ingredients in the db are currently listed as neutral but may in fact be a concern for my skin profile (oily, reactive, damaged barrier, acne-prone, hyperpigmentation, fungal acne, seborrheic, psoriasis, lupus rash, humid, hot, high uv, hard / mineral, chlorinated, iron/rust)? 
+
+ingredient lists - to add ingredients to ingredient lists, what are more user friendly ways for the user to do this? what ideas do you have for locations for the search products filter we talked about? instead of avoid/want lists what do you think about avoid/try lists? 
+
+routine - what alternative ideas do you have for the location of routine context in results? how do we feel about side bars? 
 
 
 
-what ideas do you have for allowing users to submit pictures of their skin so that the site can help determine their skin profiles?
+
+
+
+● I have a complete picture now. Let me address each
+  topic in turn.
+
+  ---
+  Product list display — "ingredients scanned" line +   card flags
+
+  What's stale: The cards (browse, did-you-mean,
+  alternatives) show raw flaggedCount / sensoryCount /
+   photoCount badges with no awareness of skin
+  profile. The "ingredients scanned" summary line
+  similarly has no profile-aware count.
+
+  Ideas for the summary line:
+  - Option A — Add a profile count: append · X for
+  your profile using the already-rendered
+  groups["profile-matched"].length +
+  groups.universal.length from the by-concern section.
+   The number already exists, it just isn't surfaced
+  at the top.
+  - Option B — Replace the breakdown entirely: {total}
+   scanned · {X profile matches} · {Y total concerns}
+  — collapses the four separate counts into two that
+  matter more.
+  - Option C — Qualitative label: "Moderate concern
+  for oily skin" based on profile match ratio. More
+  readable, less precise.
+
+  Ideas for product list cards:
+  - Option A — "For you" badge: when profile is
+  active, show an amber X concern for you badge (using
+   profile-matched count), with the raw flagged count
+  smaller/secondary. profileFlaggedCount already
+  exists on BrowseProduct and is partially populated.
+  - Option B — "Safe for your profile": when total
+  flaggedCount > 0 but profileFlaggedCount = 0,
+  replace the rose badge with Safe for your profile in
+   green. Still shows what's there, but reframes it.
+  - Option C — Dim non-matching concerns: show the raw
+   badge in gray instead of rose when none of the
+  flags match the profile. The visual weight
+  communicates relevance without needing extra logic.
+
+  Option B is the most actionable for users who are
+  browsing — "does this have anything I care about?"
+  is the real question.
+
+  ---
+  Dimethicone in "Other Concerns" — confirmed bug
+
+  The cause is a one-line gap in SENSORY_PROFILE_MAP
+  (Scanner.tsx:407). Here's the full map:
+
+  Stinging, chemical-itch, Film-forming, Occlusive,
+  occlusive-itch,
+  comedogenic-itch, Cooling, Warming, Iodine ← all
+  mapped
+  Pilling ← MISSING
+  Astringent ← MISSING
+
+  Dimethicone is sensory_category: "Pilling". The
+  profile check finds no match → returns
+  "non-matching" → "Other Concerns." This happens for
+  every Pilling-category ingredient (dimethicone,
+  acrylates copolymer, PVP) and every Astringent
+  ingredient (witch hazel).
+
+  Note that hot and humid don't help here even though
+  they should logically flag silicones — the
+  SENSORY_PROFILE_MAP only maps to skin types, not
+  climates. The climate check for silicones lives in
+  profileWatchCategories() (which feeds the profile
+  panel's "Flags" text) but not in the concern
+  classifier.
+
+  The fix: Add both to the map:
+  - "Pilling": ["reactive", "acne_prone",
+  "damaged_barrier"] — pilling causes rubbing/picking,
+   which damages the barrier and spreads bacteria
+  - "Astringent": ["reactive", "dry",
+  "damaged_barrier", "eczema"]
+
+  And optionally extend classifyConcernLevel to check
+  climates for Pilling (since profileWatchCategories
+  already names Silicones for hot/humid). Want me to
+  make both changes?
+
+  ---
+  Neutral ingredients that may be concerns for your
+  profile
+
+  Without running a DB query I can characterize the
+  coverage gaps by category. These are ingredient
+  types that are currently status = 'safe' with no
+  sensory or photo flag, but where your profile
+  dimensions create real risk:
+
+  Category: Polysorbate emulsifiers
+  Ingredients: Polysorbate 20/60/80, PEG esters,
+    sorbitan esters
+  Your relevant dimensions: Fungal acne, seborrheic —
+    Malassezia food
+  ────────────────────────────────────────
+  Category: Fatty acid esters (emollients)
+  Ingredients: C12-15 alkyl benzoate, cetearyl
+  olivate,
+    isopropyl isostearate
+  Your relevant dimensions: Fungal acne, acne-prone
+  ────────────────────────────────────────
+  Category: Oleic-acid-rich plant oils
+  Ingredients: Olive oil, argan oil, avocado oil
+  Your relevant dimensions: Fungal acne, seborrheic
+  ────────────────────────────────────────
+  Category: Chemical sunscreens
+  Ingredients: Oxybenzone, octinoxate, avobenzone,
+    octocrylene
+  Your relevant dimensions: Reactive, lupus rash
+  ────────────────────────────────────────
+  Category: High-pH cleansing agents
+  Ingredients: Triethanolamine, sodium hydroxide (in
+    cleansers)
+  Your relevant dimensions: Hard water compounds
+    alkalinity issue
+  ────────────────────────────────────────
+  Category: Chelating agents
+  Ingredients: Tetrasodium EDTA, phytic acid
+  Your relevant dimensions: Currently neutral but
+    beneficial for hard/chlorinated/iron water  —
+    should show as a positive flag
+  ────────────────────────────────────────
+  Category: Non-cyclic silicones (non-dimethicone)
+  Ingredients: Cyclohexasiloxane, amodimethicone
+  Your relevant dimensions: Hot/humid — not in any
+    sensory pattern
+  ────────────────────────────────────────
+  Category: Film-formers
+  Ingredients: Hydroxypropyl cellulose, some gums
+  Your relevant dimensions: Hot/humid, acne-prone —
+  but
+    most are in SENSORY_PATTERNS already
+
+  To check this precisely, I'd query Supabase for
+  ingredients where status = 'safe' and
+  skin_climate_notes contains a caution or
+  strong_caution note for any of your profile
+  dimensions. I can run that query against the DB if
+  you want.
+
+  ---
+  Adding ingredients to lists — user-friendly ideas
+
+  Current state: Plain text input per list, manual
+  typing only.
+
+  Ranked ideas:
+
+  1. "Add to list" button inline in scan results — the
+   most frictionless: a small + button on each
+  ingredient row in the by-concern section, opening a
+  tiny dropdown to pick which list. User is already
+  looking at the ingredient.
+  2. Autocomplete that searches the DB — replace the
+  free-text "Add ingredient…" input with a typeahead
+  that searches ingredient names. Reduces typos and
+  ensures a match.
+  3. "Add all flagged" bulk action — after scanning, a
+   button: "Add all flagged to avoid list." Creates a
+  list from the scan result in one tap. Useful after
+  finding a product you want to avoid.
+  4. Template presets — "Start from a preset" when
+  creating a new list: Malassezia-safe, Reactive skin
+  avoid, Fragrance-free essentials. Pre-populated and
+  editable.
+  5. Paste a list — allow pasting comma-separated
+  ingredient names and selecting which ones to add.
+  Good for dermatologist-provided lists.
+
+  Search products filter location:
+  - Best option: A search input at the top of the
+  browse product list (after type selection), sitting
+  above the existing filter chips. Filters by product
+  name/brand inline without leaving the page.
+  - Alternative: Integrate it into the existing sticky
+   header search — when the browse tab is active, the
+  sticky search filters browse results instead of
+  scanning. Reuses existing UI.
+
+  ---
+  Routine context in results — location ideas
+
+  The cross-product routine warnings (conflicts like
+  retinoid + exfoliant across products) currently live
+   below the formula warnings section.
+
+  Alternative placements:
+  1. Summary line — add a · X routine conflict link
+  inline with the existing "X flagged · X sensory"
+  line. Cheap to add, immediately visible, scrolls to
+  the routine section.
+  2. Top of results, collapsible banner — a compact
+  warning banner below the product header: "Routine
+  conflict with Retinol Serum → see details." Only
+  appears when there are conflicts. Collapses to
+  nothing when clear.
+  3. Within the product header card — a small "⚠
+  routine conflict" pill under the product name.
+  4. Inside the profile panel — add a "Your routine"
+  subsection alongside skin types. Keeps all "your
+  context" together.
+
+  On sidebars: Honest take — this app's primary
+  audience is on phones. A persistent right sidebar
+  requires widening the container beyond max-w-2xl and
+   adds complexity for users who need it least. A
+  collapsible slide-in drawer (like the current
+  profile panel) gives you the same always-accessible
+  benefit without committing to a two-column layout.
+  Worth considering before a sidebar.
+
+  ---
+  The most immediately fixable is the dimethicone
+  "Other Concerns" bug — two lines in
+  SENSORY_PROFILE_MAP. Want me to make that change
+  now? And do you want me to run the Supabase query to
+   list neutral ingredients with caution notes for
+  your profile?
+
+
+
+
+
+
+
+
+ideas for the summary line - let's try options b and c.
+
+ideas for product list cards - let's try options a, b, and c.
+
+dimethicone and other concerns bug - let's try the fix you recommended. yes make both changes.
+
+neutral ingredients that may be concerns by profile - yes let's run the query and see what fixes we can make.
+
+adding ingredients to lists - let's go with ideas 1, 2, 3, 5.
+
+
+
+
+
+
+● Everything compiled clean and the DB populated 86
+  ingredients (including all 32 polysorbates/sorbitan
+  esters). Let me give you the full summary of what
+  was done:
+
+  ---
+  What's done
+
+  Bug fix — dimethicone and Other Concerns
+  Added "Pilling": ["reactive", "acne_prone",
+  "damaged_barrier"] and "Astringent": ["reactive",
+  "dry", "damaged_barrier", "eczema"] to
+  SENSORY_PROFILE_MAP. Also added a climate check: hot
+   or humid climate now promotes Pilling-category
+  ingredients to "Your Profile" as well. Dimethicone,
+  acrylates/PVP, and witch hazel will no longer
+  misroute to "Other Concerns" when those profile
+  types are active.
+
+  Summary line (B+C combined)
+  When a profile is active, the summary line now
+  reads: {n} scanned · [Low/Some/High concern] for
+  your profile · {X} of {Y} concerns match · {n} safe.
+   When no profile, the existing breakdown remains.
+
+  Browse card badges (A+B+C)
+  - Profile active + profileFlaggedCount > 0 → amber X
+   for you badge + gray total
+  - Profile active + profileFlaggedCount = 0 but
+  concerns exist → green Safe for your profile + gray
+  secondary counts
+  - Profile active + no profile info available →
+  badges shown in gray (option C)
+  - No profile → original rose/amber/yellow badges
+
+  Inline "Add to list" button in scan results
+  Every ingredient row in the By Concern section now
+  has a small + button on the right. Tapping it opens
+  a tiny dropdown of your ingredient lists. Clicking a
+   list adds the ingredient immediately with a
+  checkmark if already there.
+
+  "Save all flagged to avoid list"
+  A small link below the summary line (when flagged
+  ingredients exist and avoid lists exist). Expands to
+   a list picker → Add all button.
+
+  Paste multiple
+  Each ingredient list now has a + Paste multiple link
+   below the text input. Opens a 3-line textarea,
+  accepts comma or newline-separated names, adds them
+  all at once.
+
+  sensory.ts — more wax patterns
+  Added microcrystalline wax, ozokerite, synthetic
+  beeswax, synthetic wax, euphorbia cerifera wax, and
+  helianthus annuus seed wax as Occlusive sensory
+  triggers. These will now appear in "Your Profile"
+  for oily/acne-prone/hot/humid skin instead of being
+  invisible in the neutral section.
+
+  DB — 86 ingredients updated
+  All 32 polysorbates and sorbitan esters now have
+  Malassezia caution notes for fungal_acne and
+  seborrheic profile types. The rule was already in
+  curated-explanation.ts — the populate script just
+  hadn't run since those ingredients were seeded. Also
+   picked up other emulsifier variants (polyglyceryl-,
+   sucrose esters, etc.).
+
+  ---
+  Not yet implemented: autocomplete (idea 2)
+  This needs a new API route
+  (/api/ingredients/search?q=...) plus suggestion
+  state and keyboard nav in the input. It's doable but
+   a separate piece of work — want me to build that
+  next?
+
+
+
+
+
+
+
+
+
+ tell me more about the autocomplete idea you're  talking about - is it free?
+
+search products filter location - let's go with bost the best option and the alternative. do you have any questions?
+
+routine - what ideas do you have to make routine more useful?
+
+routine context in results locations - what about a collapsible side panel? how might this work on mobile?
+
+skin profile - currently the note for oily looks like "Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself." but what happens if someone with my skin profile (damaged barrier, acne prone, oily, seborrheic, fungal acne, lupus rash, reactive) washes their face with hard water and doesn't add any products afterward, either within the minutes after washing or after? would my own facial bacteria enter my open pores and make my skin even worse? is there a note for things like this on the site?
+
+
+
+
+
+
+
+
+● A lot here — let me take each one.
+
+  ---
+  Autocomplete — is it free?
+
+  Yes, completely free. It would query the ingredients   table already in your Supabase database — a simple
+  name ILIKE '%query%' LIMIT 10 call. No API costs, no
+   third-party service. The only cost is engineering
+  time. I'd create one small API route
+  (/api/ingredients/search?q=...) and add suggestion
+  state to the input field in the ingredient list
+  editor.
+
+  ---
+  Search products filter — both locations, no
+  questions
+
+  No questions from me — straightforward to implement
+  both:
+
+  1. After type selection, above the filter chips: a
+  compact text input that filters the visible product
+  list by name/brand in real time, client-side (no
+  extra API calls since the products are already
+  loaded)
+  2. Sticky header integration: when the browse tab is
+   active, the existing sticky search re-purposes to
+  filter browse results instead of triggering a scan;
+  when search/paste/url tab is active, it scans as
+  normal
+
+  Ready to build whenever you say.
+
+  ---
+  Routine — ideas to make it more useful
+
+  The current routine tracks products and
+  cross-product warnings. Here's what could make it
+  significantly more useful:
+
+  Ordering and structure
+  - AM/PM split — tag products as morning or evening
+  when adding them; show two ordered sequences. The
+  step_tags already know which products need to go
+  last (spf-last, seal-last) or first (acid-step)
+  - Visual layer order — show products as a vertical
+  stack in apply-order, derived from step_tags +
+  product type, with drag-to-reorder
+
+  Conflict and compatibility
+  - "Scan before adding" prompt — when adding a
+  product to routine, if it hasn't been scanned yet,
+  prompt to scan it so cross-product warnings can run
+  - Cumulative sensitizer count — already partially
+  done (3+ sensitizers warning), but could show a
+  running total across the whole routine
+  - Duplicate ingredient flagging — "You already have
+  3 products with niacinamide; overuse can cause
+  flushing"
+
+  Profile-aware suggestions
+  - Routine gap detector — based on your profile, flag
+   missing steps: "No chelating cleanser in your
+  routine (hard water profile)" or "No SPF in your AM
+  routine (lupus rash, high UV)"
+  - Water quality step — suggest where a vitamin C
+  toner fits if you have chlorinated or iron water
+  - Routine climate note — if your climate changes
+  (e.g., you switch from dry to humid), flag which
+  routine products are now less appropriate
+
+  Practical
+  - Named routine slots — save separate named routines
+   (AM / PM / Travel / Flare days) rather than one
+  flat list
+  - "Add current product" shortcut — after scanning,
+  one tap adds to routine instead of having to
+  navigate to the routine panel
+
+  ---
+  Routine context in results — collapsible side panel
+
+  On desktop (md+ / ≥768px):
+  A slide-in panel from the right works well. The
+  implementation would expand the Scanner container
+  from max-w-2xl to max-w-4xl on wider screens, then
+  split into two columns: ~2/3 for the scan results
+  and ~1/3 for the routine panel. The panel collapses
+  to a thin tab strip (Routine ›) that the user can
+  click to open. When open, it shows: routine products
+   in layer order, any cross-product conflicts
+  highlighted, the current product's suggested
+  position in the stack.
+
+  On mobile:
+  A side panel doesn't translate to a narrow screen —
+  the column split would be unreadably narrow.
+  Instead, the mobile version would be a bottom sheet:
+   a persistent pill/handle at the very bottom of the
+  screen (like a mini-tab bar, Routine ▴ 3 products).
+  Tapping it slides up a half-screen drawer using
+  transform: translateY. The content is the same as
+  the desktop panel. Tapping the handle again or
+  swiping down dismisses it. This is a
+  well-established mobile pattern (Google Maps,
+  Airbnb, iOS Sheet).
+
+  The key design decision: should the bottom sheet be
+  triggered only when there are routine conflicts with
+   the current scan, or always? I'd suggest always
+  showing the pill when routineProducts.length > 0,
+  but coloring it amber when there's a conflict —
+  otherwise it stays gray and low-attention.
+
+  ---
+  Skin profile — washing with hard water and applying
+  nothing
+
+  The biological sequence is more specific than what
+  the current note captures, so let me walk through
+  it:
+
+  What actually happens:
+  1. Hard water (pH 7–9) washes away the skin's
+  surface lipid film and temporarily raises skin
+  surface pH from its normal ~4.5–5.5 to ~6.5–7
+  2. The acid mantle — the thin acidic film that
+  controls microbial balance and holds the stratum
+  corneum together — is now disrupted
+  3. Sebum starts returning almost immediately on oily
+   skin; the follicles are never actually empty, but
+  the surface pool is gone
+  4. The acid mantle doesn't fully reconstitute for
+  20–30 minutes, longer on damaged skin
+
+  During that window for your profile specifically:
+
+  - Malassezia (seborrheic, fungal acne): loves the
+  combination of warm temperature + incoming fresh
+  sebum + elevated pH. The acid mantle normally
+  inhibits it; without it, Malassezia recolonizes
+  aggressively on the fresh lipid surface. This is the
+   highest-risk window for Malassezia-driven
+  conditions
+  - Oily + damaged barrier: TEWL accelerates fast
+  because there's no surface lipid film AND the
+  stratum corneum is already compromised. The itch in
+  this window isn't just sensation — it's early-stage
+  barrier stress
+  - C. acnes (acne-prone): doesn't really "enter from
+  outside" — it lives in follicles already. But the
+  elevated pH reduces the antimicrobial activity of
+  free fatty acids that normally keep C. acnes in
+  check, so the existing population gets an unfettered
+   growth window
+  - Lupus rash: without anything protective on the
+  skin, the UV-sensitized barrier is now maximally
+  vulnerable. Even brief indoor light through a window
+   carries more risk than usual
+  - Reactive: the temporarily elevated pH and stripped
+   barrier makes the skin nonspecifically reactive to
+  anything touching it — hands, air, hair, pillow
+
+  The short answer to your question: Your own bacteria
+   don't exactly "enter" pores — they're already
+  resident in the follicles. What happens is that the
+  ecological balance shifts when the acid mantle is
+  down: bacteria and yeast that are normally
+  controlled grow faster. For Malassezia specifically
+  (which drives your fungal acne and seborrheic), the
+  post-wash window with no product is one of the worst
+   microbial moments of the day.
+
+  Does the site have a note about this? The hard_water
+   climate note mentions following quickly with a
+  low-pH toner, and the oily skin note mentions the
+  post-wash window. But there's no combined note that
+  addresses what this window means specifically when
+  you have all of: hard water + damaged barrier + oily
+   + Malassezia-prone. The current notes are
+  single-axis — they don't combine.
+
+  This points to a real gap: a "post-wash protocol"
+  note that's profile-aware. Something like:
+
+  ▎ "With a damaged barrier and Malassezia-prone skin
+  ▎ in hard water: the window between washing and your
+  ▎  first product is when Malassezia recolonizes
+  ▎ fastest and barrier water loss is highest. Aim for
+  ▎  under 30 seconds — not just as good practice, but
+  ▎  as damage control. A low-pH toner applied
+  ▎ immediately after washing does two things:
+  ▎ neutralizes the alkaline hard water residue before
+  ▎  it disrupts cell-adhesion proteins, and partially
+  ▎  restores the acid mantle faster than skin can do
+  ▎ it alone."
+
+  This would live as either a special
+  combined-dimension note in the profile panel, or as
+  part of a "Post-wash protocol" section for hard
+  water profiles. The current system can't
+  auto-generate this since it's multi-axis and
+  narrative — it would be hand-authored content. Want
+  me to add it?
+
+
+
+
+
+
+
+autocomplete - yes let's build it.
+
+search products filter - great let's build it.
+
+routine - ideas to make it more useful - let's do this with all of your ideas they're great. do you have any questions? isn't there already a shortcut to add to routine in the product card?
+
+routine context in results - let's do all your ideas for desktop and mobile, they're great. 
+
+skin profile - washing with hard water and applying nothing - i like your idea for a post-wash protocol note thats profile-aware. let's add it.
+
+skin types - update "acne-prone" to "acne". does this skin type overlap with any of the others? 
+
+
+
+
+
+
+
+
+
+● Everything is in place. Here's a summary of what was   built:
+
+  ---
+  "Acne" rename — display label changed from
+  "Acne-prone" to "Acne" (value acne_prone unchanged
+  to preserve all stored data).
+
+  Autocomplete for ingredient lists — new
+  /api/ingredients/search?q= route queries Supabase
+  for matching ingredient names. Both ingredient list
+  input instances now show a dropdown with up to 10
+  suggestions as you type (200ms debounce). Click a
+  suggestion to add it directly.
+
+  Browse search filter — text input appears above the
+  filter chips when a product type is selected.
+  Filters by product name and brand, client-side.
+  Clears when you go back to "All types". Counts
+  toward the active filter count.
+
+  Routine AM/PM tagging — "Add to routine" now shows a
+   quick picker: AM / PM / Untagged. The tag can also
+  be cycled in the routine panel by clicking the
+  AM/PM/— button next to each product.
+
+  Routine side panel — desktop (md+): fixed right-side
+   drawer (width 72) that slides in from the right,
+  with a collapsed vertical tab strip "Routine" +
+  product count that sits on the right edge. Mobile:
+  floating pill at bottom showing count, taps open a
+  bottom sheet (max 65vh, slides up). The panel turns
+  amber when there are active interaction warnings.
+
+  Routine improvements — the shared
+  renderRoutinePanel() function now shows: products
+  grouped into AM/PM/Untagged sections when any are
+  tagged; total flagged ingredient count across the
+  routine; duplicate ingredient badge when a product
+  shares an ingredient with another in the routine;
+  interaction warnings; and cycle-able AM/PM tags on
+  each row.
+
+  Post-wash protocol note — appears in the skin
+  profile panel (both idle and results state) when the
+   profile includes any of oily/acne/fungal_acne/sebor
+  rheic/damaged_barrier/reactive. Adapts its message
+  based on whether hard/chlorinated/iron water is also
+   active. Styled in blue to visually distinguish it
+  from ingredient-level warnings.
+
+
+
+
+
+
+
+
+commit and push
+
+post-wash - is the post-wash protocol note that's profile-aware also body area aware? some body areas thrive in different ph. are we missing any body areas or product types? is it possible to display empty body area and body types in browse? the number products within could display as 0. the community can add more products as we go.
+
+
+
+
+
+
+
+● Now I have the full picture. Let me answer
+  everything before touching code.
+
+  ---
+  Post-wash note and body area awareness:
+
+  Not currently — the note fires based on skin profile
+   only and would appear regardless of whether you're
+  looking at a face wash or hand cream. The acid
+  mantle disruption logic is mostly face-relevant:
+
+  - Face/scalp: Acid mantle 4.5–5.5, C. acnes and
+  Malassezia recovery window applies fully
+  - Body: Similar pH but less reactive; the note is
+  partially relevant for eczema/psoriasis on body
+  - Hands: Washed so frequently the note would be
+  constant noise
+  - Lips: Different skin architecture (no stratum
+  corneum proper, no sweat glands); pH note doesn't
+  apply the same way
+
+  The note currently lives in the skin profile panel,
+  not on individual scan results, so it's not
+  product-specific at all — it's one standing note for
+   your profile. That's actually fine as a general
+  reminder. To make it body-area-aware would mean
+  surfacing it differently when you scan a face wash
+  vs. a body wash. That's a future enhancement.
+
+  Issues found in the existing setup:
+
+  1. "Lips" vs "Lip" mismatch — the DB uses 'Lips' as
+  the body_area for Lip Balm and Lip Treatment, but
+  AREA_ORDER in the code has "Lip". This means lip
+  products currently fall into the "Other" bucket
+  instead of their own section.
+  2. "Sun" is orphaned — AREA_ORDER includes "Sun" as
+  a section, but Sun Screen in the DB has body_area =
+  'Face'. No products have body_area = 'Sun', so that
+  section never renders.
+
+  Missing product types worth adding:
+
+  ┌─────────┬─────────────────────────────────────┐
+  │  Body   │               Missing               │
+  │  Area   │                                     │
+  ├─────────┼─────────────────────────────────────┤
+  │ Face    │ Cleansing Balm, Cleansing Oil,      │
+  │         │ Micellar Water, Neck Cream, Essence │
+  ├─────────┼─────────────────────────────────────┤
+  │ Body    │ Body Oil, Body Scrub, Body Serum,   │
+  │         │ Hand Sanitizer                      │
+  ├─────────┼─────────────────────────────────────┤
+  │ Hair    │ Leave-In Conditioner, Hair Oil,     │
+  │         │ Hair Mask, Hair Mist, Dry Shampoo   │
+  ├─────────┼─────────────────────────────────────┤
+  │ Makeup  │ Setting Powder, Bronzer,            │
+  │         │ Highlighter, Lip Color              │
+  ├─────────┼─────────────────────────────────────┤
+  │ Lips    │ Lip Scrub                           │
+  ├─────────┼─────────────────────────────────────┤
+  │ Nails   │ Nail Treatment, Cuticle Oil         │
+  ├─────────┼─────────────────────────────────────┤
+  │         │ Sunscreen Body, Sunscreen Lip       │
+  │ Sun     │ (currently Sun Screen is under      │
+  │         │ Face)                               │
+  └─────────┴─────────────────────────────────────┘
+
+  Missing body area: Nails/Cuticle — there's nothing
+  for nails currently.
+
+  Empty types in browse:
+
+  Yes, that's a clean idea. Right now browseTypes only
+   contains types that have at least one product (from
+   the browse API counting live products). To show all
+   types with 0-count ones, the browse API's types
+  query needs to join against product_types — or the
+  client can merge the typeBodyAreaMap (which already
+  loads all types) with the browse count data, filling
+   missing ones with count: 0.
+
+  The client-side merge is simplest: it requires no
+  API change. Want me to fix the "Lips" mismatch, add
+  the missing product types, and update the browse to
+  show 0-count types — all in one go?
+
+
+
+
+
+
+
+
+> issues found in the existing setup - what ideas do    you have to fix the lips vs lip mismatch? what        ideas do you have for the orphaned sun?  
+
+
+
+at        ideas do you have for the orphaned sun?             
+● Lips vs Lip — two options:
+
+  A. Fix the DB — migration that updates body_area =
+  'Lips' → 'Lip' for the two existing rows. The code
+  AREA_ORDER already says "Lip", so it becomes
+  canonical. One migration, nothing to touch in the
+  frontend.
+
+  B. Fix the code — change AREA_ORDER from "Lip" to
+  "Lips" (and update the label wherever it renders).
+  DB stays as-is. Slightly more work since the label
+  appears in a few display places.
+
+  A is cleaner — the code is already right, the DB
+  seeding was the typo.
+
+  ---
+  Sun — three options:
+
+  A. Remove "Sun" from AREA_ORDER — Sun Screen stays
+  under Face (where it currently lives in the DB), the
+   dead "Sun" section just goes away. Simplest fix,
+  but loses the ability to have a dedicated sun
+  section later.
+
+  B. Move Sun Screen to body_area = 'Sun' — one DB
+  migration, and now the "Sun" section actually
+  renders with the existing Sun Screen type. Room to
+  add Sunscreen Body and Sunscreen Lip under Sun
+  later. The section renders now with real data.
+
+  C. Keep Sun Screen under Face and add new Sun types
+  for body/lip — Sun Screen (face) stays where it is,
+  you add new types like Sunscreen Body and Sunscreen
+  Lip with body_area = 'Sun'. The "Sun" section stays
+  empty until those types have products submitted.
+  More accurate categorically (face sunscreen is a
+  face product) but the section reads as empty until
+  community adds sun products.
+
+  B is the right call — sunscreen spans face and body,
+   the existing Sun Screen being under Face is an
+  oversight from the original seed. Moving it to Sun
+  makes the section populate immediately, and when you
+   later add Sunscreen Body / Sunscreen Lip / After
+  Sun they slot in naturally. The scan result display
+  already shows [body_area · type] so "Sun · Sun
+  Screen" reads correctly.
+
+  Want me to write both migrations — fix the Lips typo
+   and move Sun Screen to Sun?
+
+
+
+
+
+
+
+
+
+lips vs lip - let's go with option a. 
+
+missing product types worth adding - currently i have makeup remover and micellar water and cleansing oils in the makeup remover section. currently i have cleansing balm in the face wash section. currently i have essence in the toner or serum section. for neck cream, does the neck thrive in a different ph than the face/scalp? because if it does maybe it should be its own body area. currently deodorant is in body but does it thrive at a different ph and should it have its own body area? currently i have body oils and body serums in the body lotion section. currently i have body scrubs in the body wash section. should hand sanitizer should be in a hands body area section? currently i have leave-in conditioners, hair oils, hair masks, and hair mists in the hair styler section - is there a reason to have a separate section? currently i have dry shampoo in the shampoo section, but since it's leave-in maybe it should move to the hair styler section or scalp treatment section - what do you think? currently i have setting powder, bronzer, and highlighter in the foundation section - do you see a reason to split it up? currently i have lip color products in the lip balm section. what are lip scrubs? we can have a nails body area. are nail treatment and cuticle oil not similar? where would different types of nail polish and gels etc fall? for sun, sun screen should be edited to say sunscreen face, and we can add a sunscreen body to body as a section, and we can add sunscreen lip to the lips body area as a section. what do you think about all this? is the skin profile that's relevant to face also relevant for the other body areas or sections?
+
+empty types in browse - i'm not sure which idea to go with - what are the potential bottlenecks that may arise in the future with each idea? what do you recommend?
+
+
+
+
+
+
+
+
+
+● This is a lot of good questions. Let me go through
+  each one:
+
+  ---
+  Neck cream / own body area?
+  No significant pH difference between neck and face —
+   both are 4.5–5.5. The neck just has thinner, more
+  delicate skin and ages faster due to less sebaceous
+  activity. Same ingredient concerns apply. I'd add
+  Neck Cream under Face, not a separate area.
+
+  Deodorant / own body area?
+  Underarm skin pH runs 6.5–7.0 — genuinely different
+  from body at 4.5–5.5, because the axillary area is
+  occluded, warmer, and dominated by apocrine glands.
+  But the difference matters for formulation
+  (deodorants are often pH-adjusted to target odor
+  bacteria), not for ingredient safety scanning — the
+  flagged concerns (fragrance, alcohol, aluminum,
+  sensitizers) are the same framework. I'd keep it
+  under Body rather than creating a body area for one
+  product type.
+
+  Body Oils / Body Serums in Body Lotion, Body Scrubs
+  in Body Wash
+  These should be their own types under Body — they
+  have meaningfully different ingredient profiles and
+  application roles. Body Scrub has physical exfoliant
+   + AHA concerns that differ from Body Wash. Body Oil
+   and Body Serum are leave-on concentrated products,
+  not hydrators. Worth splitting.
+
+  Hand Sanitizer / Hands area
+  Hand skin has unique concerns — frequent washing,
+  contact allergen exposure, latex sensitivity, and
+  chronic barrier disruption from soap. A Hands body
+  area makes sense: Hand Cream (move from Body), Hand
+  Sanitizer (new). Hand Cream currently under Body is
+  fine for now, but if the community adds a lot of
+  hand products, a dedicated area is clean.
+
+  Leave-in conditioners / oils / masks / mists in Hair
+   Styler
+  Hair Styler should be for hold/shape products (gels,
+   creams, sprays, pomades) — those use fixatives,
+  resins, and alcohols that are categorically
+  different. Leave-In Conditioner, Hair Oil, Hair
+  Mask, and Hair Mist are all treatments — they
+  already belong in Hair Treatment, which already
+  exists in the DB. The community has just been
+  putting them in the wrong type. No new type needed,
+  just better labeling/description at scan time.
+
+  Dry Shampoo in Shampoo
+  Dry shampoo is leave-on and goes directly on the
+  scalp, so it's a scalp product, not a cleanser.
+  Scalp Treatment is the right home — it sits on the
+  scalp surface the same way a scalp serum or
+  treatment does, with its own concerns (starches,
+  aerosol propellants, heavy fragrances). Move it
+  there.
+
+  Setting Powder / Bronzer / Highlighter in Foundation
+  Ingredient risk profile is nearly identical —
+  pigments, talc, silicones, waxes, preservatives. No
+  meaningful reason to split from a skin safety
+  standpoint. Keep them where they are.
+
+  Lip Color in Lip Balm
+  Fine. Both are lip-contact products with overlapping
+   concerns (ingestion-safe ingredients, occlusive
+  waxes, fragrance). Same body area.
+
+  Lip Scrubs
+  Physical exfoliants for lips — sugar or salt in an
+  oil/wax base, usually flavored. Ingredient concerns:
+   physical abrasion risk, fragrance/flavor
+  sensitizers, potential ingestion of AHAs if they
+  include citric/lactic acid. Belongs under Lips as
+  its own type since the ingredient concerns are
+  distinct enough from Lip Balm.
+
+  Nails body area — Nail Treatment vs Cuticle Oil,
+  polish/gels
+  Nail Treatment and Cuticle Oil are very similar
+  (both are nourishing, vitamin-rich, oil-based
+  products applied to the nail plate and surrounding
+  skin). One type — Nail Treatment — covers both.
+  Polish, gel, top coat, and base coat are chemically
+  distinct: solvents, formaldehyde-resin, DBP,
+  toluene, resins. These have their own concern
+  profile worth flagging separately. I'd have: Nail
+  Treatment (cuticle oil, strengthening serums) and
+  Nail Polish (polish, gel, top coat, base coat) both
+  under a Nails body area.
+
+  Sun — rename and restructure
+  Agree with your plan: rename Sun Screen → Sunscreen
+  Face and move to a Sun body area. Add Sunscreen Body
+   under Body. Add Sunscreen Lip under Lips. The Sun
+  body area then holds face-specific SPF, while body
+  and lip sunscreens live in their natural areas. This
+   is the cleanest model.
+
+  Is the face skin profile relevant for other body
+  areas?
+  Partially. Some dimensions translate everywhere:
+  - Reactive, damaged barrier, eczema, psoriasis,
+  lupus rash — fully body-wide
+  - Fungal acne, seborrheic — face + scalp, less
+  relevant for body (though Malassezia does cause
+  tinea versicolor on body)
+  - Oily, acne, rosacea — primarily face/scalp; body
+  acne has different mechanics (friction, sweat,
+  occlusion from clothing)
+  - Hyperpigmentation, mature — relevant everywhere
+  but most scanned for face
+
+  Body-specific concerns not currently in the profile:
+   keratosis pilaris (arms, thighs — needs gentle
+  exfoliants, no heavy oils), ingrown hairs
+  (underarms, legs — fragrance and alcohol irritation
+  risk), body acne (back/chest — same pore-clogging
+  logic as face but sweat and occlusion dominate).
+  Worth adding eventually, but they'd only affect
+  flagging for Body-type products in scan results.
+
+  ---
+  Empty types in browse — client-side merge vs
+  server-side join:
+
+  Column 1: How
+  Client-side merge: Merge typeBodyAreaMap (already
+    loaded) with browseTypes counts, fill missing with
+
+    count: 0
+  Server-side join: Update browse API to LEFT JOIN
+    product_types and return all types
+  ────────────────────────────────────────
+  Column 1: API changes
+  Client-side merge: None
+  Server-side join: Browse route needs to change
+  ────────────────────────────────────────
+  Column 1: Bottleneck
+  Client-side merge: Two parallel fetches at mount —
+    empty types won't show until both resolve. If
+    product-types API is slow, the zero-count types
+    appear late
+  Server-side join: Single call, but browse query
+    already scans all products; no new bottleneck
+  ────────────────────────────────────────
+  Column 1: Future risk
+  Client-side merge: If product_types table and
+    products table grow large, client has to reconcile
+
+    two large payloads; minor
+  Server-side join: Browse query already does the
+  heavy
+    scan; join adds negligible cost
+  ────────────────────────────────────────
+  Column 1: Edge case
+  Client-side merge: A product type that exists in the
+
+    DB but has products not in browseTypes still shows
+
+    correctly
+  Server-side join: Canonical — one query, one source
+    of truth
+
+  Recommendation: client-side merge. The product-types
+   call is already happening and is a tiny table. The
+  two fetches are parallel. No API change needed, and
+  the zero-count types appear as soon as both resolve
+  (which is fast). The server-side join is marginally
+  cleaner in principle but requires touching the
+  browse route for no real gain at current scale.
+
+  Want me to write all the migrations and UI changes
+  in one go? The work is:
+  1. Migration: fix Lips → Lip, rename Sun Screen →
+  Sunscreen Face, move it to Sun body area
+  2. Migration: add all new product types (Body Oil,
+  Body Scrub, Body Serum, Neck Cream, Nail Treatment,
+  Nail Polish, Nails body area, Sunscreen Body under
+  Body, Sunscreen Lip under Lips, Lip Scrub)
+  3. Code: move Dry Shampoo description to Scalp
+  Treatment in any label/hint text, update AREA_ORDER
+  to include Nails, add Sun body area section
+  4. Code: client-side merge for zero-count browse
+  types
+
+
+
+
+
+
+
+neck cream - let's add neck cream under face, for now.
+
+deodorant - let's keep it in body for now, but let me know in the future if it becomes relevant to add an under arm body area.
+
+Body Oils / Body Serums in Body Lotion, Body Scrubs in Body Wash - i'm thinking that different ingredient profiles and application roles don't seem meaningful enough to split the sections within the same body area, as long as the rinse-off and leave-on sections are separated (and how this affects users by skin type). what do you think? would separating some of the sections affect formula order?
+
+hand sanitizer / hands area - you make some relevant points. let's add a hands body area and do the ideas you have.
+
+leave in conditioners / oils / masks / mists in hair styler - let's show the hair treatment section on the site. what other sections are hidden? can we display them with a 0?
+
+dry shampoo in shampoo - let's add a scalp treatment section in hair body area.
+
+lip scrubs - let's add a lip scrubs section in lips body area.
+
+nails body area - let's have a nail treatment section and a nail polish section.
+
+sun - rename sunscreen to sunscreen face and keep in the face area. add sunscreen body under body and add sunscreen lip under ips. 
+
+is it relevant to add a groin body area? does it need a different ph or other care needs?
+
+body specific concerns not currently in the profile - let's add keratosis pilaris and body acne. ingrown hairs may not need to be added if it would act similarly to the damaged barrier skin type. 
+
+empty types in browse - let's try a server-side join.
+
+
+
+
+
+
+
+
+
+
+● Pushed. Here's what to do next:
+
+  Run the migration — type this in the prompt:
+  ! npx tsx
+  scripts/migrate-product-types-2026-05-27.ts
+
+  It will print each step and then the full final
+  table so you can verify everything landed. Once that
+   runs, the browse will show all the new body areas
+  (Hands, Nails) with their 0-count types grayed out,
+  and the Lips/Sunscreen fixes will be live.
+
+  ---
+  Summary of what shipped:
+
+  - DB migration script ready to run — fixes Lips→Lip,
+   renames Sun Screen→Sunscreen Face, moves Hand Cream
+   to Hands, and adds: Neck Cream, Body Oil, Body
+  Serum, Sunscreen Body/Lip, Hand Sanitizer, Lip
+  Scrub, Nail Treatment, Nail Polish, Dry Shampoo
+  - Browse: server-side join returns all canonical
+  types; 0-count ones show as dimmed gray with tooltip
+   "No products yet — be the first to add one"
+  - AREA_ORDER updated: Face, Body, Hands, Hair, Lip,
+  Nails, Makeup (Sun removed since Sunscreen Face
+  stays under Face)
+  - Skin types: Keratosis Pilaris and Body Acne added
+  with full notes, watch categories, sensory profile
+  matching, and concern level logic
+
+
+
+
+
+
+
+order of body areas - what ideas do you have to display the makeup body area near face, and lips near makeup, with hair displaying next, and then body at the end?
+
+skin types - what ideas do you have to display an explanation of each skin type if the user isn't sure what skin types they are?
+
+db migration script - can you run migration from here?
+
+
+
+
+
+
+
+● Body area order — three options:
+
+  A. Just reorder AREA_ORDER — change the constant to
+  ["Face", "Makeup", "Lip", "Hands", "Nails", "Hair",   "Body"]. One line change, done. No visual structure
+  change, areas just appear in the right sequence.
+
+  B. Reorder + visual grouping — reorder as above AND
+  add a subtle horizontal rule or label gap between
+  "face-adjacent" areas (Face through Nails) and "rest
+   of body" (Hair, Body). Adds a small amount of
+  layout work but helps the user parse the browse at a
+   glance.
+
+  C. Reorder + nested sections — group
+  Face/Makeup/Lip/Hands/Nails under an unlabeled or
+  "Face & upper body" heading, Hair and Body under
+  their own. More visual hierarchy, more layout
+  complexity.
+
+  A is the right call — the order alone communicates
+  the grouping without adding structural noise. The
+  area label headings (Face, Makeup, Lip…) already
+  provide visual separation between each type group.
+
+  ---
+  Skin type explanations — three options:
+
+  A. Info icon per chip (ⓘ) — small tappable ⓘ next to
+   each chip label. Tap to toggle the description
+  inline below that chip. Works on both mobile and
+  desktop. Requires one state variable (hintOpenType:
+  SkinType | null). Descriptions already exist in
+  SKIN_TYPE_NOTES.
+
+  B. Preview on hover/focus — when you hover or focus
+  a chip (before selecting it), the description it
+  would show appears in a fixed area below the chip
+  group. Tap/click selects it. Mobile: first tap
+  previews, second selects. Elegant but requires extra
+   mobile interaction handling.
+
+  C. "Not sure?" collapsible block — a "Not sure which
+   types apply to you?" link below the chip group that
+   expands a reference list of all types with their
+  descriptions, styled differently from the
+  selected-type notes. No per-chip state needed, one
+  toggle. Less precise — you read the whole list
+  rather than just the one you're curious about.
+
+  A is the best fit — it's targeted (you can look up
+  exactly the type you're unsure about), works
+  naturally on touch, and reuses SKIN_TYPE_NOTES that
+  already has good descriptions. The ⓘ pattern is
+  widely understood.
+
+  ---
+  DB migration — let me try running the script
+  directly. The psql connection failed on DNS, but the
+   migration script uses the Supabase JS client over
+  HTTPS, which may resolve:
+
+● All 12 steps ran cleanly. The table looks exactly
+  right. Now let me do both remaining items — reorder
+  the areas and add skin type info icons:
+
+
+
+
+● Done and pushed. Summary:
+
+  DB migration ran successfully — all 4 steps
+  completed, the final table is exactly right.
+  Lips→Lip fixed, Sun Screen→Sunscreen Face, Hand
+  Cream moved to Hands, all 10 new types inserted.
+
+  Browse area order is now: Face → Makeup → Lip →
+  Hands → Nails → Hair → Body. 0-count types in the
+  new areas (Hands, Nails, Sunscreen Lip, etc.) show
+  dimmed with a tooltip.
+
+  Skin type ⓘ icons — each chip now has a small ⓘ
+  button beside it. Tapping/clicking toggles an inline
+   description panel below the chip group. The panel
+  shows the type name bolded and its full note.
+  Tapping the same ⓘ again dismisses it; tapping a
+  different one switches to that one. Works the same
+  way in both the idle and results state profile
+  panels.
+
+
+
+
+
+
+
+
+in admin > product types, what ideas do you have for admins to reorganize the browse section by reordering body areas and product types? 
+
+why does the browse list show a product that says "safe for your profile" but when i scan it it shows high concern for your profile? does this happen to other products?
+
+routine - why does clicking routine on desktop show it twice, once on the side and once below? what alternative ideas do you have here?
+
+by concern your profile - currently for a face wash which is rinse off, the your profile section shows stripping, contact allergen, pore-clogger, occlusive. what ideas do you have if the product is rinse off and some of the concerns don't apply?
+
+
+
+
+
+   
+● Admin product type reordering — ideas:
+
+  A. sort_order column + up/down arrows — add a
+  sort_order integer to product_types. In the admin
+  accordion, each type row gets ↑ ↓ buttons that swap
+  adjacent sort_order values. Body area order is
+  handled by a separate body_areas table (name,
+  sort_order) that the AREA_ORDER constant in frontend   reads from instead of being hardcoded. Simple to
+  implement and works reliably on all devices.
+
+  B. sort_order + drag-and-drop — same data model as
+  A, but replaces ↑ ↓ with drag handles. More
+  intuitive visually, but requires a drag library (or
+  native HTML5 drag events) and is fiddly to implement
+   well on mobile.
+
+  C. Freeform position number input — each type shows
+  a small number input for its sort_order. Admins type
+   a number and save. No animation, but very direct
+  and allows non-sequential ordering. More error-prone
+   (collisions, gaps) than swapping adjacent items.
+
+  A is the right call — up/down arrows are accessible,
+   mobile-friendly, and the data model is clean. The
+  main architectural decision is whether to store body
+   area order in a body_areas table (proper) or just
+  let admin reorder the frontend constant via a
+  settings table. I'd do a body_areas table so it's
+  database-driven and doesn't require a deploy to
+  reorder.
+
+  ---
+  Browse "Safe for your profile" vs scan showing high
+  concern — this is a real bug.
+
+  The browse profileFlaggedCount only counts
+  DB-flagged ingredients whose flagged_category
+  matches your profile concerns. It does not include:
+  - Runtime sensory pattern matches (SENSORY_PATTERNS)
+   — which are what flag occlusives, film-formers, and
+   pore-cloggers for oily/acne profiles
+  - Comedogenic pattern matches (COMEDOGENIC_PATTERNS)
+
+  So a product can have zero DB-flagged ingredients in
+   your concern categories, show "Safe for your
+  profile" in browse, but then in the scan the runtime
+   patterns fire and show multiple profile-matched
+  sensory/comedogenic concerns.
+
+  This almost certainly affects many products — any
+  product that's safe in the DB but contains beeswax,
+  shea butter, dimethicone, coconut oil, isopropyl
+  myristate, or other runtime-flagged
+  occlusives/pore-cloggers would show this discrepancy
+   for oily/acne profiles. The browse badge is
+  optimistically wrong.
+
+  The fix: browse needs to also compute
+  profile-matched sensory count by running
+  SENSORY_PROFILE_MAP against SENSORY_PATTERNS matches
+   per product. The sensoryCount is already computed
+  in the browse API — we just need a profile-aware
+  version of it, similar to how profileFlaggedCount is
+   the profile-aware version of flaggedCount. Want me
+  to build this?
+
+  ---
+  Routine showing twice on desktop:
+
+  The inline collapsible sections have md:hidden —
+  they should disappear at ≥768px and only the right
+  drawer should show. If you're seeing both, one of
+  two things is happening:
+
+  1. The browser window is narrower than 768px
+  (Tailwind's md breakpoint), so md:hidden hasn't
+  kicked in — the inline section is showing as
+  intended on mobile, and the drawer tab is hidden
+  2. Tailwind's class purging hasn't picked up
+  md:hidden from the new code (less likely if the dev
+  build is running with the JIT)
+
+  Check the window width — if you're in a desktop
+  browser but the content column is narrow (e.g., dev
+  tools panel open), you may be below 768px. To
+  confirm: does the floating "Routine ▲ N" pill appear
+   at the bottom? If yes, you're in mobile view.
+
+  Alternative ideas regardless:
+
+  A. Remove inline sections entirely — on all screen
+  sizes, only use the floating trigger + sheet/drawer.
+   Mobile: pill → bottom sheet. Desktop: vertical tab
+  → right drawer. No md:hidden complexity, no inline
+  duplicate. Cleaner.
+
+  B. Consolidate to one trigger that works at all
+  sizes — keep the floating pill at bottom for all
+  sizes, open bottom sheet on mobile and right drawer
+  on desktop. Remove the separate vertical tab strip.
+  One consistent entry point.
+
+  C. Inline section stays, side panel is removed —
+  revert to just the collapsible inline section (no
+  drawer/panel), but make it sticky or always-open on
+  desktop since there's more room. Simpler but loses
+  the "glanceable without scrolling" value of the
+  panel.
+
+  A is cleanest — eliminates the responsive complexity
+   entirely. The inline sections were the original
+  design before the side panel was added; now that the
+   panel exists they're redundant. Want me to remove
+  them?
+
+  ---
+  Rinse-off products showing irrelevant concerns:
+
+  This is a known pending item. Occlusive,
+  pore-clogger, film-forming, and comedogenic concerns
+   require sustained skin contact to have any effect —
+   a face wash ingredient that's on skin for 20
+  seconds is categorically different from the same
+  ingredient in a leave-on moisturizer.
+
+  Concerns that still fully apply to rinse-off:
+  sensitizers, fragrance allergens, stripping
+  surfactants, preservatives (contact sensitization
+  happens even briefly).
+  Concerns that don't apply: occlusives,
+  pore-cloggers, film-formers, penetration enhancers,
+  retinoids, brightening actives.
+
+  Ideas:
+
+  A. Add is_rinse_off flag to product_types table —
+  mark Face Wash, Body Wash, Shampoo, Exfoliant,
+  Makeup Remover, Body Scrub as rinse-off. Scan
+  pipeline reads this and suppresses
+  occlusive/pore-clogger/film-forming concerns,
+  adjusting their concern level to "neutral" with a
+  note "rinse-off — sustained contact required." Most
+  precise.
+
+  B. Contextual note, no suppression — add a banner at
+   the top of the Your Profile section for rinse-off
+  types: "This is a rinse-off product — occlusive and
+  pore-clogging ingredients have minimal impact when
+  rinsed off within seconds." All concerns still show,
+   but the user is told to discount certain
+  categories. Less code, but more noise.
+
+  C. Suppress from count only — exclude
+  rinse-off-irrelevant categories from the profile
+  concern count and badge (so "3 for you" doesn't
+  include occlusives), but still show them in the full
+   list with a dimmed style and a "(rinse-off)" label.
+   Middle ground.
+
+  A is the right long-term answer — it's already on
+  the pending list and the product_types table is the
+  right place for this signal. C is the fastest
+  interim fix if you want to ship something before
+  doing the full data model change. Want me to build
+  A, C, or both?
+
+
+
+
+
+
+
+
+
+admin product type reordering - let's go with idea b. what ideas do you have to implement it in a user friendly way on mobile?
+
+browse vs scan bug - let's do your fix idea. yes build it.
+
+rinse off products showing irrelevant concerns - there is already a toggle for each product showing leave-on or rinse off. let's allow users to continue toggling and have their toggle selection impact what ingredients are concerning for their profile. how can we get this working? what ideas do you have to allow admins to mark which product types should have their beginning toggle on leave-on vs rinse off (but allow users to toggle it later and see updated concerns)?
+
+
+
+
+
+
+
+● Done. Here's a summary of what was built and what
+  needs one manual step:
+
+  ---
+  Browse vs scan fix — fully live after deploy:
+  - sensory.ts now exports SENSORY_PROFILE_MAP and
+  countProfileSensoryMatches
+  - Browse API now accepts skinTypes + climates
+  params, computes profileSensoryCount server-side
+  (pattern matches that actually match your profile)
+  - Browse card "for you" count now adds DB-flagged
+  matches + sensory profile matches together — so
+  beeswax, coconut oil, dimethicone etc. are no longer
+   "safe for your profile" on acne/oily profiles
+  - The "Profile-safe" filter chip now also excludes
+  products with profile-matched sensory triggers
+
+  Rinse-off toggle — fully wired after the SQL
+  migration (see below):
+  - "Occlusive" added to the sensory suppress set (was
+   missing)
+  - DB-flagged pore-clogger, occlusive, bacteria-trap
+  are now suppressed when rinse-off is toggled on
+  - is_rinse_off column will drive the default toggle
+  position per product type
+  - Admin Product Types: each type shows a "rinse-off"
+   badge and has a "Rinse-off by default" checkbox in
+  edit mode
+
+  One manual step required — run this SQL in the
+  Supabase Dashboard → SQL Editor:
+  ALTER TABLE product_types ADD COLUMN IF NOT EXISTS
+  is_rinse_off boolean NOT NULL DEFAULT false;
+  Then run: npx tsx
+  scripts/migrate-rinse-off-2026-05-27.ts to set
+  defaults for Face Wash, Body Wash, Shampoo,
+  Conditioner, Hair Mask, Makeup Remover, etc.
+
+
+
+
+
+
+
+
+
+i ran the sql. 
+
+browse - where did all the body areas go?
+
+diet and lifestyle - why are these notes showing up on the main page instead of with the rest of the skin profile notes? why are they colored dark green, which is the color for neutral ingredients and skin benefits, even though the notes are about concerns?
+
+ingredient lists - what ideas do you have to move ingredient lists section to the my lists page? that page could show product lists and ingredient lists. what ideas do you have for how the components of this page can display?
+
+
+
+
+
+● Clear picture now. Two separate issues:
+
+  1. The "Diet & lifestyle contextual banner" in the
+  scan results (lines 3734–3759) is a duplicate of
+  what's already in the skin profile panel — and it
+  uses emerald- green for danger/caution types instead   of amber/rose. The correctly colored version lives
+  at lines 2037–2056 inside the profile panel.
+  2. The fix is to remove the scan results banner
+  entirely.
+
+  Fixing the bug now:
+
+
+
+● Good. Now for the My Lists page ideas.
+
+  ---
+  What would move there: Ingredient list creation and
+  management. The scanner main page keeps only the
+  filter chips (Avoid / Want list badges in browse),
+  with a "Manage lists →" link.
+
+  My Lists page structure — two main options:
+
+  Option A: Two sections, one page (recommended)
+  My Lists
+
+    Product Lists            Ingredient Lists
+    ─────────────────        ─────────────────────
+    + New list               + New list
+
+    [saved products list]    [Avoid] My sensitivities
+    3 products                 fragrance, alcohol
+  denat,
+                               coconut oil  (+12 more)
+
+                             [Want] Must-haves
+                               niacinamide, ceramide
+  Stacks vertically on mobile. Product lists are a new
+   feature (saving products by category, e.g., "trying
+   these," "repurchased"). Ingredient lists already
+  exist.
+
+  Option B: Tabs
+  [Ingredient Lists]  [Product Lists]
+  Cleaner if content is long. Easier to add product
+  list functionality later without the page feeling
+  crowded.
+
+  Ingredient list card design (same in both options):
+  - Header: list name + type badge (Avoid / Want)
+  - Preview: first 4–5 ingredient chips inline, "+N
+  more" if long
+  - Expanded: full editable tag input (type an
+  ingredient, press comma/enter to add, × to remove)
+  - Actions: rename, delete, export as text
+
+  For product lists (new concept):
+  - "Saved" list (default, like a wishlist)
+  - Custom named lists ("currently using,"
+  "repurchased," "want to try")
+  - Each card shows product thumbnails + names, links
+  to scan them
+  - Could replace or extend the current routine
+
+  The cleanest implementation path:
+  1. Create src/app/my-lists/page.tsx as a new
+  client-side page
+  2. Ingredient lists move from localStorage there
+  (they're already stored there — the page just
+  reads/writes the same key)
+  3. Add a "My Lists" nav link on the main page header
+  4. On the main scanner, replace the ingredient list
+  management UI with a small "Manage" link that opens
+  the My Lists page
+
+  Should I build this, or do you want to discuss the
+  design first?
+
+
+
+
+
+
+my lists page - you are mistaken that product lists are a new feature beause they already exist. there is already a my lists page and a my lists nav link on the main page header that opens to the my lists page. let's go with option b tabs.
+
+for product lists - no need for custom lists. users will create their own. it is already working great. what ideas do you have to make saved product lists show up like the did you mean and alternatives product lists with regard to borders, concerns, size, display on mobile, etc?
+
+browse lists - the product name gets cut off on mobile - what did we do with the other products lists to fix this?
+
+ingredient list card design - no need for a preview but the other ideas are great. what would export as text do?
+
+ingredient lists - what ideas do you have for some non user created ingredient lists to be avoid universal concerns, avoid my sensitivities, and want neutral and beneficial? what ideas do you have for users to create their own ingredient lists for use in either avoid or want when searching? 
+
+
+
+
+
+
+
+
+● Now addressing all the design questions:
+
+  ---
+  Saved product lists — display ideas (to match
+  alternatives/did-you-mean style):
+
+  The list detail page currently uses divide-y divider   lines. To match the alternatives style:
+  - Borders: switch to individual border
+  border-gray-200 rounded-xl p-3 cards with space-y-2
+  between them — same as alternatives
+  - Size: already matches (48×56 thumbnail, same as
+  alternatives)
+  - Name: already leading-snug (wraps on mobile) — no
+  change needed
+  - Concern counts: alternatives show
+  flagged/sensory/photo badges. The list page doesn't
+  have that data today — adding it requires either (a)
+   storing counts when saving, or (b) a new
+  lightweight /api/products/batch-stats endpoint that
+  returns counts for a list of product IDs. Option (b)
+   is cleaner and reusable
+  - Mobile: the card layout is identical to
+  alternatives — image left, name+brand+badges right,
+  wraps naturally
+
+  The simplest meaningful improvement right now: card
+  borders. Concern badges need the batch-stats API
+  first.
+
+  ---
+  Export as text:
+  Copies the ingredient list to clipboard as a
+  comma-separated string, e.g.:
+  fragrance, alcohol denat, coconut oil, isopropyl
+  myristate
+  One click — useful for pasting into another app,
+  sharing with a dermatologist, or checking against an
+   external source.
+
+  ---
+  Non-user-created ingredient lists — three smart
+  lists:
+
+  "Avoid: Universal concerns" — read-only, DB-driven.
+  All ingredients with status = "flagged". Too long to
+   show in full; shows count + "View all" link.
+  Updates automatically as the DB grows. Useful as a
+  reference: "here's everything the database considers
+   a concern."
+
+  "Avoid: My sensitivities" — read-only,
+  profile-driven. Dynamically generated from the
+  user's skin profile — uses the same
+  profileMatchedCategories logic already built. If you
+   have acne-prone + oily selected, this list contains
+   ingredients flagged as
+  pore-clogger/occlusive/bacteria-trap. If you have
+  reactive, it adds sensitizers and
+  fragrance-allergens. Updates live when you change
+  your profile. No storage needed.
+
+  "Want: Neutral & beneficial" — read-only, DB-driven.
+   Ingredients with status = "safe" + a category
+  (i.e., known benefits). Optionally filterable by
+  skin type (e.g., only show hydration ingredients for
+   dry skin). This one is the most complex to make
+  useful — a flat list of "all safe ingredients" is
+  very long. Worth discussing scope before building.
+
+  All three would appear as pinned cards at the top of
+   the Ingredient Lists tab, clearly labeled
+  auto-generated and not editable.
+
+  ---
+  User-created ingredient lists for avoid/want in
+  browse:
+
+  The creation UX ideas:
+  - Type picker first: when creating, choose "Avoid"
+  or "Want" before naming — sets the intent clearly
+  - Add ingredients two ways: (1) type-ahead search
+  using the existing /api/ingredients/search
+  autocomplete, or (2) paste a comma-separated block
+  of text (the scanner already has paste mode logic to
+   parse ingredient strings)
+  - Validation: when pasting, show which items were
+  recognized (matched in DB) vs. unrecognized (stored
+  as raw text) — unrecognized ones still work for
+  browse text matching
+  - Use in browse: already works — these show as
+  filter chips under "Profile-safe" in browse. Moving
+  creation to My Lists doesn't break that since they
+  stay in localStorage.
+
+  The pre-built smart lists (My sensitivities,
+  Universal concerns) could also be available as
+  one-tap filter chips in browse, not just on the My
+  Lists page.
+
+  Should I start with: (a) the My Lists tabs +
+  ingredient lists UI, (b) the product list card style
+   update, or (c) the smart lists?
+
+
+
+
+
+
+
+
+
+save product lists - let's go ahead with the card borders. we'll update the concern badges later.
+
+export as text - where would this be relevant for the site?
+
+non-user-created ingredient lists - avoid universal concerns would include all ingredients that are universal concerns, not status = flagged. avoid my sensitivities list idea looks great. what ideas do you have to include the skin profile in my lists page so that users can see the list change live according to their skin profile updates? want neutral and beneficial would include all ingredients that are neutral and beneficial, not status = safe. what ideas do you have for updating what products show up in the beneficial list according to skin profile? are there any neutral and beneficial ingredients that are universal for all skin profiles? if so, that should be a separate non-user-created ingredient list.
+
+i like your idea for prebuild smart lists to be available as one tap filter chips in browse as well.
+
+
+user-created ingredient lists - what ideas do you have for users not needing to choose avoid or want before creating ingredient lists? i'd like users to be able to choose whether their searches include or exclude their own lists. 
+
+submissions - what ideas do you have for admins to see user submitted ingredients and edit or remove them?
+
+
+
+
+
+
+
+
+
+
+● Now answering all the open questions:
+
+  ---
+  Export as text — where relevant on the site:
+  Mostly useful outside the app — checking labels in a   store, sharing with a dermatologist, pasting into a   spreadsheet. Within the app itself, the scanner
+  already does the work, so there's no in-app use
+  case. Not worth building right now.
+
+  ---
+  Skin profile on My Lists page:
+  The cleanest approach: embed the exact same skin
+  type chips from the scanner — reads and writes the
+  same skindex:skinTypes / skindex:climates
+  localStorage keys. When you toggle a chip, "My
+  sensitivities" and the profile-filtered beneficial
+  list update immediately on the same page. No sync
+  needed. It's a mini version of the scanner's profile
+   panel: just the chips and chip groups (Skin type,
+  Climate, etc.), no post-wash note or skin type hint
+  tooltips. You'd see the list react in real time as
+  you add/remove chips.
+
+  ---
+  "Avoid: Universal concerns" — correct framing:
+  You're right — universal concerns means ingredients
+  that are concerning for every skin profile, not just
+   DB status. Those are the ingredients in
+  CONCERN_UNIVERSAL_CATEGORIES: contact-allergen,
+  biocide, Sulfate Surfactant, Drying Solvent, plus
+  photosensitizers flagged "avoid." Small, curated,
+  meaningful.
+
+  ---
+  "Want: Neutral & beneficial" — correct framing:
+  Neutral = reviewed and confirmed safe, no documented
+   benefit (status = "safe", category IS NULL).
+  Beneficial = reviewed safe with a documented benefit
+   (status = "safe", category IS NOT NULL). Both are
+  worth wanting; the list covers both. Labeling them
+  as "safe ingredients" in the UI avoids the schema
+  language.
+
+  Profile filtering the beneficial list:
+  Two ideas:
+  - Option A — Profile-first view: show only
+  beneficial ingredients whose category matches your
+  skin concerns. Acne-prone → show "anti-acne,"
+  "non-comedogenic," "antibacterial" categories. Dry →
+   "hydrating," "barrier-repair," "emollient."
+  Reactive → "anti-inflammatory," "calming." The list
+  shrinks to what's actually relevant.
+  - Option B — Full list with "for you" highlighting:
+  show all beneficial ingredients but visually group
+  or badge the ones that match your profile first.
+  Everything is visible, relevant ones float to the
+  top.
+
+  Option A is cleaner on mobile and more actionable.
+
+  ---
+  Universal neutral/beneficial ingredients — separate
+  list:
+  Yes, some ingredients are beneficial with no
+  profile-specific concerns at all. Panthenol,
+  allantoin, beta-glucan, ceramides, niacinamide (for
+  most), hyaluronic acid. In DB terms: status = "safe"
+   + category IS NOT NULL + ingredient name doesn't
+  match any SENSORY_PATTERNS. This would be a fourth
+  smart list: "Want: Universal good ingredients" —
+  safe and beneficial regardless of skin type, no
+  sensory flags.
+
+  ---
+  Pre-built smart lists as one-tap browse chips:
+  Agreed. In browse, alongside "Photo-safe" and
+  "Profile-safe" chips, there could be:
+  - "Universal safe" — hides products containing any
+  contact-allergen / biocide / Sulfate Surfactant /
+  Drying Solvent
+  - "My sensitivities" — already exists as
+  "Profile-safe"
+
+  These would be distinct, clearly labeled chips.
+
+  ---
+  User-created lists — no forced type at creation:
+  Instead of choosing Avoid/Want upfront, users just
+  name the list and add ingredients. Then at the usage
+   site (browse filter bar) they choose how to apply
+  it: include (show only products containing at least
+  one ingredient from this list) or exclude (hide
+  products containing any ingredient from this list).
+  The same list can be used either way depending on
+  the search. A toggle or dropdown next to the chip in
+   browse: [My list ▾] → Include / Exclude. The list
+  itself stays neutral.
+
+  ---
+  Admin: review user-submitted ingredients:
+  Currently there's an ingredient queue in the admin
+  panel. For user-submitted ingredients (ones added
+  via the autocomplete paste mode that aren't in the
+  DB), ideas:
+
+  - Submission queue tab: list of submitted ingredient
+   names with count of how many products use them,
+  submit date, and a "Review" action
+  - Review action: opens an inline edit form to set
+  name, status, category/flagged_category,
+  structural_category — same fields as the existing
+  ingredient edit form
+  - Batch actions: approve all (mark safe), flag
+  selected, or delete (if spam/malformed)
+  - Priority sorting: sort by product count descending
+   — ingredients used across many scanned products are
+   highest impact to review first
+  - Filter: unreviewed only, or
+  flagged-but-no-category, or "suspicious"
+  (ingredients that pattern-match a SENSORY rule but
+  aren't in DB yet)
+
+  This builds on the existing ingredient queue UI —
+  likely just needs the edit/remove actions wired in.
+
+
+
+
+
+
+
+
+skin profile on my lists page - looks good.
+
+avoid universal concerns - looks good.
+
+want neutral and beneficial - the ingredients in the beneficial ingredient list should only be ingredients with both netural and beneficial. 
+
+profile filtering the beneficial list - i'm unsure which option to go with. how would we ensure that if a category matches some of the user's skin concerns but not others, it won't show up in the beneficial list?
+
+universal neutral/beneficial ingredients - this could be a good idea but i'm unsure if we should make a separate list for this. my concern is that some of the ingredients you mentioned may turn out to be a concern for a skin profile. for example, even though hyaluronic acid helps skin retain water, it may also clog pores or be occlusive. as in, sometimes an ingredient isn't categorized properly and needs updating. what are your thoughts?
+
+
+
+
+
+
+
+
+
+● Neutral & beneficial list — agree, the combined list   includes both: neutral (status=safe, category IS
+  NULL) + beneficial (status=safe, category IS NOT
+  NULL). All reviewed-safe ingredients in one list,
+  two sections or mixed alphabetically.
+
+  Profile filtering for beneficial ingredients — the
+  cleanest approach for "if a category matches some
+  concerns, hide it": filter beneficial ingredients
+  through the same sensory pattern check used in scan.
+   If an ingredient returns any sensory pattern match
+  relevant to the user's skin types/climates, it gets
+  excluded from their filtered view of the beneficial
+  list. So:
+  - Hyaluronic acid: no sensory patterns → stays for
+  everyone
+  - A ceramide that triggers "Occlusive" pattern:
+  hidden for oily/acne-prone profiles
+  - This uses the existing countProfileSensoryMatches
+  logic, so no new infrastructure needed
+
+  The user would see: "Showing X of Y ingredients for
+  your profile" with a toggle to see all. This is
+  Option A with sensory-awareness, which directly
+  answers your concern — partial matches get caught.
+
+  Universal good as separate list — your concern is
+  exactly right, and I think it's also the reason it's
+   still worth building. The list would be:
+  ingredients where status=safe, category IS NOT NULL
+  AND sensory profile matches = 0 for ALL profile
+  types (not just the user's). So it's only
+  ingredients that are safe AND have no sensory
+  concern for anyone. It updates automatically as
+  categorizations are corrected. If hyaluronic acid
+  later gets an Occlusive sensory flag, it drops off
+  the universal list immediately. That's the system
+  working correctly, not a flaw.
+
+  The practical difference between the two lists:
+  - Universal good: safe for everyone, no exceptions —
+   short list, high confidence
+  - Neutral & beneficial: all reviewed-safe
+  ingredients, some filtered by your profile
+
+  Both have value. The universal list is a trust
+  signal; the profile-filtered list is personalized.
+
+  Ready to build My Lists page with tabs when you want
+   to proceed. I'd start with the tab structure +
+  ingredient list management UI, leaving the smart
+  lists as a second pass once we confirm the filtering
+   logic.
+
+
+
+
+
+
+
+
+great. go ahead and build. 
+
+what else is waiting to be built and what needs to be committed and pushed?
+
+
+
+universal beneficial as separate list - great. by the way, are you sure about hyaluronic acid? can you research it to see if there is no way it could cause concern for certain skin types?
+
+
+
+
+
+
+
+
+
+● Pushed. Here's the full picture of what's built and
+  what's waiting:
+
+  ---
+  Just built & pushed (9339332)
+  - My Lists page: Product Lists | Ingredient Lists
+  tabs
+  - Mini skin profile chips at top (reads
+  localStorage, links to home to edit)
+  - Ingredient Lists tab: 3 built-in smart list cards
+  (info only for now) + full user-created list
+  management with autocomplete and paste-multiple
+  - Product list cards: card borders (matching list
+  detail page)
+
+  ---
+  What still needs to be committed/run:
+  - _reference/t - suggestions.txt is the only
+  unstaged change — that's a reference file, not code.
+   No action needed unless you want to stage it.
+  - The is_rinse_off DML migration
+  (scripts/migrate-rinse-off-2026-05-27.ts) — sets
+  is_rinse_off=true for the default rinse-off product
+  types in the DB. The SQL DDL was already run; this
+  DML script hasn't been run yet.
+
+  ---
+  Approved but not yet built:
+  1. Pre-built smart list APIs — fetch actual
+  ingredient data for Universal Concerns, My
+  Sensitivities, Neutral & Beneficial
+  2. Browse filter chips for smart lists (one-tap from
+   browse screen)
+  3. User-created list include/exclude toggle in
+  browse (replace fixed avoid/want with per-search
+  toggle)
+  4. Admin ingredient submission review queue
+
+  Known backlog (older):
+  - Rinse-off type detection in communityVariants
+  enrichment in scan route
+  - Admin drag-and-drop product type reordering
+  - Activity log undo for update_product
+  - Fix "nothing new to review" race condition in
+  admin
+
+
+
+
+
+
+
+
+
+what still needs to be committed/run - run the is rinse off dml migration from here.
+
+approved but not yet built - let's build all of these
+
+known backlog - let's do all of these.
+
+do you have questions?
+
+
+
+
+
+
+                    
+● The drag-and-drop is now fully functional. Open the
+  Product Types section in admin, and you'll see ⠿
+  handles on each type row — drag to reorder, and it
+  saves to DB immediately on drop.
+
+  Everything from this session is live:
+  - Rinse-off migration: DB updated
+  - Smart list counts: showing on My Lists ingredient
+  list cards
+  - Browse chips: "No universal concerns" and "Clean
+  only" active in browse
+  - New ingredient lists: no avoid/want selection
+  needed — toggle include/exclude at browse time
+  - Admin queue: click any name to edit it, checkbox
+  to batch-remove
+  - Admin submissions: no more empty flash on load
+  - Product type drag-and-drop: working end-to-end now
+   that the column exists
+
+
+
+
+
+
+
+
+
+
+
+number ingredients scanned line - instead of "some concerns for your profile" and "5 of 5 concerns match" can it just say the number of concerns for your profile? instead of "9 safe" can it show "9 neutral"? instead of having "6 unreviewed" show up in black can it show up in light gray?
+
+skin profile line - instead of "20 active" showing up in green, can they show up in dark purple?
+
+skin type - i see acne, fungal acne, and body in skin type but not bacterial acne or viral acne - should these be added?
+
+skin profile - when marking selections in skin profile, they show up as dark green but maybe they should show up as dark amber to match the coloring of concerns by profile? for devices marking selections shows up as blue, and supplements show up as purple, but for now can they show up in dark gray? 
+
+diet - what ideas do you have for preservatives in food? do eating any cause skin concerns?
+
+
+
+
+
+
+
+
+
+
+● All code changes done. Now for your two questions:
+
+  ---
+  Bacterial acne / viral acne as skin types?
+
+  I'd leave them out. "Bacterial acne" is essentially
+  just regular acne (acne vulgaris is caused by C.
+  acnes bacteria) — anyone who selects "acne" is
+  already selecting for that. Adding a "bacterial
+  acne" option would confuse most users who don't know
+   their acne was bacterial vs. not. "Viral acne"
+  isn't really a skin category — viral skin conditions
+   (molluscum, herpes) are distinct from acne and
+  extremely unlikely to drive ingredient concerns in a
+   skincare app. The acne/fungal acne/body acne split
+  you already have maps to real ingredient decisions
+  (antifungals vs. comedogenics vs. body-safe
+  formulas), which is the right level of granularity.
+
+  ---
+  Food preservatives and skin concerns?
+
+  Yes, several food preservatives have real links to
+  skin reactions:
+
+  - Sulfites (wine, dried fruit, deli meat, pickles) —
+   trigger flushing and rosacea flares in sensitive
+  individuals; also linked to eczema flares
+  - Benzoates (sodium benzoate in sodas, sauces,
+  juices) — linked to urticaria (hives) and
+  contact-type skin reactions, especially in people
+  already sensitive to aspirin
+  - Nitrites/nitrates (processed meats, bacon, hot
+  dogs) — can trigger rosacea flares; associated with
+  acne flares in some studies, possibly via
+  inflammatory pathways
+  - Parabens in food (methylparaben used in some baked
+   goods, jams) — same class as topical preservatives;
+   controversial systemically
+  - BHA/BHT (chips, cereals, packaged snacks) —
+  antioxidant preservatives; BHA is a known allergen
+  that can cause contact urticaria; same compound
+  appears in some cosmetics
+  - Propionate (calcium/sodium propionate in bread) —
+  linked to eczema and hives in some reports
+  - Carmine / cochineal (red dye in yogurt, candy,
+  juice) — technically a colorant but used as a
+  preservative system additive; a common allergen with
+   cross-reactivity to topical sensitizers
+
+  If you want to add a food preservatives option under
+   Diet, good candidates: "sulfites," "benzoates," or
+  a combined "processed/preserved foods" trigger.
+  Rosacea users especially benefit from the sulfite
+  flag.
+
+
+
+
+
+
+
+
+
+diet preservatives - yes let's add all the ones you listed, and show more information when the user clicks an information i icon near it (like for skin types). where else can the informational icons show up in skin profile?
+
+main - ingredient lists section still show on the main page - let's have it only in the my lists page.
+
+my lists - your ingredient lists show want even though i didnt select avoid or want when creating it. 
+
+my lists - when clicking edit for my profile, the site moves me to the main page instead of letting me edit my skin peofile from the my lists page.
+
+main - device interactions note shows an interaction concern as dark green instead of dark amber.
+
+prebuilt smart lists as one-tap browse chips - can we build this?
+
+
+
+
+
+
+
+
+
+● All done and pushed. Here's a summary of everything
+  that was built:
+
+  ---
+  Diet preservatives — 6 new entries added (Sulfites,
+  Benzoates, Nitrites/nitrates, BHT/BHA, Propionates,
+  Carmine/red dye), each with detailed skin concern
+  notes that explain the mechanism (flushing,
+  urticaria, rosacea flares, contact sensitization,
+  etc.).
+
+  ⓘ info icons — Added to all profile sections:
+  Climate, Water quality, Devices, Supplements, and
+  Diet. Tap the ⓘ next to any option to see the full
+  note inline. Both idle and scan result states
+  updated.
+
+  Ingredient lists removed from main page — Both
+  sections replaced with a compact "Manage in My Lists
+   →" link. The active count still shows so you know
+  your filters are live. The lists themselves still
+  work for browse filtering — they just live in My
+  Lists now.
+
+  Browse smart list chips — "Quick filters" row now
+  appears before you select a product type. Shows: ✗
+  Universal Concerns, ✗ My Sensitivities (when profile
+   is set), ✓ Neutral & Beneficial, Photo-safe. These
+  same chip labels carry into the product list filter
+  row.
+
+  Device interactions — Non-danger notes (the
+  informational ✦ ones) now show amber instead of
+  teal, matching the profile concern color.
+
+  My Lists type badge — User-created lists with no
+  type set no longer wrongly display "Want". No badge
+  shows for type-free lists.
+
+  My Lists profile editing — "Edit" link replaced with
+   an inline skin type editor that saves directly to
+  localStorage. No more redirect to the home page.
+
+
+
+
+
+
+
+
+
+
+
+user-created lists - no forced type at creation - yes i like your ideas.
+
+admin - review new ingredients - user-submitted and queued ingredients should show up here. let admins sort by priority, date added, or alphabetically. i like all your ideas here, including review action, batch actions, filter, etc.
+
+undo - did we ever finish the before and after state tracking?
+
+search misses - what ideas do you have to improve the search misses functionality?
+
+skin profile - what ideas do you have for making this section shorter? what do you think about having a new skin profile page that lets users edit their skin profile and shows all the notes - and the skin profile section on the main page, product page, and my lists page would let the user edit their skin profile but wouldn't show as many notes?
+
+
+
+
+
+● Committed and pushed. The fix was that the
+  submissions API was stripping ingredient_list before   returning it — added it back, updated the
+  Submission type to match, and TypeScript is clean.
+
+
+
+
+
+
+
+
+routine - what ideas do you have for making this tool more useful? currently all i see in my routine is "duplicate ingredient" but i don't know further information such as which ingredient or why it's relevant for my skin profile. do the routine notes update if i remove a product from my routine? what ideas do you have to let users add products to their routine from lists like did you mean, alternatives, or browse?
+
+routine showing twice on desktop - alternative ideas - let's go with a collapsible bottom sheet for mobile and desktop. 
+
+skin profile - what ideas do you have to show skin profile as a bottom sheet like routine, or would it make the bottom sheet too crowded? 
+
+skin type - is there a reason to add a skin type for users whose skin sheds very fast?
+
+
+
+
+
+
+
+● Now I have enough context. Let me answer everything:
+  ---
+  Routine — making it more useful
+
+  "Duplicate ingredient" badge:
+  The badge already stores the shared ingredient names   in the title attribute (visible on hover on
+  desktop), but that's invisible on mobile and doesn't   explain why it matters. Better approaches:
+  - Show the names inline, e.g. niacinamide × 2
+  products instead of "duplicate ingredient" — no
+  tooltip needed
+  - Add a category-aware severity note:
+  double-retinoid is a real irritation risk;
+  double-moisturizer is just redundant waste. The
+  badge could use different colors (amber vs gray)
+  based on whether the duplicated ingredient is in a
+  flagged category
+  - For the Interactions section, add a "Double dose"
+  warning card (similar to Zinc+Copper) for
+  high-concern duplicates like retinoids, AHAs, BHAs,
+  or vitamin C
+
+  Do routine notes update when removing a product?
+  Yes — renderRoutinePanel() rebuilds dupMap from the
+  current routineProducts array every render, so
+  removing a product immediately recalculates all
+  notes. No stale state issue.
+
+  Adding to routine from browse/lists/alternatives:
+  - Browse: Add a small + button on each product card
+  (next to the product name row). Tap → adds to
+  routine with a brief confirmation
+  - "Did you mean" / Alternatives panel: Add an + Add
+  to routine link beside "View" for each suggested
+  product
+  - My Lists: In the /lists page, add a + Routine
+  button per product in each list — this is the most
+  useful since the user's "want" list is already their
+   curated set
+
+  ---
+  Routine showing twice — bottom sheet for both mobile
+   and desktop
+
+  Good call. The current architecture (inline
+  collapsible in scroll + side drawer on desktop +
+  bottom sheet on mobile + floating pill + tab strip)
+  is doing five jobs and showing the same content in
+  two places at once on desktop. Collapsing to a
+  single bottom sheet that works everywhere simplifies
+   this to:
+  - One floating trigger button (bottom-right, always
+  visible, shows product count / warning dot)
+  - One bottom sheet with fixed max-height and scroll,
+   same component for all breakpoints
+  - Remove: the md:hidden inline sections in both idle
+   and results state, the fixed right drawer, the
+  collapsed tab strip
+
+  ---
+  Skin profile as a bottom sheet
+
+  It could share the bottom sheet pattern, but I'd
+  keep them separate:
+
+  - Separate floating buttons (e.g. routine
+  bottom-right, profile bottom-left) with two
+  independent sheets — clean and doesn't crowd either
+  - Tabbed sheet (Routine | Profile tabs in one sheet)
+   — compact but means opening the sheet just to check
+   profile means navigating tabs; mixes two very
+  different intents
+  - Profile stays in scroll, routine gets the sheet —
+  honestly still the strongest split, since profile is
+   something you set once and forget, while routine is
+   something you consult mid-scan
+
+  My recommendation: if you build a dedicated /profile
+   page (as discussed last session), skin profile
+  doesn't need a bottom sheet at all — the main page
+  just shows a compact read-only summary with an "Edit
+   →" link. The bottom sheet is then purely for
+  routine.
+
+  ---
+  Skin type for fast cell turnover
+
+  Yes, there's a real case for it. Fast desquamation
+  (naturally rapid skin cell shedding without a
+  pathology) is distinct from the existing types:
+
+  - Psoriasis covers pathological rapid turnover
+  (already in the list)
+  - A "fast turnover" type would describe people whose
+   skin renews itself quickly and visibly — tends to
+  look fresh, rarely congested, but new cells come up
+  more fragile and sensitive to harsh treatments
+
+  Practical ingredient implications:
+  - Warn about over-exfoliation — AHAs, BHAs,
+  retinoids are more likely to thin or sensitize skin
+  that's already cycling fast
+  - Benefit from heavy occlusives/emollients — new
+  cells need protection before they've fully cornified
+  - Fragrance/irritant threshold lower — fresh cells
+  are less tolerant
+
+  The risk of adding it: most users don't know their
+  skin's turnover rate without a derm telling them.
+  The clearest self-reportable signal is "my skin
+  peels or flakes even when I'm not using exfoliants."
+   You could label it something like "Fast-shedding /
+  peels easily" to make it self-diagnosable. Worth
+  adding if you want to cover it — the ingredient
+  logic (lower exfoliant tolerance, higher occlusive
+  benefit) is specific enough to be useful and doesn't
+   fully overlap with damaged_barrier or dry.
+
+
+
+
+
+
+
+
+
+great ideas - let's do all of them / the ones you recommended. ill decide about skin profile as a bottom sheet later. can we also include add to product list link for did you mean, alternatives, and browse lists?
+
+skin type for fast cell turnover - i'm also thinking the practical ingredient implications can cover scenarios where adding a product over rapidly shedding skin cells causes them to clump on the skin and increases the risk of sensory issues causing affected users to scratch them off. 
+
+
+
+
+
+
+
+
+● Everything shipped. Here's what changed:
+
+  Routine:
+  - Duplicate badge now reads e.g. niacinamide ×
+  shared or glycolic acid, retinol × 2 shared — amber
+  if any duplicated ingredient is a high-concern
+  active, gray if just redundant
+  - New "Double dose" interaction warning card fires
+  when the same retinoid/AHA/BHA/benzoyl
+  peroxide/azelaic acid appears across multiple
+  routine products
+  - Bottom sheet is now one unified component for
+  mobile and desktop — floating trigger button fixed
+  at bottom-right, sheet anchors bottom-right on
+  desktop (80 → w-80), full-width on mobile
+  - Removed the old side drawer, collapsed tab strip,
+  and both inline collapsibles
+
+  Browse / Did You Mean / Alternatives:
+  Each card now has an action row with + Routine
+  (toggles in/out; uses ingredient list if available
+  from browse) and + List (inline list picker loads
+  lazily, same user lists). Both cards restructured
+  from <button> → <div> + inner <button> to support
+  nested interactions.
+
+  Fast-shedding skin type:
+  Added with note covering fragile immature cells,
+  over-exfoliation risk, and the clumping/scratching
+  scenario you described. Flags exfoliants, retinoids,
+   sensitizers, fragrance allergens, and drying
+  solvents as profile-matched. Also added to the
+  Stripping sensory trigger match list.
+
+
+
+
+
+
+
+
+
+
+
+fast-shedding skin type - is the note for clumping/scratching scenario enough or would certain ingredients move to the your profile concern list?
+
+
+
+
+● The note describes the mechanism, but it doesn't
+  move any ingredients into the "Your Profile
+  Concerns" highlight. Let me check what ingredient
+  categories are actually in play for this scenario.
+
+
+
+● The note is necessary but not sufficient. Right now
+  fast_shedding has no sensory trigger matches — so
+  Film-forming ingredients (carbomers, kaolin),
+  Pilling ingredients (dimethicone, acrylates), and
+  Stinging ones (AHAs, BHAs) all pass through without
+  a "for you" flag even though the mechanism in the
+  note is exactly describing those categories.
+
+  The key ones that should move into profile concerns:
+  - Film-forming — carbomer/polyacrylate note already
+  says "lays a continuous surface film that slows the
+  natural shedding of dead skin cells — first
+  producing a subtle itch as cells accumulate
+  underneath." That's the exact clumping scenario.
+  Currently only flags for oily/acne/fungal.
+  - Pilling — dimethicone, acrylates/PVP ball up when
+  they grab loose dead cells. Currently flags for
+  reactive/acne/damaged_barrier but not fast_shedding.
+  - Stinging — AHAs, BHAs, benzoyl peroxide on
+  immature cells. The photo-AHA/photo-BHA flagged
+  categories only cover the photo- prefix; the sensory
+   stinging pathway needs fast_shedding added
+  separately.
+  - Astringent (witch hazel) — tightening film can
+  mechanically pull on partially shed cells. Currently
+   only reactive/dry/damaged_barrier.
+
+  Let me add these now:
+
+
+
+
+● The note alone wasn't enough — without the sensory
+  map entries, all those ingredients would have passed   through as yellow generic triggers with no "for
+  you" marker. Now:
+
+  - Film-forming (carbomers, polyacrylates, aloe gel,
+  kaolin) → profile concern — these are the primary
+  clumping culprits; the existing note for carbomer
+  already describes the exact mechanism
+  - Pilling (dimethicone, acrylates copolymer, PVP) →
+  profile concern — grabs loose cells and balls up
+  - Stinging (AHAs, BHAs, benzoyl peroxide, glycolic,
+  salicylic) → profile concern — immature cells have
+  lower threshold; the photo-AHA/photo-BHA flagged
+  categories only covered the photosensitivity angle,
+  not the stinging path
+  - Astringent (witch hazel) → profile concern —
+  tightening film can mechanically pull on partially
+  shed cells
+  - Stripping (alcohol denat, SLS, SLES) → profile
+  concern — already fixed in Scanner.tsx last session,
+   now also fixed in sensory.ts for browse product
+  counts
+
+  Also updated the skin type note itself to name
+  film-forming polymers and pilling ingredients
+  specifically so users understand what to watch for
+  before they even scan.
+
+
+
+
+
+
+
+
+
+
+
+
+browse - what product types and body areas should products like dish soap, laundry detergent, and other house cleaning supplies go? hands?
+
+main - since ingredient lists is in my lists it can be removed from the main page. 
+
+skin profile notes - are any of the skin notes redundant and overlap with the information icon notes? what ideas do you have to make this section shorter?
+
+diet - for marked in diet change the dark green to dark amber.
+
+
+
+
+
+
+● Both changes done — diet chips now amber, ingredient lists   sections removed from both views. Let me now answer the
+  two design questions.
+
+  ---
+  Browse — cleaning supplies
+
+  These products belong in a new "Home" body area, not
+  Hands. Here's my reasoning:
+
+  Product: Dish Soap
+  Contact type: Applied directly to hands, rinse-off
+  Suggested type: Dish Soap
+  Body area: Hands
+  ────────────────────────────────────────
+  Product: Hand Soap (liquid/bar, non-dish)
+  Contact type: Applied directly to hands, rinse-off
+  Suggested type: already covered or new "Hand Soap"
+  Body area: Hands
+  ────────────────────────────────────────
+  Product: Laundry Detergent
+  Contact type: Contacts skin via fabric/residue
+  Suggested type: Laundry Detergent
+  Body area: Home
+  ────────────────────────────────────────
+  Product: Fabric Softener / Dryer Sheets
+  Contact type: Contacts skin via fabric/residue
+  Suggested type: Fabric Softener
+  Body area: Home
+  ────────────────────────────────────────
+  Product: Surface Cleaners / Disinfectants
+  Contact type: Incidental contact (hands, surfaces)
+  Suggested type: Household Cleaner
+  Body area: Home
+
+  Dish Soap → Hands makes sense: it's applied directly to
+  hands during washing, same as hand soap. Both are
+  rinse-off.
+
+  Laundry products → Home: These never touch the skin
+  directly — they contact it indirectly through fabric. This
+   is a different exposure mechanism that warrants a
+  distinct body area. "Home" (or "Household") covers laundry
+   + surface cleaners cleanly without stretching any
+  existing area.
+
+  What I'd skip for now: generic all-purpose cleaners and
+  bathroom sprays. They're rarely scanned by name (no real
+  INCI ingredient list) and don't fit the product-as-formula
+   model. Laundry detergent and fabric softener are the ones
+   with real ingredient lists worth scanning.
+
+  So: add Home as a new body area with Laundry Detergent and
+   Fabric Softener as product types; add Dish Soap under
+  Hands. Confirm and I'll write the migration + code.
+
+  ---
+  Skin profile notes — redundancy analysis
+
+  What overlaps: The ⓘ icon next to every chip already shows
+   the full note for that item (e.g. clicking ⓘ next to
+  "Oily" shows the oily skin paragraph). When that chip is
+  then selected/active, the exact same paragraph also
+  appears again in the persistent notes block below. Every
+  individual skin-type note and every
+  climate/water/device/supplement/diet note is a duplicate
+  of its own ⓘ popup.
+
+  What's unique to the persistent block (can't be seen via
+  ⓘ):
+  - The cross-combo warning cards (amber/orange/teal boxes)
+  — these only trigger from combinations like "rosacea +
+  alcohol" or "acne + high-glycemic diet"
+  - The post-wash window card — combination-dependent
+  - The Flags: … summary line — though this overlaps
+  conceptually with the notes themselves
+
+  Ideas to shorten, pick one or combine:
+
+  1. Drop the individual notes from the persistent block
+  entirely — rely on ⓘ for all single-chip explanations; the
+   persistent block becomes only combo warnings + post-wash
+  + flags line. Most impactful cut.
+  2. Drop the Flags line — the ingredient scan already
+  surfaces what flags apply per ingredient inline. The
+  "Flags: Occlusives · Film-formers · …" line restates the
+  same concern categories the scan results show anyway.
+  3. Drop the footnote "Matching profile notes replace the
+  generic explanation…" — it's meta-commentary about how the
+   tool works; could live in a one-time help tooltip
+  instead.
+
+  Combining all three = persistent block shows only the
+  combo warning cards and post-wash note, which is genuinely
+   new information that can't be previewed via any single ⓘ
+  icon. The section would collapse to nothing when no
+  cross-combo warnings apply, and show only the relevant
+  cards when they do.
+
+  Want me to implement any combination of those?
+
+
+
+
+
+
+
+
+yes add home as a new body area with laundry detergent and fabric softener as product types, and add dish soap under hands.
+
+skin profile notes redundancy - let's go with ideas 1, 2, and 3.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+neutral - what beneficial category ideas do you have for ingredients listed in neutral that don't have a beneficial category displayed, but then discusses benefits by skin type when expanded? for example, disodium edta is listed as a chelating agent for the structural category but doesn't have a beneficial category displayed, even though upon expanding the ingredient the note by skin profile discusses its benefits. 
+
+fragrance sensitizers - i see that some ingredients with structural category fragrance and concern category sensitizer show up in both universal concerns and your profile. for example, citrus grandis (grapefruit) peel oil and citrus limon (lemon) peel oil show up in the universal concerns list, but lavandula hybrida oil, pelargonium graveolens flower oil, citrus nobilis (mandarin orange) peel oil, and juniperus mexicana oil show up in your profile concerns list. is there a reason for this difference? does this discrepancy happen for other ingredients with structural category fragrance and concern category sensitizer? 
+
+what ideas do you have to reduce the spacing between ingredients in by concern ingredient lists? 
+
+formula interactions - what colors are used here? what alternative ideas do you have? currently if the note is a high sensitizer load, it shows up as amber with a yellow border, but sensitizers usually surface as universal concerns in dark rose. what ideas do you have for the formula interactions note to make the color system less confusing?
+
+product lists - the did you mean, alternatives, and browse product lists still show number flagged, sensory, photo and not updated information by concern instead. what ideas do you have to fix this?
+
+admin - product types - some of the body areas and product types don't have an icon. what ideas do you have for them?
+
+
+
+
+
+
+
+
+
+supplements - what ideas do you have if the user doesn't know which supplements profiles to click but do know the name of their supplements? 
+
+diet - what ideas do you have if the user doesn't know which diet they are eating but do know what foods they ate recently or will eat soon?
+
+are we missing any body areas, or could product types be organized into alternative areas or subareas or subsubareas? 
+
+skin profile - what ideas do you have of how the options within each section (skin type, climate, water quality, devices, internal factors) should be ordered?
+
+autocomplete for ingredient lists - what ideas do you have to increase the functionality of this tool?
+
+product names in browse and ingredient names get cut off on mobile - what did we do about this in the other lists? what alternative ideas do you have?
+
+
+
 
 what ideas do you have for diy formula analysis to add a diy formula builder that warns about base compatibility, mixing rules, and stability?
 
 
 
-are we missing any body areas, or could product types be organized into alternative areas or subareas or subsubareas? 
 
-
-
-
-
-
-
-
-
-
-unreviewed shows "Already in database — rescan to see results" but no easy click to scan the ingredients. what ideas do you have for this?
-
-what ideas do you have for allowing users to filter a search for products by marking ingredients or by ingredient lists (that they can also create and edit) or by ingredient categories that they want and/or dont want in the product search results?
-
-product names in browse and ingredient names get cut off on mobile - what did we do about this in the other lists? what alternative ideas do you have?
-
-Import
-https://incidecoder.com/products/axis-y-panthenol-10-skin-smoothing-shield-cream
-https://incidecoder.com/products/purito-green-cleansing-oil
-Check out this product I found on iHerb. 
-https://iherb.co/4JoxZRAk?rcode=DYT4743
-https://iherb.co/JhjQZDk6?rcode=DYT4743
-
-
-
-
-
-
-why does Ingredient Queue say 1 and then say Queue is empty — all ingredients classified?
 
 What ideas do you have to separate admin and super admin permissions?
 
@@ -25934,18 +28570,48 @@ what ideas do you have on where can the community submit support and feature req
 
 
 
+what ideas do you have for allowing users to submit pictures of their skin so that the site can help determine their skin profiles?
+
+
+
+
 Fix ingredients list and image size: Sos Daily Rescue Facial Spray - why does Sos Daily Rescue Facial Spray by Tower 28 Beauty show a huge image in the safer alternatives list, but all of the other products in the list have smaller images and take up less vertical space? what ideas do you have to keep the products in this section at least somewhat consistently sized without losing image clarity?
+
+how can the admin page showcase the site colors better? 
 
 what are the top searched and shopped online shopping or ecommerce sites that sell bath and beauty products? i'd like to eventually create the ability for users to import product pages from sites other than incidecoder and iherb. are these similar to the top rewards or affiliate online shopping or ecommerce sites that sell bath and beauty products? 
 
 
 
+
+
 the add body area in admin panel doesn't work - i can type a new body area but it doesn't add it to the db.
 
-how can the admin page showcase the site colors better? 
+why does Ingredient Queue say 1 and then say Queue is empty — all ingredients classified?
+
+unreviewed shows "Already in database — rescan to see results" but no easy click to scan the ingredients. what ideas do you have for this?
 
 
 
+
+
+
+
+
+  my skin profile (oily, reactive, damaged barrier,
+  acne-prone, hyperpigmentation, fungal acne,
+  seborrheic, psoriasis, lupus rash, humid, hot, high
+   uv, hard / mineral, chlorinated, iron/rust)?
+
+
+
+
+Import
+https://incidecoder.com/products/axis-y-panthenol-10-skin-smoothing-shield-cream
+https://incidecoder.com/products/purito-green-cleansing-oil
+Check out this product I found on iHerb. 
+https://iherb.co/4JoxZRAk?rcode=DYT4743
+https://iherb.co/JhjQZDk6?rcode=DYT4743
 
 
 
