@@ -216,7 +216,7 @@ const RINSE_OFF_TYPES = new Set([
 ]);
 
 type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash" | "keratosis_pilaris" | "body_acne";
-type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water" | "red_nir" | "blue_light" | "amber_light" | "vibration_sonic" | "heat_steam" | "microcurrent" | "iodine_load" | "phytoestrogen_load" | "anti_androgenic" | "vasodilating_supps" | "immune_stimulating" | "insulin_sensitizing" | "anabolic_dht" | "high_dose_b12" | "collagen_support" | "high_glycemic" | "dairy_regular" | "gluten_sensitive" | "histamine_foods" | "alcohol_regular" | "spicy_foods" | "high_iodine_diet";
+type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water" | "red_nir" | "blue_light" | "amber_light" | "vibration_sonic" | "heat_steam" | "microcurrent" | "iodine_load" | "phytoestrogen_load" | "anti_androgenic" | "vasodilating_supps" | "immune_stimulating" | "insulin_sensitizing" | "anabolic_dht" | "high_dose_b12" | "collagen_support" | "high_glycemic" | "dairy_regular" | "gluten_sensitive" | "histamine_foods" | "alcohol_regular" | "spicy_foods" | "high_iodine_diet" | "sulfites_diet" | "benzoates_diet" | "nitrites_diet" | "bha_bht_diet" | "propionates_diet" | "carmine_diet";
 
 const SKIN_TYPES: { value: SkinType; label: string }[] = [
   { value: "oily", label: "Oily" },
@@ -280,6 +280,12 @@ const DIET_TYPES: { value: ClimateType; label: string }[] = [
   { value: "alcohol_regular", label: "Alcohol" },
   { value: "spicy_foods", label: "Spicy foods" },
   { value: "high_iodine_diet", label: "High-iodine diet" },
+  { value: "sulfites_diet", label: "Sulfites" },
+  { value: "benzoates_diet", label: "Benzoates" },
+  { value: "nitrites_diet", label: "Nitrites / nitrates" },
+  { value: "bha_bht_diet", label: "BHT / BHA (food)" },
+  { value: "propionates_diet", label: "Propionates" },
+  { value: "carmine_diet", label: "Carmine / red dye" },
 ];
 
 const ALL_MODIFIER_TYPES = [...CLIMATE_TYPES, ...WATER_TYPES, ...DEVICE_TYPES, ...SUPPLEMENT_TYPES, ...DIET_TYPES];
@@ -334,6 +340,12 @@ const CLIMATE_NOTES: Record<ClimateType, string> = {
   alcohol_regular: "Alcohol is a direct vasodilator and one of the most reliable rosacea flush triggers. It also dehydrates systemically and impairs the skin barrier repair cycle — acutely relevant for dry and barrier-compromised skin. Even moderate regular intake can sustain a baseline of chronic low-grade vascular inflammation.",
   spicy_foods: "Capsaicin and piperine in spicy foods activate TRPV1 (the heat-sensing nerve receptor) in facial skin — the same receptor that responds to menthol and eucalyptol. On rosacea-affected skin this triggers the same flush cycle that topical warming agents do. Identifying and reducing primary spicy triggers has a measurable effect on baseline redness.",
   high_iodine_diet: "A high-iodine diet (seaweed, shellfish, generous iodized salt) can contribute to iodine acne through the same mechanism as iodine supplements — uniform papular eruptions that don't respond to standard acne treatments. Dietary sources are usually lower intensity than supplements but compound with any iodine load from kelp or marine algae capsules.",
+  sulfites_diet: "Sulfites (wine, dried fruit, deli meats, pickles, shrimp) can trigger flushing and rosacea flares — sulfite sensitivity is an enzyme deficiency, not a true allergy. The reaction is vascular: rapid redness and warmth, usually within minutes. Also associated with eczema flares in atopic skin. Look for 'sulfites,' 'sulfur dioxide,' 'sodium/potassium bisulfite' on labels.",
+  benzoates_diet: "Sodium benzoate (sodas, sauces, juices, salad dressings) can trigger urticaria (hives) and contact-type reactions, especially in people sensitive to aspirin — they share a COX-1 inhibition pathway. In reactive and eczema-prone skin, benzoates in food compound with topical preservative exposure. Also found in some fermented foods naturally.",
+  nitrites_diet: "Nitrites and nitrates (processed meats, bacon, hot dogs, cured fish) are associated with rosacea flares and acne worsening, likely via systemic inflammatory pathways and conversion to vasoactive nitric oxide. Fermentation converts nitrates to nitrites, so heavily cured and aged meats have the highest load.",
+  bha_bht_diet: "BHT and BHA (butylated hydroxytoluene / butylated hydroxyanisole) are antioxidant preservatives in packaged snacks, cereals, frying oils, and chewing gum. BHA is a recognized contact allergen — the same compound that appears in some cosmetics as a sensitizer. Regular oral exposure can worsen contact sensitization to BHA in topical products.",
+  propionates_diet: "Calcium and sodium propionate (commercial bread, packaged baked goods, some cheese wraps) are associated with eczema flares and urticaria in propionate-sensitive individuals. Propionates are structurally related to propionic acid, which can activate mast cells in sensitive skin. Look for 'E280–E283' on EU labels.",
+  carmine_diet: "Carmine (cochineal extract, E120, 'natural red 4') is a red dye in yogurt, candy, juice, some medications, and cosmetics. It is a potent allergen — carmine is a complete insect-derived antigen that can cause urticaria, angioedema, and rarely anaphylaxis. Cross-reacts with some botanical allergens. On skin products, the same sensitization from dietary carmine can trigger topical reactions.",
 };
 
 function noteLabel(n: SkinClimateNote): string {
@@ -710,17 +722,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [browseCleanOnly, setBrowseCleanOnly] = useState(false);
   const [listModes, setListModes] = useState<Record<string, "include" | "exclude" | "off">>({});
   const [ingredientLists, setIngredientLists] = useState<IngredientList[]>([]);
-  const [ingListsOpen, setIngListsOpen] = useState(false);
-  const [newIngListOpen, setNewIngListOpen] = useState(false);
-  const [newIngListName, setNewIngListName] = useState("");
-  const [newIngListType, setNewIngListType] = useState<"avoid" | "want">("avoid");
-  const [addItemInputs, setAddItemInputs] = useState<Record<string, string>>({});
   const [addToListMenu, setAddToListMenu] = useState<string | null>(null);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [bulkAddListId, setBulkAddListId] = useState<string | null>(null);
-  const [pasteListId, setPasteListId] = useState<string | null>(null);
-  const [pasteTexts, setPasteTexts] = useState<Record<string, string>>({});
-  const [ingSuggestions, setIngSuggestions] = useState<Record<string, string[]>>({});
   const [browseSearch, setBrowseSearch] = useState("");
   const [imageUploadOpen, setImageUploadOpen] = useState(false);
   const [imageUploadUrl, setImageUploadUrl] = useState("");
@@ -793,8 +797,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [routinePanelOpen, setRoutinePanelOpen] = useState(false);
   const [addRoutinePickerOpen, setAddRoutinePickerOpen] = useState(false);
   const [skinTypeHint, setSkinTypeHint] = useState<SkinType | null>(null);
+  const [climateHint, setClimateHint] = useState<ClimateType | null>(null);
+  const [waterHint, setWaterHint] = useState<ClimateType | null>(null);
+  const [deviceHint, setDeviceHint] = useState<ClimateType | null>(null);
+  const [supplementHint, setSupplementHint] = useState<ClimateType | null>(null);
+  const [dietHint, setDietHint] = useState<ClimateType | null>(null);
   const stickySearchRef = useRef<HTMLInputElement>(null);
-  const ingSuggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 
   const initialProductIdRef = useRef(initialProductId);
   const scrollToProductRef = useRef(false);
@@ -1575,18 +1584,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     return parts.join(" ");
   }
 
-  function fetchIngSuggestions(listId: string, val: string) {
-    if (ingSuggestTimerRef.current) clearTimeout(ingSuggestTimerRef.current);
-    if (val.length < 2) { setIngSuggestions(m => ({ ...m, [listId]: [] })); return; }
-    ingSuggestTimerRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/ingredients/search?q=${encodeURIComponent(val)}`);
-        const json = await res.json() as { suggestions: string[] };
-        setIngSuggestions(m => ({ ...m, [listId]: json.suggestions }));
-      } catch { /* ignore */ }
-    }, 200);
-  }
-
   function renderRoutinePanel() {
     const routineWarns = detectRoutineWarnings(routineProducts);
     const dupMap = new Map<string, string[]>();
@@ -1938,7 +1935,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             >
               Skin profile
               {(activeSkinTypes.size + activeClimates.size) > 0 && (
-                <span className="text-teal-600 font-medium normal-case tracking-normal">
+                <span className="text-purple-800 font-medium normal-case tracking-normal">
                   {activeSkinTypes.size + activeClimates.size} active
                 </span>
               )}
@@ -1956,7 +1953,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           onClick={() => toggleSkinType(value)}
                           className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
                             activeSkinTypes.has(value)
-                              ? "bg-teal-700 text-white border-teal-700"
+                              ? "bg-amber-700 text-white border-amber-700"
                               : "text-gray-500 border-gray-200 hover:border-gray-400"
                           }`}
                         >
@@ -1982,51 +1979,85 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <p className="text-xs text-gray-400 mb-1.5">Climate</p>
                   <div className="flex flex-wrap gap-1.5">
                     {CLIMATE_TYPES.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => toggleClimate(value)}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                          activeClimates.has(value)
-                            ? "bg-teal-700 text-white border-teal-700"
-                            : "text-gray-500 border-gray-200 hover:border-gray-400"
-                        }`}
-                      >
-                        {label}
-                      </button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setClimateHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {climateHint && CLIMATE_NOTES[climateHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === climateHint)?.label} — </span>
+                      {CLIMATE_NOTES[climateHint]}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-1.5">Water quality</p>
                   <div className="flex flex-wrap gap-1.5">
                     {WATER_TYPES.map(({ value, label }) => (
-                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setWaterHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {waterHint && CLIMATE_NOTES[waterHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === waterHint)?.label} — </span>
+                      {CLIMATE_NOTES[waterHint]}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-1.5">Devices</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DEVICE_TYPES.map(({ value, label }) => (
-                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-blue-700 text-white border-blue-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-gray-700 text-white border-gray-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setDeviceHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {deviceHint && CLIMATE_NOTES[deviceHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === deviceHint)?.label} — </span>
+                      {CLIMATE_NOTES[deviceHint]}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-1.5">Internal factors</p>
                   <p className="text-[10px] text-gray-400 mb-1">Supplements</p>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {SUPPLEMENT_TYPES.map(({ value, label }) => (
-                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-violet-700 text-white border-violet-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-gray-700 text-white border-gray-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setSupplementHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {supplementHint && CLIMATE_NOTES[supplementHint] && (
+                    <div className="mb-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === supplementHint)?.label} — </span>
+                      {CLIMATE_NOTES[supplementHint]}
+                    </div>
+                  )}
                   <p className="text-[10px] text-gray-400 mb-1">Diet</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DIET_TYPES.map(({ value, label }) => (
-                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-emerald-700 text-white border-emerald-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-emerald-700 text-white border-emerald-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setDietHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {dietHint && CLIMATE_NOTES[dietHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === dietHint)?.label} — </span>
+                      {CLIMATE_NOTES[dietHint]}
+                    </div>
+                  )}
                 </div>
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
                   <div className="space-y-1.5 pt-1">
@@ -2073,142 +2104,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             )}
           </section>
 
-          {/* Ingredient lists panel — idle state */}
+          {/* Ingredient lists — manage in My Lists */}
           <section className="mb-6">
-            <button
-              type="button"
-              onClick={() => setIngListsOpen(v => !v)}
-              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full"
-            >
+            <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full">
               Ingredient lists
               {ingredientLists.some(l => l.items.length > 0) && (
                 <span className="text-gray-500 font-medium normal-case tracking-normal">
                   {ingredientLists.filter(l => l.items.length > 0).length} active
                 </span>
               )}
-              <span className="text-gray-300 ml-auto">{ingListsOpen ? "▲" : "▼"}</span>
-            </button>
-            {ingListsOpen && (
-              <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3">
-                <p className="text-xs text-gray-400">Build avoid and want lists to filter browse results. Lists are saved locally on this device.</p>
-                {ingredientLists.map((list) => (
-                  <div key={list.id} className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${list.type === "avoid" ? "bg-rose-50 text-rose-700" : "bg-teal-50 text-teal-700"}`}>{list.type === "avoid" ? "Avoid" : "Want"}</span>
-                      <span className="text-xs font-medium text-gray-700 flex-1">{list.name}</span>
-                      <button type="button" onClick={() => setIngredientLists(ls => ls.filter(l => l.id !== list.id))} className="text-[10px] text-gray-400 hover:text-rose-600">Delete list</button>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {list.items.map((item) => (
-                        <span key={item} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                          {item}
-                          <button type="button" onClick={() => setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: l.items.filter(i => i !== item) } : l))} className="text-gray-400 hover:text-rose-600 leading-none">×</button>
-                        </span>
-                      ))}
-                    </div>
-                    {pasteListId === list.id ? (
-                      <div className="space-y-1.5 pt-1 border-t border-gray-100">
-                        <p className="text-[10px] text-gray-400 pt-0.5">Paste names — one per line or comma-separated</p>
-                        <textarea
-                          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 resize-none"
-                          rows={3}
-                          value={pasteTexts[list.id] ?? ""}
-                          onChange={(e) => setPasteTexts(m => ({ ...m, [list.id]: e.target.value }))}
-                          placeholder="niacinamide, fragrance, alcohol denat…"
-                          autoFocus
-                        />
-                        <div className="flex gap-1.5">
-                          <button type="button" className="text-xs px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700"
-                            onClick={() => {
-                              const raw = pasteTexts[list.id] ?? "";
-                              const items = raw.split(/[,\n]+/).map((s: string) => s.trim().toLowerCase()).filter(Boolean);
-                              if (items.length > 0) setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...new Set([...l.items, ...items])] } : l));
-                              setPasteTexts(m => ({ ...m, [list.id]: "" }));
-                              setPasteListId(null);
-                            }}>
-                            Add {(pasteTexts[list.id] ?? "").split(/[,\n]+/).filter((s: string) => s.trim()).length || ""}
-                          </button>
-                          <button type="button" className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200"
-                            onClick={() => { setPasteListId(null); setPasteTexts(m => ({ ...m, [list.id]: "" })); }}>
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <form onSubmit={(e) => {
-                          e.preventDefault();
-                          const val = (addItemInputs[list.id] ?? "").trim().toLowerCase();
-                          if (!val || list.items.includes(val)) return;
-                          setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
-                          setAddItemInputs(m => ({ ...m, [list.id]: "" }));
-                          setIngSuggestions(m => ({ ...m, [list.id]: [] }));
-                        }} className="flex gap-1.5 relative">
-                          <div className="relative flex-1">
-                            <input
-                              type="text"
-                              value={addItemInputs[list.id] ?? ""}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setAddItemInputs(m => ({ ...m, [list.id]: v }));
-                                fetchIngSuggestions(list.id, v);
-                              }}
-                              onBlur={() => setTimeout(() => setIngSuggestions(m => ({ ...m, [list.id]: [] })), 150)}
-                              placeholder="Add ingredient…"
-                              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
-                            />
-                            {(ingSuggestions[list.id] ?? []).length > 0 && (
-                              <ul className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden text-xs">
-                                {(ingSuggestions[list.id] ?? []).map((s) => (
-                                  <li key={s}>
-                                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
-                                      const val = s.toLowerCase();
-                                      if (!list.items.includes(val)) setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
-                                      setAddItemInputs(m => ({ ...m, [list.id]: "" }));
-                                      setIngSuggestions(m => ({ ...m, [list.id]: [] }));
-                                    }} className="w-full text-left px-2 py-1.5 hover:bg-gray-50 truncate">{s}</button>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                          <button type="submit" className="text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600">Add</button>
-                        </form>
-                        <button type="button" className="text-[10px] text-gray-400 hover:text-gray-600"
-                          onClick={() => setPasteListId(list.id)}>
-                          + Paste multiple
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {newIngListOpen ? (
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!newIngListName.trim()) return;
-                    setIngredientLists(ls => [...ls, { id: crypto.randomUUID(), name: newIngListName.trim(), items: [] }]);
-                    setNewIngListName("");
-                    setNewIngListOpen(false);
-                  }} className="space-y-1.5 pt-1 border-t border-gray-100">
-                    <p className="text-[10px] text-gray-400 pt-1">New list</p>
-                    <input
-                      type="text"
-                      value={newIngListName}
-                      onChange={(e) => setNewIngListName(e.target.value)}
-                      placeholder="List name…"
-                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
-                      autoFocus
-                    />
-                    <div className="flex gap-1.5">
-                      <button type="submit" className="ml-auto text-xs px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700">Create</button>
-                      <button type="button" onClick={() => setNewIngListOpen(false)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200">Cancel</button>
-                    </div>
-                  </form>
-                ) : (
-                  <button type="button" onClick={() => setNewIngListOpen(true)} className="text-xs text-gray-400 hover:text-gray-700">+ New list</button>
-                )}
-              </div>
-            )}
+              <a href="/lists" className="ml-auto text-[10px] font-normal normal-case tracking-normal text-gray-400 hover:text-gray-700 underline underline-offset-2">Manage in My Lists →</a>
+            </div>
           </section>
 
           {/* Routine panel — idle state (inline collapsible, hidden on md+ where the side panel is used) */}
@@ -2220,7 +2126,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             >
               Routine
               {routineProducts.length > 0 && (
-                <span className="text-teal-600 font-medium normal-case tracking-normal">
+                <span className="text-purple-800 font-medium normal-case tracking-normal">
                   {routineProducts.length} product{routineProducts.length !== 1 ? "s" : ""}
                 </span>
               )}
@@ -2238,6 +2144,25 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
           {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
             <>
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Quick filters</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" onClick={() => setBrowseNoUniversal(v => !v)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${browseNoUniversal ? "bg-rose-600 text-white border-rose-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                  ✗ Universal Concerns
+                </button>
+                {(activeSkinTypes.size + activeClimates.size) > 0 && (
+                  <button type="button" onClick={() => setBrowseProfileLinked(v => !v)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${browseProfileLinked ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                    ✗ My Sensitivities
+                  </button>
+                )}
+                <button type="button" onClick={() => setBrowseCleanOnly(v => !v)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${browseCleanOnly ? "bg-green-700 text-white border-green-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                  ✓ Neutral &amp; Beneficial
+                </button>
+                <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                  Photo-safe
+                </button>
+              </div>
+            </div>
             <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
             <div className="space-y-5">
               {(() => {
@@ -2332,12 +2257,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       className="w-full text-sm border border-gray-200 rounded-xl px-3 py-1.5 mb-3 focus:outline-none focus:border-gray-400"
                     />
                     <div className="flex flex-wrap gap-1.5 mb-3">
-                      <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Photo-safe</button>
+                      <button type="button" onClick={() => setBrowseNoUniversal(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseNoUniversal ? "bg-rose-600 text-white border-rose-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>✗ Universal Concerns</button>
                       {profileCats.length > 0 && (
-                        <button type="button" onClick={() => setBrowseProfileLinked(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseProfileLinked ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Profile-safe</button>
+                        <button type="button" onClick={() => setBrowseProfileLinked(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseProfileLinked ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>✗ My Sensitivities</button>
                       )}
-                      <button type="button" onClick={() => setBrowseNoUniversal(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseNoUniversal ? "bg-rose-600 text-white border-rose-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>No universal concerns</button>
-                      <button type="button" onClick={() => setBrowseCleanOnly(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseCleanOnly ? "bg-green-700 text-white border-green-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Clean only</button>
+                      <button type="button" onClick={() => setBrowseCleanOnly(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseCleanOnly ? "bg-green-700 text-white border-green-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>✓ Neutral &amp; Beneficial</button>
+                      <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Photo-safe</button>
                       {avoidLists.filter(l => l.type === "avoid").map(l => (
                         <span key={l.id} className="text-xs px-2 py-0.5 rounded-full border bg-rose-50 text-rose-700 border-rose-200">✗ {l.name}</span>
                       ))}
@@ -3150,13 +3075,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               return (
                 <p className="text-xs -mt-2">
                   <span className="text-gray-700">{totalItems} ingredient{totalItems !== 1 ? "s" : ""} scanned</span>
+                  {profileCount > 0 && <>{" · "}<button type="button" className={`${qualColor} font-medium hover:underline underline-offset-2`} onClick={scrollToConcern}>{profileCount} profile concern{profileCount !== 1 ? "s" : ""}</button></>}
                   {" · "}
-                  <button type="button" className={`${qualColor} font-medium hover:underline underline-offset-2`} onClick={scrollToConcern}>{qualLabel} for your profile</button>
-                  {" · "}
-                  <button type="button" className="text-gray-500 hover:underline underline-offset-2" onClick={scrollToConcern}>{profileCount} of {totalConcernCount} concern{totalConcernCount !== 1 ? "s" : ""} match</button>
-                  {" · "}
-                  <button type="button" className="text-teal-700 hover:underline underline-offset-2" onClick={scrollToConcern}>{result.safe.length} safe</button>
-                  {result.unreviewed.length > 0 && <>{" · "}<button type="button" className="hover:underline underline-offset-2" onClick={() => { setShowUnreviewed(true); requestAnimationFrame(() => { document.getElementById("section-unreviewed")?.scrollIntoView({ behavior: "smooth", block: "start" }); }); }}>{result.unreviewed.length} unreviewed</button></>}
+                  <button type="button" className="text-teal-700 hover:underline underline-offset-2" onClick={scrollToConcern}>{result.safe.length} neutral</button>
+                  {result.unreviewed.length > 0 && <>{" · "}<button type="button" className="text-gray-400 hover:underline underline-offset-2" onClick={() => { setShowUnreviewed(true); requestAnimationFrame(() => { document.getElementById("section-unreviewed")?.scrollIntoView({ behavior: "smooth", block: "start" }); }); }}>{result.unreviewed.length} unreviewed</button></>}
                 </p>
               );
             }
@@ -3202,14 +3124,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 className="text-teal-700 hover:underline underline-offset-2"
                 onClick={scrollToConcern}
               >
-                {result.safe.length} safe
+                {result.safe.length} neutral
               </button>
               {result.unreviewed.length > 0 && (
                 <>
                   {" · "}
                   <button
                     type="button"
-                    className="hover:underline underline-offset-2"
+                    className="text-gray-400 hover:underline underline-offset-2"
                     onClick={() => {
                       setShowUnreviewed(true);
                       requestAnimationFrame(() => {
@@ -3362,7 +3284,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             >
               Skin profile
               {(activeSkinTypes.size + activeClimates.size) > 0 && (
-                <span className="text-teal-600 font-medium normal-case tracking-normal">
+                <span className="text-purple-800 font-medium normal-case tracking-normal">
                   {activeSkinTypes.size + activeClimates.size} active
                 </span>
               )}
@@ -3380,7 +3302,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           onClick={() => toggleSkinType(value)}
                           className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
                             activeSkinTypes.has(value)
-                              ? "bg-teal-700 text-white border-teal-700"
+                              ? "bg-amber-700 text-white border-amber-700"
                               : "text-gray-500 border-gray-200 hover:border-gray-400"
                           }`}
                         >
@@ -3406,51 +3328,85 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <p className="text-xs text-gray-400 mb-1.5">Climate</p>
                   <div className="flex flex-wrap gap-1.5">
                     {CLIMATE_TYPES.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => toggleClimate(value)}
-                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                          activeClimates.has(value)
-                            ? "bg-teal-700 text-white border-teal-700"
-                            : "text-gray-500 border-gray-200 hover:border-gray-400"
-                        }`}
-                      >
-                        {label}
-                      </button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setClimateHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {climateHint && CLIMATE_NOTES[climateHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === climateHint)?.label} — </span>
+                      {CLIMATE_NOTES[climateHint]}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-1.5">Water quality</p>
                   <div className="flex flex-wrap gap-1.5">
                     {WATER_TYPES.map(({ value, label }) => (
-                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-teal-700 text-white border-teal-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setWaterHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {waterHint && CLIMATE_NOTES[waterHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === waterHint)?.label} — </span>
+                      {CLIMATE_NOTES[waterHint]}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-1.5">Devices</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DEVICE_TYPES.map(({ value, label }) => (
-                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-blue-700 text-white border-blue-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-gray-700 text-white border-gray-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setDeviceHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {deviceHint && CLIMATE_NOTES[deviceHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === deviceHint)?.label} — </span>
+                      {CLIMATE_NOTES[deviceHint]}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-1.5">Internal factors</p>
                   <p className="text-[10px] text-gray-400 mb-1">Supplements</p>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {SUPPLEMENT_TYPES.map(({ value, label }) => (
-                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-violet-700 text-white border-violet-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-gray-700 text-white border-gray-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setSupplementHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {supplementHint && CLIMATE_NOTES[supplementHint] && (
+                    <div className="mb-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === supplementHint)?.label} — </span>
+                      {CLIMATE_NOTES[supplementHint]}
+                    </div>
+                  )}
                   <p className="text-[10px] text-gray-400 mb-1">Diet</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DIET_TYPES.map(({ value, label }) => (
-                      <button key={value} type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-emerald-700 text-white border-emerald-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-emerald-700 text-white border-emerald-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setDietHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
                     ))}
                   </div>
+                  {dietHint && CLIMATE_NOTES[dietHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === dietHint)?.label} — </span>
+                      {CLIMATE_NOTES[dietHint]}
+                    </div>
+                  )}
                 </div>
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
                   <div className="space-y-1.5 pt-1">
@@ -3497,142 +3453,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             )}
           </section>
 
-          {/* Ingredient lists panel — results state */}
+          {/* Ingredient lists — manage in My Lists */}
           <section className="mb-4">
-            <button
-              type="button"
-              onClick={() => setIngListsOpen(v => !v)}
-              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full"
-            >
+            <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full">
               Ingredient lists
               {ingredientLists.some(l => l.items.length > 0) && (
                 <span className="text-gray-500 font-medium normal-case tracking-normal">
                   {ingredientLists.filter(l => l.items.length > 0).length} active
                 </span>
               )}
-              <span className="text-gray-300 ml-auto">{ingListsOpen ? "▲" : "▼"}</span>
-            </button>
-            {ingListsOpen && (
-              <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3">
-                <p className="text-xs text-gray-400">Build avoid and want lists to filter browse results. Lists are saved locally on this device.</p>
-                {ingredientLists.map((list) => (
-                  <div key={list.id} className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${list.type === "avoid" ? "bg-rose-50 text-rose-700" : "bg-teal-50 text-teal-700"}`}>{list.type === "avoid" ? "Avoid" : "Want"}</span>
-                      <span className="text-xs font-medium text-gray-700 flex-1">{list.name}</span>
-                      <button type="button" onClick={() => setIngredientLists(ls => ls.filter(l => l.id !== list.id))} className="text-[10px] text-gray-400 hover:text-rose-600">Delete list</button>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {list.items.map((item) => (
-                        <span key={item} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                          {item}
-                          <button type="button" onClick={() => setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: l.items.filter(i => i !== item) } : l))} className="text-gray-400 hover:text-rose-600 leading-none">×</button>
-                        </span>
-                      ))}
-                    </div>
-                    {pasteListId === list.id ? (
-                      <div className="space-y-1.5 pt-1 border-t border-gray-100">
-                        <p className="text-[10px] text-gray-400 pt-0.5">Paste names — one per line or comma-separated</p>
-                        <textarea
-                          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 resize-none"
-                          rows={3}
-                          value={pasteTexts[list.id] ?? ""}
-                          onChange={(e) => setPasteTexts(m => ({ ...m, [list.id]: e.target.value }))}
-                          placeholder="niacinamide, fragrance, alcohol denat…"
-                          autoFocus
-                        />
-                        <div className="flex gap-1.5">
-                          <button type="button" className="text-xs px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700"
-                            onClick={() => {
-                              const raw = pasteTexts[list.id] ?? "";
-                              const items = raw.split(/[,\n]+/).map((s: string) => s.trim().toLowerCase()).filter(Boolean);
-                              if (items.length > 0) setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...new Set([...l.items, ...items])] } : l));
-                              setPasteTexts(m => ({ ...m, [list.id]: "" }));
-                              setPasteListId(null);
-                            }}>
-                            Add {(pasteTexts[list.id] ?? "").split(/[,\n]+/).filter((s: string) => s.trim()).length || ""}
-                          </button>
-                          <button type="button" className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200"
-                            onClick={() => { setPasteListId(null); setPasteTexts(m => ({ ...m, [list.id]: "" })); }}>
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <form onSubmit={(e) => {
-                          e.preventDefault();
-                          const val = (addItemInputs[list.id] ?? "").trim().toLowerCase();
-                          if (!val || list.items.includes(val)) return;
-                          setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
-                          setAddItemInputs(m => ({ ...m, [list.id]: "" }));
-                          setIngSuggestions(m => ({ ...m, [list.id]: [] }));
-                        }} className="flex gap-1.5 relative">
-                          <div className="relative flex-1">
-                            <input
-                              type="text"
-                              value={addItemInputs[list.id] ?? ""}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setAddItemInputs(m => ({ ...m, [list.id]: v }));
-                                fetchIngSuggestions(list.id, v);
-                              }}
-                              onBlur={() => setTimeout(() => setIngSuggestions(m => ({ ...m, [list.id]: [] })), 150)}
-                              placeholder="Add ingredient…"
-                              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
-                            />
-                            {(ingSuggestions[list.id] ?? []).length > 0 && (
-                              <ul className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden text-xs">
-                                {(ingSuggestions[list.id] ?? []).map((s) => (
-                                  <li key={s}>
-                                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
-                                      const val = s.toLowerCase();
-                                      if (!list.items.includes(val)) setIngredientLists(ls => ls.map(l => l.id === list.id ? { ...l, items: [...l.items, val] } : l));
-                                      setAddItemInputs(m => ({ ...m, [list.id]: "" }));
-                                      setIngSuggestions(m => ({ ...m, [list.id]: [] }));
-                                    }} className="w-full text-left px-2 py-1.5 hover:bg-gray-50 truncate">{s}</button>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                          <button type="submit" className="text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600">Add</button>
-                        </form>
-                        <button type="button" className="text-[10px] text-gray-400 hover:text-gray-600"
-                          onClick={() => setPasteListId(list.id)}>
-                          + Paste multiple
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {newIngListOpen ? (
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!newIngListName.trim()) return;
-                    setIngredientLists(ls => [...ls, { id: crypto.randomUUID(), name: newIngListName.trim(), items: [] }]);
-                    setNewIngListName("");
-                    setNewIngListOpen(false);
-                  }} className="space-y-1.5 pt-1 border-t border-gray-100">
-                    <p className="text-[10px] text-gray-400 pt-1">New list</p>
-                    <input
-                      type="text"
-                      value={newIngListName}
-                      onChange={(e) => setNewIngListName(e.target.value)}
-                      placeholder="List name…"
-                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400"
-                      autoFocus
-                    />
-                    <div className="flex gap-1.5">
-                      <button type="submit" className="ml-auto text-xs px-2 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700">Create</button>
-                      <button type="button" onClick={() => setNewIngListOpen(false)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200">Cancel</button>
-                    </div>
-                  </form>
-                ) : (
-                  <button type="button" onClick={() => setNewIngListOpen(true)} className="text-xs text-gray-400 hover:text-gray-700">+ New list</button>
-                )}
-              </div>
-            )}
+              <a href="/lists" className="ml-auto text-[10px] font-normal normal-case tracking-normal text-gray-400 hover:text-gray-700 underline underline-offset-2">Manage in My Lists →</a>
+            </div>
           </section>
 
           {/* Routine panel — results state (inline collapsible, hidden on md+ where the side panel is used) */}
@@ -3644,7 +3475,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             >
               Routine
               {routineProducts.length > 0 && (
-                <span className="text-teal-600 font-medium normal-case tracking-normal">
+                <span className="text-purple-800 font-medium normal-case tracking-normal">
                   {routineProducts.length} product{routineProducts.length !== 1 ? "s" : ""}
                 </span>
               )}
@@ -3744,9 +3575,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Device interactions</p>
                 <div className="space-y-2">
                   {devWarns.map((w, i) => (
-                    <div key={i} className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-blue-200 bg-blue-50" : "border-teal-100 bg-teal-50"}`}>
-                      <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-blue-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚡ " : "✦ "}{w.title}</p>
-                      <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-blue-700" : "text-teal-700"}`}>{w.body}</p>
+                    <div key={i} className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-blue-200 bg-blue-50" : "border-amber-100 bg-amber-50"}`}>
+                      <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-blue-800" : "text-amber-800"}`}>{w.type === "danger" ? "⚡ " : "✦ "}{w.title}</p>
+                      <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-blue-700" : "text-amber-700"}`}>{w.body}</p>
                     </div>
                   ))}
                 </div>

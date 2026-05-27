@@ -29,6 +29,8 @@ const SKIN_TYPE_LABELS: Record<string, string> = {
   keratosis_pilaris: "Keratosis pilaris", body_acne: "Body acne",
 };
 
+const SKIN_TYPE_VALUES = Object.keys(SKIN_TYPE_LABELS);
+
 const SMART_LISTS = [
   {
     id: "universal-concerns",
@@ -64,6 +66,7 @@ export default function ListsPage() {
 
   // Profile (from localStorage)
   const [skinTypes, setSkinTypes] = useState<string[]>([]);
+  const [editingProfile, setEditingProfile] = useState(false);
 
   // Ingredient lists (localStorage)
   const [ingredientLists, setIngredientLists] = useState<IngredientList[]>([]);
@@ -173,7 +176,38 @@ export default function ListsPage() {
           </div>
 
           {/* Mini skin profile chips */}
-          {skinTypes.length > 0 ? (
+          {editingProfile ? (
+            <div className="border border-gray-200 rounded-xl p-3 space-y-2.5">
+              <p className="text-xs font-medium text-gray-700">Skin types</p>
+              <div className="flex flex-wrap gap-1.5">
+                {SKIN_TYPE_VALUES.map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => {
+                      const next = skinTypes.includes(st) ? skinTypes.filter(s => s !== st) : [...skinTypes, st];
+                      setSkinTypes(next);
+                      try { localStorage.setItem("skindex:skinTypes", JSON.stringify(next)); } catch {}
+                    }}
+                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                      skinTypes.includes(st)
+                        ? "bg-amber-700 text-white border-amber-700"
+                        : "text-gray-500 border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    {SKIN_TYPE_LABELS[st]}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingProfile(false)}
+                className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2"
+              >
+                Done
+              </button>
+            </div>
+          ) : skinTypes.length > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-0.5">Profile:</span>
               {skinTypes.map((st) => (
@@ -181,16 +215,16 @@ export default function ListsPage() {
                   {SKIN_TYPE_LABELS[st] ?? st}
                 </span>
               ))}
-              <Link href="/" className="text-[10px] text-gray-400 hover:text-gray-700 underline underline-offset-2 ml-1">
+              <button type="button" onClick={() => setEditingProfile(true)} className="text-[10px] text-gray-400 hover:text-gray-700 underline underline-offset-2 ml-1">
                 Edit
-              </Link>
+              </button>
             </div>
           ) : (
             <p className="text-xs text-gray-400">
               No skin profile set.{" "}
-              <Link href="/" className="underline underline-offset-2 hover:text-gray-700">
-                Set it on the home page
-              </Link>{" "}
+              <button type="button" onClick={() => setEditingProfile(true)} className="underline underline-offset-2 hover:text-gray-700">
+                Set it here
+              </button>{" "}
               to personalize your ingredient lists.
             </p>
           )}
@@ -424,11 +458,13 @@ export default function ListsPage() {
                     <div key={list.id} className="border border-gray-200 rounded-xl p-3 space-y-2">
                       {/* List header */}
                       <div className="flex items-center gap-2">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
-                          list.type === "avoid" ? "bg-rose-50 text-rose-700" : "bg-teal-50 text-teal-700"
-                        }`}>
-                          {list.type === "avoid" ? "Avoid" : "Want"}
-                        </span>
+                        {list.type && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
+                            list.type === "avoid" ? "bg-rose-50 text-rose-700" : "bg-teal-50 text-teal-700"
+                          }`}>
+                            {list.type === "avoid" ? "Avoid" : "Want"}
+                          </span>
+                        )}
                         <span className="text-sm font-medium text-gray-800 flex-1 leading-snug">{list.name}</span>
                         <span className="text-xs text-gray-400">{list.items.length}</span>
                         <button
