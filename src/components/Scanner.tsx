@@ -1639,14 +1639,21 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     : tab === "add" ? addTabUrlCount === 1
     : false;
 
-  function getPostWashNote(skinTypes: Set<SkinType>, climates: Set<ClimateType>): string | null {
-    const hardOrChlorinated = climates.has("hard_water") || climates.has("chlorinated_water") || climates.has("iron_water");
-    const acneOrOily = skinTypes.has("acne_prone") || skinTypes.has("oily");
-    const malassezia = skinTypes.has("fungal_acne") || skinTypes.has("seborrheic");
-    const barrier = skinTypes.has("damaged_barrier") || skinTypes.has("reactive");
+  function getPostWashNote(skinTypes: Set<SkinType>, climates: Set<ClimateType>): { title: string; body: string } | null {
+    const hardWater      = climates.has("hard_water");
+    const chlorinated    = climates.has("chlorinated_water");
+    const ironWater      = climates.has("iron_water");
+    const waterTypes     = [hardWater && "hard water", chlorinated && "chlorinated water", ironWater && "iron water"].filter(Boolean) as string[];
+    const acneOrOily     = skinTypes.has("acne_prone") || skinTypes.has("oily");
+    const malassezia     = skinTypes.has("fungal_acne") || skinTypes.has("seborrheic");
+    const barrier        = skinTypes.has("damaged_barrier") || skinTypes.has("reactive");
     if (!acneOrOily && !malassezia && !barrier) return null;
+    const waterLabel     = waterTypes.length > 1 ? "water quality" : waterTypes[0];
+    const title          = waterLabel
+      ? `⚠ Post-wash conflict — ${waterLabel}`
+      : "⚠ Post-wash timing conflict";
     const parts: string[] = [];
-    if (hardOrChlorinated) {
+    if (waterTypes.length > 0) {
       parts.push("Hard or chlorinated water temporarily raises skin pH above 7 — the acid mantle (normally 4.5–5.5) takes 20–30 minutes to recover on its own.");
     } else {
       parts.push("After washing, the acid mantle takes up to 20–30 minutes to recover its normal pH of 4.5–5.5.");
@@ -1655,7 +1662,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     if (malassezia) parts.push("Malassezia recolonizes most rapidly in the first minutes after cleansing, when the skin surface is warm and freshly sebum-coated. A low-pH toner or essence applied immediately helps suppress this.");
     if (barrier) parts.push("With a damaged barrier, transepidermal water loss (TEWL) peaks in the first minutes post-wash — applying any film-forming or occlusive layer promptly traps moisture before evaporation sets in.");
     parts.push("The highest-impact habit for your profile: apply your first product within 30 seconds of patting dry, before the skin surface dries completely.");
-    return parts.join(" ");
+    return { title, body: parts.join(" ") };
   }
 
   function renderRoutinePanel() {
@@ -2150,20 +2157,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       return allWarns.length > 0 ? (
                         <div className="space-y-1.5">
                           {allWarns.map((w, i) => (
-                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800" : w.type === "caution" ? "border-amber-600" : "border-teal-800"}`}>
-                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
-                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-700" : "text-teal-800"}`}>{w.body}</p>
+                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800" : w.type === "caution" ? "border-amber-800" : "border-teal-800"}`}>
+                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : w.type === "caution" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
+                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
                             </div>
                           ))}
                         </div>
                       ) : null;
                     })()}
                     {(() => {
-                      const note = getPostWashNote(activeSkinTypes, activeClimates);
-                      return note ? (
+                      const postWash = getPostWashNote(activeSkinTypes, activeClimates);
+                      return postWash ? (
                         <div className="rounded-xl border border-amber-800 px-3 py-2">
-                          <p className="text-xs font-semibold text-amber-900 mb-0.5">⚠ Post-wash timing conflict</p>
-                          <p className="text-xs leading-relaxed text-amber-800">{note}</p>
+                          <p className="text-xs font-semibold text-amber-900 mb-0.5">{postWash.title}</p>
+                          <p className="text-xs leading-relaxed text-amber-800">{postWash.body}</p>
                         </div>
                       ) : null;
                     })()}
@@ -3530,20 +3537,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       return allWarns.length > 0 ? (
                         <div className="space-y-1.5">
                           {allWarns.map((w, i) => (
-                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800" : w.type === "caution" ? "border-amber-600" : "border-teal-800"}`}>
-                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
-                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-700" : "text-teal-800"}`}>{w.body}</p>
+                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800" : w.type === "caution" ? "border-amber-800" : "border-teal-800"}`}>
+                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : w.type === "caution" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
+                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
                             </div>
                           ))}
                         </div>
                       ) : null;
                     })()}
                     {(() => {
-                      const note = getPostWashNote(activeSkinTypes, activeClimates);
-                      return note ? (
+                      const postWash = getPostWashNote(activeSkinTypes, activeClimates);
+                      return postWash ? (
                         <div className="rounded-xl border border-amber-800 px-3 py-2">
-                          <p className="text-xs font-semibold text-amber-900 mb-0.5">⚠ Post-wash timing conflict</p>
-                          <p className="text-xs leading-relaxed text-amber-800">{note}</p>
+                          <p className="text-xs font-semibold text-amber-900 mb-0.5">{postWash.title}</p>
+                          <p className="text-xs leading-relaxed text-amber-800">{postWash.body}</p>
                         </div>
                       ) : null;
                     })()}

@@ -29257,7 +29257,57 @@ instead of white maybe just no fill
 
 
 
+● Pushed. All warning and note cards now have no fill — just   the colored border and text:
 
+  ┌────────────────┬───────────┬─────────────────┬──────┐
+  │   Card type    │  Border   │      Text       │ Fill │
+  ├────────────────┼───────────┼─────────────────┼──────┤
+  │ Danger /       │ amber-800 │ amber-900 /     │ none │
+  │ conflict       │           │ amber-800       │      │
+  ├────────────────┼───────────┼─────────────────┼──────┤
+  │ Caution        │ amber-600 │ amber-800 /     │ none │
+  │                │           │ amber-700       │      │
+  ├────────────────┼───────────┼─────────────────┼──────┤
+  │ Synergy        │ teal-800  │ teal-800        │ none │
+  ├────────────────┼───────────┼─────────────────┼──────┤
+  │ Post-wash      │ amber-800 │ amber-900 /     │ none │
+  │ conflict       │           │ amber-800       │      │
+  └────────────────┴───────────┴─────────────────┴──────┘
+
+  The floating routine button (pill at bottom-right) keeps
+  its bg-white since a button without a background wouldn't
+  be legible as a button.
+
+  Other note/card styles that were already consistent and
+  untouched:
+  - Step tags in routine (acid-step, low-ph-step, retinoid)
+  — different component, intentionally colored
+  - Profile climate/diet pills (climateNoteStyle) — display
+  elements, not warnings
+  - Ingredient concern pills (rose/amber/yellow/teal
+  CONCERN_PILL) — part of the by-concern ingredient view
+  - Shared-ingredient duplication pill in routine panel —
+  small inline tag, fine as-is
+
+
+
+
+
+danger/conflict and caution should show up as similar colors. let's have the caution cards show up with the style of danger/conflict cards.
+the post-wash timing conflict card still doesn't include mention of hard or chlorinated water in its header text
+
+
+
+
+● Now I have everything. Two changes:
+
+  1. Caution → same as danger: border-amber-600 →
+  border-amber-800, title text-amber-800 → text-amber-900,
+  body text-amber-700 → text-amber-800
+  2. Post-wash header: getPostWashNote returns a static
+  string but the title needs to vary. I'll change it to
+  return { title, body } | null and compute the
+  water-specific header inside.
 
 
 
