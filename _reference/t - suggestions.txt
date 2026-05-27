@@ -28506,7 +28506,49 @@ skin profile notes redundancy - let's go with ideas 1, 2, and 3.
 
 
 
+● Done. Here's the summary:
 
+  ---
+  What changed
+
+  Diet (done) — selected diet chips are now dark amber to
+  match the Climate and Water chips instead of the old
+  isolated green.
+
+  Skin profile notes (done) — the persistent notes panel at
+  the bottom of the profile section now shows only what
+  can't be discovered via ⓘ: cross-combo interaction
+  warnings (e.g. rosacea + alcohol, acne + iodine stack) and
+   the post-wash window note. The per-chip individual notes,
+   the Flags summary line, and the "matching profile notes…"
+   footnote are all gone. On a typical profile with no
+  cross-combo combinations active, the panel will be empty.
+
+  Ingredient lists (done) — the "Ingredient lists · Manage
+  in My Lists →" headers are removed from both the browse
+  view and the scan result view.
+
+  Home body area (done in code) — AREA_ORDER,
+  PRODUCT_TYPE_GROUPS, and RINSE_OFF_TYPES are all updated.
+  To push to the DB:
+
+  ! npx tsx scripts/migrate-home-area-2026-05-27.ts
+
+  That adds Dish Soap (Hands, rinse-off), Laundry Detergent
+  (Home), and Fabric Softener (Home). Fabric Softener is not
+   marked rinse-off — it leaves residue on fabric that
+  contacts skin, which means pore-clogger/occlusive flags
+  remain active when scanning it.
+
+
+
+
+
+● All three inserted cleanly:
+
+  - Hands: Dish Soap (rinse-off), Hand Cream, Hand Sanitizer  - Home: Fabric Softener, Laundry Detergent
+
+  Live in the DB now.
 
 
 
@@ -28519,6 +28561,222 @@ skin profile notes redundancy - let's go with ideas 1, 2, and 3.
 
 
 neutral - what beneficial category ideas do you have for ingredients listed in neutral that don't have a beneficial category displayed, but then discusses benefits by skin type when expanded? for example, disodium edta is listed as a chelating agent for the structural category but doesn't have a beneficial category displayed, even though upon expanding the ingredient the note by skin profile discusses its benefits. 
+
+
+
+
+
+
+● Good picture now. Here's the analysis:
+
+  What's causing the gap
+
+  generateNotes() in curated-explanation.ts fires on
+  structural_category (e.g. sc === "Chelating Agent") as
+  well as on category. So an ingredient can have rich
+  benefit notes purely from its structural role — but the
+  teal badge only renders when ingredient.category is set in
+   the DB. Disodium EDTA has structural_category =
+  "Chelating Agent", which triggers 4 benefit notes (hard
+  water, iron water, heavy metal water, eczema+hard water),
+  but category is null, so no badge shows.
+
+  ---
+  New categories worth adding
+
+  1. Chelating — the Disodium EDTA case exactly. Covers:
+  Disodium EDTA, Tetrasodium EDTA, Trisodium EDTA, Phytic
+  Acid, Sodium Phytate, Sodium Gluconate. All
+  chelating-agent structural items that already have
+  water-quality benefit notes in the notes engine. Nothing
+  needs changing in the notes code — just assign category =
+  "chelating" in the DB and add the label.
+
+  2. Skin-repairing — a cellular/wound-healing tier distinct
+   from "barrier-repairing" (which is lipid-layer focused).
+  Covers: Allantoin, Panthenol/Dexpanthenol, Madecassoside,
+  Asiaticoside, Centella Asiatica extract. These generate
+  benefit notes for damaged_barrier and eczema profiles but
+  currently sit with no category at all.
+
+  3. Sebum-regulating — for ingredients that reduce oil
+  production at the sebocyte level, not just absorb surface
+  oil. The main candidate is Zinc PCA specifically
+  (Niacinamide is usually brightening already; Salicylic
+  Acid is flagged). Would need a new generateNotes() rule:
+  benefit for oily and acne_prone skin types.
+
+  4. Prebiotic — already in CATEGORY_LABELS but likely
+  unassigned in the DB. Candidates: Inulin,
+  Fructooligosaccharides, GOS, Xylitol (as prebiotic).
+  Distinct from "Ferment" (which is a fermented ingredient)
+  — prebiotic feeds the existing skin flora.
+
+  5. Photo-protective — for ingredients specifically
+  documented to counter UV-induced oxidative stress: Ferulic
+   Acid, Ergothioneine, Resveratrol. "Antioxidant" already
+  covers them structurally, but these specifically amplify
+  SPF protection rather than just scavenging general free
+  radicals. Lower priority — "antioxidant" already generates
+   the high-UV benefit note.
+
+  ---
+  Before adding new categories — the quick wins
+
+  Some ingredients may simply have the right note logic
+  already but category = null in the DB. Worth checking
+  whether things like:
+  - Ceramide ingredients → category = "barrier-repairing"
+  assigned?
+  - Fatty acids/alcohols → category = "emollient" or
+  "barrier-repairing" assigned?
+  - Bisabolol, Colloidal Oatmeal → category = "soothing"
+  assigned?
+
+  If those are missing in the DB, assigning existing
+  categories covers a lot of ground before writing any new
+  code.
+
+  ---
+  My recommendation in priority order: Chelating first
+  (clean case, existing notes engine already handles it,
+  just needs label + DB assignment), then Skin-repairing
+  (allantoin/panthenol are very common ingredients), then a
+  DB audit of existing categories before adding the rest.
+  Want me to implement Chelating and Skin-repairing?
+
+
+
+
+
+
+
+yes let's do everything.
+
+would chelating as a beneficial category be redundant with the structural category? what ideas do you have for this?
+
+
+
+
+
+          
+● Good instinct to pause on this. There are a few distinct
+  issues worth untangling.
+
+  The redundancy problem
+
+  "Chelating" as a teal beneficial badge would say nearly
+  the same thing as the gray "Chelating Agent" structural
+  badge — both communicate mechanism, not outcome. Unlike
+  "barrier-repairing" (structural = Ceramide, benefit = what
+   it does FOR skin), chelating → chelating has no
+  meaningful translation step.
+
+  The deeper problem is that chelating agent benefits are
+  entirely water-quality dependent. They're not beneficial
+  for soft water users — they're just a preservative
+  function. So a universal teal badge would mislead users
+  without hard/iron/heavy-metal water selected.
+
+  Compare to how other categories work:
+  - Antioxidant — benefits everyone (UV, pollution) → teal
+  badge makes sense universally
+  - Antimicrobial — primarily benefits acne/fungal acne →
+  teal badge is a stretch but the trait is at least
+  directionally positive for everyone
+  - Chelating — benefits ONLY hard/iron/metal water users →
+  teal badge would be noise for everyone else
+
+  ---
+  What would actually solve the problem
+
+  The real gap isn't that chelating agents need a teal badge
+   — it's that profile-relevant benefits aren't visually
+  signaled on the ingredient card before expanding. The
+  expanded notes engine already handles it perfectly; the
+  issue is discoverability.
+
+  Some ideas for that instead:
+
+  1. Profile-matched benefit indicator on the card — when
+  the active profile would produce a sentiment: "benefit"
+  note from generateNotes(), show a small "✦ Good for your
+  profile" or a colored dot on the ingredient card row
+  without requiring expansion. This surfaces water-quality,
+  climate, and skin-type benefits in context, not
+  universally.
+
+  2. "Water-protective" as a label, not a category — instead
+   of a permanent teal badge, a contextual chip that only
+  renders when hard_water / iron_water / heavy_metal_water
+  is active in the profile. Consistent with how the browse
+  filter chips work — amber when active.
+
+  3. Rename the teal badge use case — reserve teal only for
+  profile-independent benefits (humectant, antioxidant,
+  barrier-repairing, soothing, etc.), and introduce a
+  distinct visual system for profile-dependent benefits. The
+   two types are fundamentally different.
+
+  ---
+  My recommendation
+
+  Skip "chelating" as a teal category entirely — it's the
+  one case where a new category adds more confusion than
+  clarity.
+
+  For the other four (skin-repairing, sebum-regulating,
+  prebiotic, photo-protective) the teal badge works
+  naturally because those benefits hold regardless of water
+  quality — allantoin repairs skin for everyone with a
+  damaged barrier, zinc PCA regulates sebum for everyone
+  who's oily. Those should proceed.
+
+  For the chelating/water-quality gap specifically, the
+  profile-matched benefit indicator (idea 1 above) would
+  solve it properly and also backfill benefit signaling for
+  any ingredient whose notes engine returns a benefit note
+  for the active profile — which is a much broader fix than
+  a new category.
+
+  Want me to: (a) implement the four non-chelating
+  categories now and come back to the profile-benefit
+  indicator separately, or (b) design the profile-benefit
+  indicator first?
+
+
+
+
+
+
+
+go ahead and implement the four non-chelating categories now. 
+
+regarding chelating, what about adding water-protective as the beneficial category only when the hard waters etc are active in the profile?
+
+
+
+● Good — that's a clean solution for the chelating case. Let   me find the badge rendering logic before writing
+  anything:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 fragrance sensitizers - i see that some ingredients with structural category fragrance and concern category sensitizer show up in both universal concerns and your profile. for example, citrus grandis (grapefruit) peel oil and citrus limon (lemon) peel oil show up in the universal concerns list, but lavandula hybrida oil, pelargonium graveolens flower oil, citrus nobilis (mandarin orange) peel oil, and juniperus mexicana oil show up in your profile concerns list. is there a reason for this difference? does this discrepancy happen for other ingredients with structural category fragrance and concern category sensitizer? 
 

@@ -351,6 +351,105 @@ export function generateNotes(ing: {
     });
   }
 
+  if (cat === "skin-repairing") {
+    notes.push({
+      dimensions: ["damaged_barrier", "eczema"],
+      climate: [],
+      sentiment: "benefit",
+      text: "Skin-repairing actives (allantoin, panthenol, centella asiatica) accelerate barrier cell renewal and reduce active irritation — most impactful while the skin is actively rebuilding from damage or during an eczema flare.",
+    });
+    notes.push({
+      dimensions: ["fast_shedding"],
+      climate: [],
+      sentiment: "benefit",
+      text: "Fast-cycling skin sheds cells before they fully cornify, leaving the surface more fragile. Repair actives support cell maturation so surface cells finish keratinization rather than shedding as immature, barrier-deficient cells.",
+    });
+    notes.push({
+      dimensions: ["reactive"],
+      climate: [],
+      sentiment: "benefit",
+      text: "Repeated low-grade sensitizer exposure accumulates baseline barrier damage over time. Skin-repairing ingredients help reduce this background damage and shorten recovery between reactions.",
+    });
+  }
+
+  if (cat === "sebum-regulating") {
+    notes.push({
+      dimensions: ["oily", "acne_prone"],
+      climate: [],
+      sentiment: "benefit",
+      text: "Reduces sebum production at the sebocyte level rather than just absorbing surface oil — a sustained reduction in the oil load that drives congestion and breakouts.",
+    });
+    notes.push({
+      dimensions: ["oily"],
+      climate: ["hot", "humid"],
+      sentiment: "benefit",
+      text: "Hot and humid conditions increase sebum output — sebum-regulating ingredients have the most noticeable effect when environmental factors are already amplifying oil production.",
+    });
+  }
+
+  if (cat === "prebiotic") {
+    notes.push({
+      dimensions: ["acne_prone", "fungal_acne", "seborrheic"],
+      climate: [],
+      sentiment: "benefit",
+      text: "Prebiotics selectively feed beneficial skin bacteria over pathogenic species — a meaningful advantage where microbial imbalance (C. acnes dominance, Malassezia overgrowth) is a primary driver of breakouts.",
+    });
+    notes.push({
+      dimensions: ["reactive", "eczema"],
+      climate: [],
+      sentiment: "benefit",
+      text: "A balanced skin microbiome reduces barrier permeability and the chronic low-grade inflammation characteristic of reactive and atopic skin. Prebiotics support microbial diversity that acts as a first line of defense against irritant-triggering colonization.",
+    });
+  }
+
+  if (cat === "photo-protective") {
+    notes.push({
+      dimensions: [],
+      climate: ["high_uv"],
+      sentiment: "benefit",
+      text: "Photo-protective antioxidants (ferulic acid, ergothioneine, resveratrol) specifically neutralize UV-generated free radicals — more targeted than general antioxidants and most effective when applied before sun exposure in high-UV environments.",
+    });
+    notes.push({
+      dimensions: ["hyperpigmentation_prone"],
+      climate: ["high_uv"],
+      sentiment: "benefit",
+      text: "UV-generated free radicals are a primary melanocyte activation trigger. Photo-protective actives reduce the oxidative signal that drives hyperpigmentation — complementary to SPF by neutralizing what gets through rather than blocking UV at the surface.",
+    });
+    notes.push({
+      dimensions: [],
+      climate: ["chlorinated_water", "iron_water"],
+      sentiment: "benefit",
+      text: "Photo-protective antioxidants also counteract free radicals from oxidizing water contaminants — ferulic acid in particular is effective against the reactive oxygen species that chlorine and iron ions generate on contact with skin.",
+    });
+  }
+
+  if (cat === "water-protective") {
+    notes.push({
+      dimensions: [],
+      climate: ["hard_water"],
+      sentiment: "benefit",
+      text: "Chelating agents bind calcium and magnesium ions from hard water, preventing mineral film buildup on skin and improving cleanser rinse-off — also helping restore pH closer to the skin's natural acid mantle.",
+    });
+    notes.push({
+      dimensions: ["damaged_barrier", "eczema"],
+      climate: ["hard_water"],
+      sentiment: "benefit",
+      text: "Hard water's mineral film is a documented eczema aggravator that compounds barrier disruption. A chelating ingredient is especially protective for compromised or eczema-prone skin in hard water areas.",
+    });
+    notes.push({
+      dimensions: [],
+      climate: ["iron_water"],
+      sentiment: "benefit",
+      text: "Chelating agents neutralize ferrous and ferric ions from iron-bearing water before they can generate free radicals on the skin surface, preventing the lipid oxidation that iron contact triggers.",
+    });
+    notes.push({
+      dimensions: [],
+      climate: ["heavy_metal_water"],
+      sentiment: "benefit",
+      text: "EDTA-class chelators bind lead and dissolved heavy metals on the skin surface before absorption — a cleanser containing tetrasodium EDTA or phytic acid is the most practical topical defense when water quality is unknown or compromised.",
+    });
+  }
+
   // ── NEW SKIN TYPE RULES ────────────────────────────────────────────────────
 
   if (cat === "anti-malassezia") {

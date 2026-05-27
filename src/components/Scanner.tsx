@@ -88,6 +88,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   "antioxidant": "Antioxidant",
   "firming": "Firming",
   "emollient": "Emollient",
+  "skin-repairing": "Skin-repairing",
+  "sebum-regulating": "Sebum-regulating",
+  "prebiotic": "Prebiotic",
+  "photo-protective": "Photo-protective",
+  "water-protective": "Water-protective",
   // Title-case aliases (original seed)
   "Sensitizer": "Sensitizer",
   "Occlusive": "Occlusive",
@@ -3761,7 +3766,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 ? (photoItem.sunLevel === "avoid" ? "Photosensitizer" : "Photo caution")
                 : null;
               const concernLabel = catLabel ?? sensoryLabel ?? photoLabel;
-              const benefitLabel = safeCategory ? (CATEGORY_LABELS[safeCategory] ?? safeCategory) : null;
+              const waterProtectiveActive = activeClimates.has("hard_water") || activeClimates.has("iron_water") || activeClimates.has("heavy_metal_water");
+              const benefitLabel = safeCategory && (safeCategory !== "water-protective" || waterProtectiveActive)
+                ? (CATEGORY_LABELS[safeCategory] ?? safeCategory)
+                : null;
 
               const rawClimateNotes = match?.ingredient.skin_climate_notes;
               const rawNotes: SkinClimateNote[] = Array.isArray(rawClimateNotes) ? rawClimateNotes : [];
