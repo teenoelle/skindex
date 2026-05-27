@@ -2356,7 +2356,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             <img src={`/api/image-proxy?url=${encodeURIComponent(p.image_url)}`} alt={p.name} className="w-10 h-10 object-contain rounded-lg bg-gray-50 shrink-0" />
                           )}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate" title={p.name}>{p.name}</p>
+                            <p className="text-sm font-medium text-gray-800 leading-snug">{p.name}</p>
                             {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
