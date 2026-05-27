@@ -28889,12 +28889,16 @@ fragrance sensitizers - i see that some ingredients with structural category fra
 
 
 
+yes
 
 
+● Done. One line added to getIngredientConcernLevel(),
+  pushed as ac11d23.
 
-
-
-
+  Lavender, geranium, mandarin orange, juniper, and all
+  other fragrance oils with fc = "sensitizer" now surface in   Universal Concerns alongside the named EU 26 allergens —
+  no profile required to see them. Non-fragrance sensitizers
+   (preservatives, actives) are unaffected.
 
 
 
@@ -28908,6 +28912,71 @@ fragrance sensitizers - i see that some ingredients with structural category fra
 
 
 what ideas do you have to reduce the spacing between ingredients in by concern ingredient lists? 
+
+
+
+
+● Here's what's creating the height per row. The concern
+  button is py-2 (8px top + 8px bottom) around text-sm
+  ingredient names — so roughly 36px per row before any
+  badge wrapping. The divide-y between rows adds just 1px
+  borders, so that's not the issue.
+
+  Ideas, in order of impact:
+
+  1. Reduce row padding — py-2 → py-1.5 on the row button.
+  The simplest change: 4px off each row. At py-1 it gets
+  pretty tight; py-1.5 is the sweet spot. Affects all
+  concern rows uniformly.
+  2. Move structural category badge to expanded-only — the
+  gray "Fragrance" / "Emollient" / "Plant Extract" badge on
+  every row is the most common cause of rows wrapping to a
+  second line. If it only shows when the row is open, most
+  rows stay single-line and much shorter. The concern badge
+  (rose/amber) would still show collapsed.
+  3. Smaller ingredient name text — text-sm → text-xs for
+  the ingredient name. More dramatic density gain but trades
+   off readability. Could work well for the Neutral group
+  (least important) while keeping text-sm for
+  Universal/Profile.
+  4. Compress the Neutral group further — Neutral is often
+  the longest list but lowest priority. A tighter style
+  there specifically (no badges at all collapsed, just name
+  + chevron) would reduce its footprint without changing the
+   flagged groups.
+  5. Combine 1 + 2 — py-1.5 padding + structural badge moves
+   to expanded-only. This would be the most noticeable
+  improvement without any readability loss.
+
+  My recommendation is 1 + 2 combined. The structural badge
+  in the collapsed row doesn't help you decide whether to
+  expand — the concern badge (Sensitizer / Photosensitizer)
+  does that job. Hiding it collapsed and keeping it in the
+  open state gives back the most space cleanly.
+
+  Want me to implement that combination, or a different
+  pick?
+
+
+
+
+
+
+
+let's go with idea 1 to reduce row padding.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 formula interactions - what colors are used here? what alternative ideas do you have? currently if the note is a high sensitizer load, it shows up as amber with a yellow border, but sensitizers usually surface as universal concerns in dark rose. what ideas do you have for the formula interactions note to make the color system less confusing?
 

@@ -3787,7 +3787,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   <div className="flex items-center">
                   <button
                     type="button"
-                    className="flex-1 flex items-center justify-between px-3 py-2 text-left"
+                    className="flex-1 flex items-center justify-between px-3 py-1.5 text-left"
                     onClick={toggle}
                   >
                     <span className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
@@ -3810,7 +3810,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       <button
                         type="button"
                         title="Add to list"
-                        className={`px-2 py-2 text-sm leading-none transition-colors ${inList ? "text-gray-700" : "text-gray-300 hover:text-gray-500"}`}
+                        className={`px-2 py-1.5 text-sm leading-none transition-colors ${inList ? "text-gray-700" : "text-gray-300 hover:text-gray-500"}`}
                         onClick={() => setAddToListMenu(inList ? null : itemKey)}
                       >
                         +
