@@ -230,17 +230,17 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
 ];
 
 export const SENSORY_PROFILE_MAP: Record<string, string[]> = {
-  "Stinging": ["reactive", "damaged_barrier", "eczema", "rosacea"],
+  "Stinging": ["reactive", "damaged_barrier", "eczema", "rosacea", "fast_shedding"],
   "chemical-itch": ["reactive", "damaged_barrier", "eczema"],
-  "Film-forming": ["oily", "acne_prone", "fungal_acne"],
+  "Film-forming": ["oily", "acne_prone", "fungal_acne", "fast_shedding"],
   "Occlusive": ["oily", "acne_prone", "fungal_acne", "seborrheic", "body_acne", "keratosis_pilaris"],
   "occlusive-itch": ["oily", "acne_prone", "fungal_acne", "body_acne"],
   "comedogenic-itch": ["oily", "acne_prone", "fungal_acne", "body_acne"],
   "Cooling": ["reactive", "rosacea"],
   "Warming": ["reactive", "rosacea"],
   "Iodine": ["acne_prone", "fungal_acne"],
-  "Pilling": ["reactive", "acne_prone", "damaged_barrier"],
-  "Astringent": ["reactive", "dry", "damaged_barrier", "eczema"],
+  "Pilling": ["reactive", "acne_prone", "damaged_barrier", "fast_shedding"],
+  "Astringent": ["reactive", "dry", "damaged_barrier", "eczema", "fast_shedding"],
 };
 
 export function countProfileSensoryMatches(
@@ -273,6 +273,7 @@ export function countProfileSensoryMatches(
           if (!isProfileMatch && sc === "Stripping") {
             isProfileMatch =
               skinTypeSet.has("dry") || skinTypeSet.has("damaged_barrier") ||
+              skinTypeSet.has("fast_shedding") ||
               climateSet.has("dry_climate") || climateSet.has("cold");
           }
           if (!isProfileMatch && sc === "Pilling") {
