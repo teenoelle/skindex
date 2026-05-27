@@ -1639,7 +1639,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     : tab === "add" ? addTabUrlCount === 1
     : false;
 
-  function getPostWashNote(skinTypes: Set<SkinType>, climates: Set<ClimateType>): { title: string; body: string } | null {
+  function getPostWashNote(
+    skinTypes: Set<SkinType>,
+    climates: Set<ClimateType>,
+    ingredients?: { structural_category?: string | null; category?: string | null }[]
+  ): { title: string; body: string } | null {
     const hardWater      = climates.has("hard_water");
     const chlorinated    = climates.has("chlorinated_water");
     const ironWater      = climates.has("iron_water");
@@ -1648,16 +1652,31 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     const malassezia     = skinTypes.has("fungal_acne") || skinTypes.has("seborrheic");
     const barrier        = skinTypes.has("damaged_barrier") || skinTypes.has("reactive");
     if (!acneOrOily && !malassezia && !barrier) return null;
+
+    const hasChelating   = !!ingredients?.some(i => i.structural_category === "Chelating Agent" || i.category === "water-protective");
+    const hasExfoliant   = !!ingredients?.some(i => i.structural_category === "Exfoliant");
+    const hasWater       = waterTypes.length > 0;
+
     const waterLabel     = waterTypes.length > 1 ? "water quality" : waterTypes[0];
     const title          = waterLabel
       ? `⚠ Post-wash conflict — ${waterLabel}`
       : "⚠ Post-wash timing conflict";
+
     const parts: string[] = [];
-    if (waterTypes.length > 0) {
+    if (hasWater && hasChelating && hasExfoliant) {
+      parts.push("Your cleanser contains chelating agents (which bind hard water minerals during rinsing) and exfoliant acids (which leave the skin more acidified post-rinse) — together these significantly reduce the acid mantle disruption from hard water. The timing window is shorter than with a standard cleanser.");
+    } else if (hasWater && hasChelating) {
+      parts.push("Your cleanser contains chelating agents that bind hard water minerals during rinsing, preventing most of the mineral deposit that raises skin pH. The acid mantle recovers faster than with a standard cleanser — the 30-second window is less critical but still beneficial.");
+    } else if (hasWater && hasExfoliant) {
+      parts.push("Hard or chlorinated water temporarily raises skin pH — however, your cleanser's exfoliant acids leave the skin more acidified post-rinse, so the acid mantle recovers faster than after a standard cleanser.");
+    } else if (hasWater) {
       parts.push("Hard or chlorinated water temporarily raises skin pH above 7 — the acid mantle (normally 4.5–5.5) takes 20–30 minutes to recover on its own.");
+    } else if (hasExfoliant) {
+      parts.push("Your cleanser contains exfoliant acids, so the acid mantle recovers faster than after a standard alkaline cleanser — though applying your first product quickly still helps.");
     } else {
       parts.push("After washing, the acid mantle takes up to 20–30 minutes to recover its normal pH of 4.5–5.5.");
     }
+
     if (acneOrOily) parts.push("During this window, C. acnes proliferates at elevated pH and fresh sebum replenishment begins immediately — applying a low-pH product within 30 seconds of patting dry closes this window fastest.");
     if (malassezia) parts.push("Malassezia recolonizes most rapidly in the first minutes after cleansing, when the skin surface is warm and freshly sebum-coated. A low-pH toner or essence applied immediately helps suppress this.");
     if (barrier) parts.push("With a damaged barrier, transepidermal water loss (TEWL) peaks in the first minutes post-wash — applying any film-forming or occlusive layer promptly traps moisture before evaporation sets in.");
@@ -3546,7 +3565,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       ) : null;
                     })()}
                     {(() => {
-                      const postWash = getPostWashNote(activeSkinTypes, activeClimates);
+                      const scanIngredients = [
+                        ...result.safe.map(m => m.ingredient),
+                        ...result.flagged.map(m => m.ingredient),
+                      ];
+                      const postWash = getPostWashNote(activeSkinTypes, activeClimates, scanIngredients);
                       return postWash ? (
                         <div className="rounded-xl border border-amber-800 px-3 py-2">
                           <p className="text-xs font-semibold text-amber-900 mb-0.5">{postWash.title}</p>

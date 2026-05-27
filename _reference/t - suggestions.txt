@@ -29314,6 +29314,94 @@ the post-wash timing conflict card still doesn't include mention of hard or chlo
 
 
 
+● Pushed. Summary:
+
+  Caution cards — now identical styling to danger: amber-800   border, amber-900 title, amber-800 body. The ◆ icon still   distinguishes caution from danger's ⚠.
+
+  Post-wash conflict header — now dynamically reflects which
+   water concern is active:
+
+  ┌────────────────────┬────────────────────────────────┐
+  │   Active climate   │             Header             │
+  ├────────────────────┼────────────────────────────────┤
+  │ Hard water only    │ ⚠ Post-wash conflict — hard    │
+  │                    │ water                          │
+  ├────────────────────┼────────────────────────────────┤
+  │ Chlorinated water  │ ⚠ Post-wash conflict —         │
+  │ only               │ chlorinated water              │
+  ├────────────────────┼────────────────────────────────┤
+  │ Iron water only    │ ⚠ Post-wash conflict — iron    │
+  │                    │ water                          │
+  ├────────────────────┼────────────────────────────────┤
+  │ Multiple water     │ ⚠ Post-wash conflict — water   │
+  │ types              │ quality                        │
+  ├────────────────────┼────────────────────────────────┤
+  │ No water concern   │ ⚠ Post-wash timing conflict    │
+  └────────────────────┴──────────────────────────────
+
+
+
+
+
+
+
+
+
+if a face wash has acids or chelating agents does the note need to change if a user with acne and poor water quality doesn't put on a low ph product within 30 seconds of patting dry?
+
+
+
+
+                    
+● Yes, the note should change — both ingredients
+  meaningfully alter the timing concern:
+
+  Chelating agents in the cleanser (EDTA, phytic acid,
+  sodium gluconate): These bind calcium/magnesium ions
+  during rinsing, so the hard water mineral film that raises
+   skin pH deposits less in the first place. The acid mantle
+   still needs recovery time, but it starts from a less
+  disrupted state. The hard-water urgency is reduced — the
+  note should acknowledge this rather than treating the
+  product as if it did nothing.
+
+  Acids in the cleanser (AHAs, BHAs, citric/lactic acid): A
+  low-pH cleanser leaves the skin surface more acidified
+  post-rinse, so the acid mantle recovers faster than after
+  a standard alkaline cleanser. The 30-second window is
+  still real but the stakes are lower.
+
+  If both are present: The cleanser is already doing most of
+   the work the note warns about — the urgency drops
+  considerably.
+
+  The scan result panel has access to the scanned product's
+  ingredients (result.safe etc.) so it can check for these.
+  The browse panel can't (no product scanned yet), so it
+  stays generic.
+
+  Want me to implement this? The approach would be:
+  - In the scan result render site only, pass the scanned
+  ingredients into getPostWashNote as an optional third
+  argument
+  - Check for structural_category === "Chelating Agent" (or
+  category === "water-protective") and structural_category
+  === "Exfoliant"
+  - Swap or append a sentence when either is detected — e.g.
+   "Your cleanser contains chelating agents that bind hard
+  water minerals during rinsing, reducing the pH disruption.
+   The 30-second window still applies but is less urgent."
+  - The browse panel call stays as-is (no product context)
+
+
+
+
+
+
+
+
+
+
 
 
 
