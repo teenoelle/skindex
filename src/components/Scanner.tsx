@@ -2269,7 +2269,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {browseLoading && !browseSelectedType && (
             <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
           )}
-          {!browseLoading && browseTypes.length > 0 && (
+          {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
+            <>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Browse</p>
             <div className="mb-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Quick filters</p>
               <div className="flex flex-wrap gap-1.5">
@@ -2289,10 +2291,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 </button>
               </div>
             </div>
-          )}
-          {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
-            <>
-            <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
             <div className="space-y-5">
               {(() => {
                 const AREA_ORDER = ["Face", "Makeup", "Lip", "Hands", "Nails", "Hair", "Body", "Home"];
