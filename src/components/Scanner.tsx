@@ -2106,7 +2106,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <button
               type="button"
               onClick={() => setProfileOpen((v) => !v)}
-              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest w-full"
+              className="flex items-center gap-2 text-sm font-semibold text-gray-700 uppercase tracking-widest w-full"
             >
               Skin profile
               {(activeSkinTypes.size + activeClimates.size) > 0 && (
@@ -2271,7 +2271,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
           {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
             <>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Browse</p>
+            <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
             <div className="mb-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Quick filters</p>
               <div className="flex flex-wrap gap-1.5">
@@ -3499,7 +3499,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <button
               type="button"
               onClick={() => setProfileOpen((v) => !v)}
-              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest"
+              className="flex items-center gap-2 text-sm font-semibold text-gray-700 uppercase tracking-widest"
             >
               Skin profile
               {(activeSkinTypes.size + activeClimates.size) > 0 && (
@@ -4155,7 +4155,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <section>
               <button
                 type="button"
-                className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest"
+                className="flex items-center gap-2 text-sm font-semibold text-gray-700 uppercase tracking-widest"
                 onClick={() => setShowObfVariants((v) => !v)}
               >
                 More variants from Open Beauty Facts
