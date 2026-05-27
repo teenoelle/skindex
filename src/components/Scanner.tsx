@@ -3731,32 +3731,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             ) : null;
           })()}
 
-          {/* Diet & lifestyle contextual banner */}
-          {(() => {
-            const activeDietChips = DIET_TYPES.filter(d => activeClimates.has(d.value));
-            if (activeDietChips.length === 0) return null;
-            const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
-            if (dietWarns.length === 0 && activeDietChips.length === 0) return null;
-            return (
-              <section className="mb-6">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Diet & lifestyle</p>
-                {dietWarns.length > 0 ? (
-                  <div className="space-y-2">
-                    {dietWarns.map((w, i) => (
-                      <div key={i} className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-emerald-200 bg-emerald-50" : w.type === "caution" ? "border-emerald-100 bg-emerald-50" : "border-teal-100 bg-teal-50"}`}>
-                        <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-emerald-900" : w.type === "caution" ? "text-emerald-800" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
-                        <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-emerald-800" : w.type === "caution" ? "text-emerald-700" : "text-teal-700"}`}>{w.body}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 leading-relaxed">
-                    Active diet flags: {activeDietChips.map(d => d.label).join(", ")}. No specific interactions detected for this product and skin profile combination.
-                  </p>
-                )}
-              </section>
-            );
-          })()}
 
           {/* By concern — grouped ingredient view */}
           {result.originalItems.length > 0 && (() => {
