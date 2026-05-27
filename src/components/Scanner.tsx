@@ -2353,31 +2353,30 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             ) : (() => {
                               const hasProf = activeSkinTypes.size > 0 || activeClimates.size > 0;
                               const pfc = p.profileFlaggedCount;
+                              const universalCount = p.universalConcernCount ?? 0;
                               if (hasProf && pfc !== undefined) {
-                                const totalForYou = pfc + (p.profileSensoryCount ?? 0);
-                                if (totalForYou > 0) {
+                                const profileCount = pfc + (p.profileSensoryCount ?? 0);
+                                if (universalCount === 0 && profileCount === 0) {
                                   return (
                                     <>
-                                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{totalForYou} for you</span>
-                                      {p.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{p.sensoryCount} sensory</span>}
-                                      {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photo</span>}
-                                      {p.flaggedCount > pfc && <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-400">{p.flaggedCount} total</span>}
+                                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe for your profile</span>
+                                      {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500">{p.photoCount} photo</span>}
                                     </>
                                   );
                                 }
                                 return (
                                   <>
-                                    <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Safe for your profile</span>
-                                    {p.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500">{p.sensoryCount} sensory</span>}
-                                    {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500">{p.photoCount} photo</span>}
-                                    {p.flaggedCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-400">{p.flaggedCount} flagged</span>}
+                                    {universalCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{universalCount} universal</span>}
+                                    {profileCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{profileCount} profile concerns</span>}
+                                    {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photo</span>}
                                   </>
                                 );
                               }
                               return (
                                 <>
-                                  {p.flaggedCount > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-md ${hasProf ? "bg-gray-100 text-gray-500" : "bg-rose-50 text-rose-700"}`}>{p.flaggedCount} flagged</span>}
-                                  {p.sensoryCount > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-md ${hasProf ? "bg-gray-100 text-gray-500" : "bg-amber-50 text-amber-700"}`}>{p.sensoryCount} sensory</span>}
+                                  {universalCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{universalCount} universal</span>}
+                                  {p.flaggedCount > universalCount && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{p.flaggedCount - universalCount} flagged</span>}
+                                  {p.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{p.sensoryCount} sensory</span>}
                                   {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photo</span>}
                                 </>
                               );

@@ -29148,6 +29148,21 @@ post wash window note should be similar colors as danger/conflict and mention th
 
 
 
+● Pushed. Here's what changed:
+
+  - All danger/conflict borders → amber-800 (dark, distinct
+  amber line)
+  - All synergy borders → teal-800 (dark, distinct teal
+  line)
+  - Yellow fix — the allWarns danger cards were still on
+  bg-amber-50 / border-amber-200 (light yellow); now
+  bg-amber-100 / border-amber-800 to match everything else
+  - Post-wash note → same dark amber card styling, header
+  now reads ⚠ Post-wash timing conflict
+
+  The caution tier (skin profile combo warnings) is kept
+  slightly lighter (amber-600 / bg-amber-50) so it sits
+  visibly between danger and synergy in severity.
 
 
 
@@ -29159,13 +29174,12 @@ post wash window note should be similar colors as danger/conflict and mention th
 
 
 
+notes in formula interactions and device interactions are not the updated colors.
 
-
-
+product lists show no universal concerns, "3 for you" instead of "3 profile concerns", "2 sensory" instead of nothing, "1 total" why? 
 
 product lists - the did you mean, alternatives, and browse product lists still show number flagged, sensory, photo and not updated information by concern instead. what ideas do you have to fix this?
 
-admin - product types - some of the body areas and product types don't have an icon. what ideas do you have for them?
 
 
 
@@ -29174,6 +29188,22 @@ admin - product types - some of the body areas and product types don't have an i
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+product types - some of the body areas and product types don't have an icon in admin, and none of them display their icon in browse. what ideas do you have for them?
 
 supplements - what ideas do you have if the user doesn't know which supplements profiles to click but do know the name of their supplements? 
 
