@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { countComedogenicPatternMatches } from "@/lib/comedogenic";
-import { countSensoryPatternMatches } from "@/lib/sensory";
+import { countSensoryPatternMatches, countProfileSensoryMatches } from "@/lib/sensory";
 import { countPhotoPatternMatches } from "@/lib/photo";
 
 export async function GET(req: NextRequest) {
@@ -85,6 +85,12 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Profile-specific sensory count (runtime pattern matches that match the user's skin types)
+  const skinTypesParam = req.nextUrl.searchParams.get("skinTypes");
+  const climatesParam = req.nextUrl.searchParams.get("climates");
+  const skinTypes = skinTypesParam ? skinTypesParam.split(",").filter(Boolean) : [];
+  const climates = climatesParam ? climatesParam.split(",").filter(Boolean) : [];
+
   const results = products.map((p) => ({
     id: p.id,
     name: p.name,
@@ -95,6 +101,9 @@ export async function GET(req: NextRequest) {
     sensoryCount: p.ingredient_list ? countSensoryPatternMatches(p.ingredient_list) : 0,
     photoCount: p.ingredient_list ? countPhotoPatternMatches(p.ingredient_list) : 0,
     profileFlaggedCount: concerns.length > 0 ? (profileCounts.get(p.id) ?? 0) : undefined,
+    profileSensoryCount: skinTypes.length > 0 || climates.length > 0
+      ? (p.ingredient_list ? countProfileSensoryMatches(p.ingredient_list, skinTypes, climates) : 0)
+      : undefined,
   })).sort((a, b) => {
     if (a.flaggedCount !== b.flaggedCount) return a.flaggedCount - b.flaggedCount;
     if (a.sensoryCount !== b.sensoryCount) return a.sensoryCount - b.sensoryCount;

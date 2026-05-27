@@ -53,7 +53,7 @@ type AllEditState = {
   ingredient_list: string;
 };
 
-type ProductType = { id: string; name: string; body_area: string };
+type ProductType = { id: string; name: string; body_area: string; is_rinse_off: boolean };
 
 type AdminUser = {
   clerk_id: string; email: string | null; name: string | null;
@@ -490,6 +490,8 @@ export default function AdminPage() {
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
   const [editTypeName, setEditTypeName] = useState("");
   const [editTypeBodyArea, setEditTypeBodyArea] = useState("Face");
+  const [editTypeRinseOff, setEditTypeRinseOff] = useState(false);
+  const [newTypeRinseOff, setNewTypeRinseOff] = useState(false);
   const [typeSaving, setTypeSaving] = useState<string | null>(null);
   const [typeDeleting, setTypeDeleting] = useState<string | null>(null);
   const [typeOpError, setTypeOpError] = useState<string | null>(null);
@@ -1123,12 +1125,13 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/product-types", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newTypeName.trim(), body_area: newTypeBodyArea }),
+        body: JSON.stringify({ name: newTypeName.trim(), body_area: newTypeBodyArea, is_rinse_off: newTypeRinseOff }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
       setProductTypes((prev) => [...prev, data.type]);
       setNewTypeName("");
+      setNewTypeRinseOff(false);
     } catch (e) {
       setTypeAddError((e as Error).message);
     }
@@ -1139,6 +1142,7 @@ export default function AdminPage() {
     setEditingTypeId(t.id);
     setEditTypeName(t.name);
     setEditTypeBodyArea(t.body_area);
+    setEditTypeRinseOff(t.is_rinse_off);
     setTypeOpError(null);
   }
 
@@ -1149,7 +1153,7 @@ export default function AdminPage() {
       const res = await fetch(`/api/admin/product-types/${t.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editTypeName.trim() || t.name, body_area: editTypeBodyArea }),
+        body: JSON.stringify({ name: editTypeName.trim() || t.name, body_area: editTypeBodyArea, is_rinse_off: editTypeRinseOff }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
@@ -2244,6 +2248,15 @@ export default function AdminPage() {
                   {typeAddError && <span className="text-xs text-rose-600">{typeAddError}</span>}
                 </div>
                 <BodyAreaPicker value={newTypeBodyArea} onChange={setNewTypeBodyArea} />
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newTypeRinseOff}
+                    onChange={(e) => setNewTypeRinseOff(e.target.checked)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+                  />
+                  <span className="text-xs text-gray-600">Rinse-off by default</span>
+                </label>
               </div>
             ) : (
               <button
@@ -2315,6 +2328,15 @@ export default function AdminPage() {
                                       </button>
                                     </div>
                                     <BodyAreaPicker value={editTypeBodyArea} onChange={setEditTypeBodyArea} />
+                                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={editTypeRinseOff}
+                                        onChange={(e) => setEditTypeRinseOff(e.target.checked)}
+                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+                                      />
+                                      <span className="text-xs text-gray-600">Rinse-off by default</span>
+                                    </label>
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-3 group">
@@ -2326,6 +2348,9 @@ export default function AdminPage() {
                                     />
                                     {TypeIcon && <TypeIcon size={12} className="text-gray-400 shrink-0" />}
                                     <span className="text-sm text-gray-800 flex-1">{t.name}</span>
+                                    {t.is_rinse_off && (
+                                      <span className="text-xs text-blue-500 border border-blue-200 rounded-full px-1.5 py-0.5">rinse-off</span>
+                                    )}
                                     <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <button type="button" onClick={() => startEditType(t)} className="text-xs text-gray-400 hover:text-gray-700">
                                         Edit

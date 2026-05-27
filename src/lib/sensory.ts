@@ -229,6 +229,64 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
   },
 ];
 
+export const SENSORY_PROFILE_MAP: Record<string, string[]> = {
+  "Stinging": ["reactive", "damaged_barrier", "eczema", "rosacea"],
+  "chemical-itch": ["reactive", "damaged_barrier", "eczema"],
+  "Film-forming": ["oily", "acne_prone", "fungal_acne"],
+  "Occlusive": ["oily", "acne_prone", "fungal_acne", "seborrheic", "body_acne", "keratosis_pilaris"],
+  "occlusive-itch": ["oily", "acne_prone", "fungal_acne", "body_acne"],
+  "comedogenic-itch": ["oily", "acne_prone", "fungal_acne", "body_acne"],
+  "Cooling": ["reactive", "rosacea"],
+  "Warming": ["reactive", "rosacea"],
+  "Iodine": ["acne_prone", "fungal_acne"],
+  "Pilling": ["reactive", "acne_prone", "damaged_barrier"],
+  "Astringent": ["reactive", "dry", "damaged_barrier", "eczema"],
+};
+
+export function countProfileSensoryMatches(
+  ingredientList: string,
+  skinTypes: string[],
+  climates: string[] = []
+): number {
+  if (skinTypes.length === 0 && climates.length === 0) return 0;
+  const skinTypeSet = new Set(skinTypes);
+  const climateSet = new Set(climates);
+
+  const tokens = ingredientList
+    .split(/,(?![^(]*\))/)
+    .map((s) => s.replace(/\([^)]*\)/g, "").replace(/[​‌‍﻿]/g, "").trim().replace(/\s+/g, " "))
+    .filter((s) => s.length > 1);
+
+  let count = 0;
+  const seen = new Set<string>();
+  for (let i = 0; i < tokens.length; i++) {
+    const cleaned = tokens[i].replace(/\([^)]*\)/g, "").trim();
+    for (const rule of SENSORY_PATTERNS) {
+      if (rule.maxPosition !== undefined && i >= rule.maxPosition) continue;
+      if (rule.pattern.test(cleaned)) {
+        const key = cleaned.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          const sc = rule.sensory_category;
+          const profileTypes = SENSORY_PROFILE_MAP[sc] ?? [];
+          let isProfileMatch = profileTypes.some((st) => skinTypeSet.has(st));
+          if (!isProfileMatch && sc === "Stripping") {
+            isProfileMatch =
+              skinTypeSet.has("dry") || skinTypeSet.has("damaged_barrier") ||
+              climateSet.has("dry_climate") || climateSet.has("cold");
+          }
+          if (!isProfileMatch && sc === "Pilling") {
+            isProfileMatch = climateSet.has("hot") || climateSet.has("humid");
+          }
+          if (isProfileMatch) count++;
+        }
+        break;
+      }
+    }
+  }
+  return count;
+}
+
 export function countSensoryPatternMatches(ingredientList: string): number {
   const tokens = ingredientList
     .split(/,(?![^(]*\))/)

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X, Menu } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
+import { SENSORY_PROFILE_MAP } from "@/lib/sensory";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -62,7 +63,7 @@ type ImportResult = {
 type UserList = { id: string; name: string; is_public: boolean; itemCount: number };
 
 type BrowseType = { name: string; count: number };
-type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; ingredient_list: string | null; flaggedCount: number; sensoryCount: number; photoCount: number; profileFlaggedCount?: number };
+type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; ingredient_list: string | null; flaggedCount: number; sensoryCount: number; photoCount: number; profileFlaggedCount?: number; profileSensoryCount?: number };
 type IngredientList = { id: string; name: string; type: "avoid" | "want"; items: string[] };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -410,19 +411,6 @@ const SENSORY_CATEGORY_LABEL: Record<string, string> = {
   "comedogenic-itch": "Pore-blocking",
 };
 
-const SENSORY_PROFILE_MAP: Partial<Record<string, SkinType[]>> = {
-  "Stinging": ["reactive", "damaged_barrier", "eczema", "rosacea"],
-  "chemical-itch": ["reactive", "damaged_barrier", "eczema"],
-  "Film-forming": ["oily", "acne_prone", "fungal_acne"],
-  "Occlusive": ["oily", "acne_prone", "fungal_acne", "seborrheic", "body_acne", "keratosis_pilaris"],
-  "occlusive-itch": ["oily", "acne_prone", "fungal_acne", "body_acne"],
-  "comedogenic-itch": ["oily", "acne_prone", "fungal_acne", "body_acne"],
-  "Cooling": ["reactive", "rosacea"],
-  "Warming": ["reactive", "rosacea"],
-  "Iodine": ["acne_prone", "fungal_acne"],
-  "Pilling": ["reactive", "acne_prone", "damaged_barrier"],
-  "Astringent": ["reactive", "dry", "damaged_barrier", "eczema"],
-};
 
 const STEP_TAG_CONFIG: Record<string, { label: string; desc: string; className: string }> = {
   "acid-step":        { label: "Acid step",            desc: "Apply before serums; leave 15–20 min before higher-pH actives like niacinamide or peptides",                     className: "border-amber-200 bg-amber-50 text-amber-700" },
@@ -473,7 +461,7 @@ function getIngredientConcernLevel(
   if (sensoryItem) {
     const sc = sensoryItem.sensory_category ?? "";
     const profileTypes = SENSORY_PROFILE_MAP[sc] ?? [];
-    if (profileTypes.some((st) => activeSkinTypes.has(st))) return "profile-matched";
+    if (profileTypes.some((st) => activeSkinTypes.has(st as SkinType))) return "profile-matched";
     if (
       sc === "Stripping" &&
       (activeSkinTypes.has("dry") || activeSkinTypes.has("damaged_barrier") ||
@@ -711,6 +699,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [alternativesFetched, setAlternativesFetched] = useState(false);
   const [alternativesOpen, setAlternativesOpen] = useState(true);
   const [isRinseOff, setIsRinseOff] = useState(false);
+  const [rinseOffDefaults, setRinseOffDefaults] = useState<Set<string>>(RINSE_OFF_TYPES);
   const [browseTypes, setBrowseTypes] = useState<BrowseType[]>([]);
   const [browseSelectedType, setBrowseSelectedType] = useState<string | null>(null);
   const [browseProducts, setBrowseProducts] = useState<BrowseProduct[]>([]);
@@ -816,8 +805,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   useEffect(() => {
     fetch("/api/product-types")
       .then((r) => r.json())
-      .then((d: { types?: { name: string; body_area: string }[] }) => {
-        if (d.types) setTypeBodyAreaMap(new Map(d.types.map((t) => [t.name, t.body_area])));
+      .then((d: { types?: { name: string; body_area: string; is_rinse_off?: boolean }[] }) => {
+        if (d.types) {
+          setTypeBodyAreaMap(new Map(d.types.map((t) => [t.name, t.body_area])));
+          setRinseOffDefaults(new Set(d.types.filter((t) => t.is_rinse_off).map((t) => t.name)));
+        }
       })
       .catch(() => {});
   }, []);
@@ -918,7 +910,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       setEditBrand(result.product.brand ?? "");
       setEditType(result.product.type ?? "");
       setEditIngredients("");
-      setIsRinseOff(RINSE_OFF_TYPES.has(result.product.type ?? ""));
+      setIsRinseOff(rinseOffDefaults.has(result.product.type ?? ""));
     }
   }, [result?.product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1544,6 +1536,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     const params = new URLSearchParams({ type: typeName });
     const concerns = profileMatchedCategories(activeSkinTypes, activeClimates);
     if (concerns.length) params.set("concerns", concerns.join(","));
+    if (activeSkinTypes.size > 0) params.set("skinTypes", [...activeSkinTypes].join(","));
+    if (activeClimates.size > 0) params.set("climates", [...activeClimates].join(","));
     const res = await fetch(`/api/browse?${params.toString()}`);
     const data = await res.json();
     setBrowseProducts(data.products ?? []);
@@ -2316,7 +2310,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 const filtered = browseProducts.filter(p => {
                   if (searchLower && !p.name.toLowerCase().includes(searchLower) && !(p.brand ?? "").toLowerCase().includes(searchLower)) return false;
                   if (browsePhotosafe && p.photoCount > 0) return false;
-                  if (browseProfileLinked && (p.profileFlaggedCount ?? 0) > 0) return false;
+                  if (browseProfileLinked && ((p.profileFlaggedCount ?? 0) + (p.profileSensoryCount ?? 0)) > 0) return false;
                   const txt = ingText(p);
                   if (avoidLists.some(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
                   if (wantLists.length > 0 && !wantLists.every(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
@@ -2372,10 +2366,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               const hasProf = activeSkinTypes.size > 0 || activeClimates.size > 0;
                               const pfc = p.profileFlaggedCount;
                               if (hasProf && pfc !== undefined) {
-                                if (pfc > 0) {
+                                const totalForYou = pfc + (p.profileSensoryCount ?? 0);
+                                if (totalForYou > 0) {
                                   return (
                                     <>
-                                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{pfc} for you</span>
+                                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{totalForYou} for you</span>
                                       {p.sensoryCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{p.sensoryCount} sensory</span>}
                                       {p.photoCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-yellow-50 text-yellow-700">{p.photoCount} photo</span>}
                                       {p.flaggedCount > pfc && <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-400">{p.flaggedCount} total</span>}
@@ -3767,8 +3762,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {result.originalItems.length > 0 && (() => {
             const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
 
-            const RINSE_OFF_SUPPRESS_SENSORY_CATS = new Set(["Pilling", "Film-forming", "occlusive-itch", "comedogenic-itch"]);
+            const RINSE_OFF_SUPPRESS_SENSORY_CATS = new Set(["Pilling", "Film-forming", "Occlusive", "occlusive-itch", "comedogenic-itch"]);
             const RINSE_OFF_SUPPRESS_PHOTO_CATS = new Set(["photo-retinoid", "photo-BHA", "photo-brightening"]);
+            const RINSE_OFF_SUPPRESS_DB_CATS = new Set(["pore-clogger", "occlusive", "bacteria-trap"]);
 
             type GroupItem = {
               item: string;
@@ -3799,8 +3795,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               if (isRinseOff && photoItem && RINSE_OFF_SUPPRESS_PHOTO_CATS.has(photoItem.photoCategory ?? "")) {
                 photoItem = null;
               }
-              const level = getIngredientConcernLevel(match, sensoryItem, photoItem, activeSkinTypes, activeClimates);
-              if (level !== "skip") groups[level].push({ item, match, fullMatch, sensoryItem, photoItem });
+              const effectiveMatch = isRinseOff && match?.ingredient.status === "flagged" && RINSE_OFF_SUPPRESS_DB_CATS.has(match.ingredient.flagged_category ?? "") ? null : match;
+              const level = getIngredientConcernLevel(effectiveMatch, sensoryItem, photoItem, activeSkinTypes, activeClimates);
+              if (level !== "skip") groups[level].push({ item, match: effectiveMatch, fullMatch, sensoryItem, photoItem });
             }
 
             const CONCERN_STRIPE: Record<ConcernLevel, string> = {

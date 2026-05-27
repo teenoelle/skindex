@@ -17,24 +17,25 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   if (!(await isAdmin(userId))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await ctx.params;
-  const { name, body_area } = await req.json();
+  const { name, body_area, is_rinse_off } = await req.json();
 
   const { data: existing } = await supabaseAdmin
     .from("product_types")
-    .select("name, body_area")
+    .select("name, body_area, is_rinse_off")
     .eq("id", id)
     .maybeSingle();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const patch: Record<string, string> = {};
+  const patch: Record<string, string | boolean> = {};
   if (name?.trim()) patch.name = name.trim();
   if (body_area?.trim()) patch.body_area = body_area.trim();
+  if (is_rinse_off !== undefined) patch.is_rinse_off = Boolean(is_rinse_off);
 
   const { data, error } = await supabaseAdmin
     .from("product_types")
     .update(patch)
     .eq("id", id)
-    .select("id, name, body_area")
+    .select("id, name, body_area, is_rinse_off")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -44,8 +45,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 
   await writeAuditLog(userId!, "edit_type", "product_type", id, {
-    before: { name: existing.name, body_area: existing.body_area },
-    after: { name: data.name, body_area: data.body_area },
+    before: { name: existing.name, body_area: existing.body_area, is_rinse_off: existing.is_rinse_off },
+    after: { name: data.name, body_area: data.body_area, is_rinse_off: data.is_rinse_off },
   });
 
   return NextResponse.json({ type: data });

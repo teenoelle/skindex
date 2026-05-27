@@ -16,7 +16,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("product_types")
-    .select("id, name, body_area")
+    .select("id, name, body_area, is_rinse_off")
     .order("body_area")
     .order("name");
 
@@ -28,15 +28,15 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!(await isAdmin(userId))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { name, body_area } = await req.json();
+  const { name, body_area, is_rinse_off } = await req.json();
   if (!name?.trim() || !body_area?.trim()) {
     return NextResponse.json({ error: "name and body_area are required" }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin
     .from("product_types")
-    .insert({ name: name.trim(), body_area: body_area.trim() })
-    .select("id, name, body_area")
+    .insert({ name: name.trim(), body_area: body_area.trim(), is_rinse_off: Boolean(is_rinse_off ?? false) })
+    .select("id, name, body_area, is_rinse_off")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
