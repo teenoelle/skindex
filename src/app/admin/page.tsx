@@ -8,7 +8,7 @@ import {
   FlaskConical, Sparkles, Eye, Shield, BrushCleaning,
   Eraser, Droplets, Droplet, Layers, Moon, Pill, Sun,
   GlassWater, Pencil, Brush, Pen, Wind, Footprints,
-  Hand, Pipette, Waves,
+  Hand, Pipette, Waves, Home, Fingerprint,
   type LucideIcon,
 } from "lucide-react";
 
@@ -112,14 +112,17 @@ type SiteStats = {
 };
 
 
-const BODY_AREAS = ["Face", "Makeup", "Lips", "Body", "Hair"];
+const BODY_AREAS = ["Face", "Makeup", "Lip", "Hands", "Nails", "Hair", "Body", "Home"];
 
 const BODY_AREA_ICON: Record<string, LucideIcon> = {
   Face: Smile,
   Makeup: Palette,
-  Lips: Heart,
-  Body: PersonStanding,
+  Lip: Heart,
+  Hands: Hand,
+  Nails: Fingerprint,
   Hair: Scissors,
+  Body: PersonStanding,
+  Home: Home,
 };
 
 const PRODUCT_TYPE_ICON: Record<string, LucideIcon> = {
@@ -161,20 +164,30 @@ const PRODUCT_TYPE_ICON: Record<string, LucideIcon> = {
   Deodorant: Wind,
   "Foot Cream": Footprints,
   "Hand Cream": Hand,
+  "Dish Soap": Droplets,
+  // Nails
+  "Nail Polish": Sparkles,
+  "Nail Treatment": Sparkles,
   // Hair
   Conditioner: Droplets,
   "Hair Styler": Wind,
   "Hair Treatment": Sparkles,
   "Scalp Treatment": Pipette,
   Shampoo: Waves,
+  // Home
+  "Laundry Detergent": Waves,
+  "Fabric Softener": Wind,
 };
 
 const PRODUCT_TYPE_GROUPS: { label: string; types: string[] }[] = [
   { label: "Face", types: ["Concentrate", "Exfoliant", "Eye Cream", "Eye Primer", "Face Mask", "Face Wash", "Makeup Remover", "Mist", "Moisturizer", "Oil", "Ointment", "Primer", "Serum", "Sleeping Mask", "Spot Patches", "Sun Screen", "Toner"].sort() },
   { label: "Makeup", types: ["BB Cream", "Blush", "Brow Gel", "CC Cream", "Concealer", "Eyeliner", "Eyeshadow", "Foundation", "Mascara", "Setting Spray"].sort() },
-  { label: "Lips", types: ["Lip Balm", "Lip Treatment"] },
-  { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream", "Hand Cream"].sort() },
+  { label: "Lip", types: ["Lip Balm", "Lip Treatment"] },
+  { label: "Hands", types: ["Dish Soap", "Hand Cream"].sort() },
+  { label: "Nails", types: ["Nail Polish", "Nail Treatment"].sort() },
   { label: "Hair", types: ["Conditioner", "Hair Styler", "Hair Treatment", "Scalp Treatment", "Shampoo"].sort() },
+  { label: "Body", types: ["Body Lotion", "Body Wash", "Deodorant", "Foot Cream"].sort() },
+  { label: "Home", types: ["Fabric Softener", "Laundry Detergent"].sort() },
 ];
 
 const FALLBACK_TYPES_SET = new Set(PRODUCT_TYPE_GROUPS.flatMap((g) => g.types));

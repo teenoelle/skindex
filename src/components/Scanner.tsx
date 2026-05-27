@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X, Menu } from "lucide-react";
+import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Search, X, Menu, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 import { SENSORY_PROFILE_MAP } from "@/lib/sensory";
@@ -37,6 +37,73 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "Spot Patches": Bandage,
   "Sun Screen": Sun,
   Toner: Droplets,
+};
+
+const BROWSE_AREA_ICON: Record<string, LucideIcon> = {
+  Face:   Smile,
+  Makeup: Palette,
+  Lip:    Heart,
+  Hands:  Hand,
+  Nails:  Fingerprint,
+  Hair:   Scissors,
+  Body:   PersonStanding,
+  Home:   Home,
+};
+
+const BROWSE_TYPE_ICON: Record<string, LucideIcon> = {
+  // Face
+  Concentrate:     FlaskConical,
+  Exfoliant:       Sparkles,
+  "Eye Cream":     Eye,
+  "Eye Primer":    Eye,
+  "Face Mask":     Shield,
+  "Face Wash":     Droplets,
+  "Makeup Remover":Droplets,
+  Mist:            Wind,
+  Moisturizer:     Droplet,
+  Oil:             Droplet,
+  Ointment:        Droplets,
+  Primer:          Layers,
+  Serum:           Pipette,
+  "Sleeping Mask": Moon,
+  "Spot Patches":  Bandage,
+  "Sun Screen":    Sun,
+  Toner:           GlassWater,
+  // Makeup
+  "BB Cream":      Layers,
+  Blush:           Sparkles,
+  "Brow Gel":      Pencil,
+  "CC Cream":      Layers,
+  Concealer:       Brush,
+  Eyeliner:        Pen,
+  Eyeshadow:       Eye,
+  Foundation:      Layers,
+  Mascara:         Eye,
+  "Setting Spray": Wind,
+  // Lip
+  "Lip Balm":      Heart,
+  "Lip Gloss":     Heart,
+  "Lip Treatment": Heart,
+  // Hands
+  "Hand Cream":    Hand,
+  "Dish Soap":     Droplets,
+  // Nails
+  "Nail Polish":   Sparkles,
+  "Nail Treatment":Sparkles,
+  // Hair
+  Conditioner:     Droplets,
+  "Hair Styler":   Wind,
+  "Hair Treatment":Sparkles,
+  "Scalp Treatment":Pipette,
+  Shampoo:         Waves,
+  // Body
+  "Body Lotion":   Droplets,
+  "Body Wash":     Waves,
+  Deodorant:       Wind,
+  "Foot Cream":    Footprints,
+  // Home
+  "Laundry Detergent": Waves,
+  "Fabric Softener":   Wind,
 };
 
 function CategoryIcon({ type, size = 28 }: { type?: string | null; size?: number }) {
@@ -2238,30 +2305,40 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     ungrouped.push(t);
                   }
                 }
-                const typeButton = (t: BrowseType) =>
-                  t.count === 0 ? (
+                const typeButton = (t: BrowseType) => {
+                  const TypeIcon = BROWSE_TYPE_ICON[t.name] ?? null;
+                  return t.count === 0 ? (
                     <span
                       key={t.name}
                       title="No products yet — be the first to add one"
-                      className="text-sm text-gray-300 border border-gray-100 rounded-full px-3 py-1 cursor-default select-none"
+                      className="text-sm text-gray-300 border border-gray-100 rounded-full px-3 py-1 cursor-default select-none flex items-center gap-1.5"
                     >
+                      {TypeIcon && <TypeIcon size={12} />}
                       {t.name} <span className="text-xs">0</span>
                     </span>
                   ) : (
                     <button
                       key={t.name}
                       onClick={() => selectBrowseType(t.name)}
-                      className="text-sm text-gray-700 border border-gray-200 rounded-full px-3 py-1 hover:border-gray-400 hover:text-gray-900 transition-colors"
+                      className="text-sm text-gray-700 border border-gray-200 rounded-full px-3 py-1 hover:border-gray-400 hover:text-gray-900 transition-colors flex items-center gap-1.5"
                     >
+                      {TypeIcon && <TypeIcon size={12} />}
                       {t.name} <span className="text-gray-400 text-xs">{t.count}</span>
                     </button>
                   );
-                const areaSection = (label: string, types: BrowseType[]) => (
-                  <div key={label}>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">{label}</p>
-                    <div className="flex flex-wrap gap-2">{types.map(typeButton)}</div>
-                  </div>
-                );
+                };
+                const areaSection = (label: string, types: BrowseType[]) => {
+                  const AreaIcon = BROWSE_AREA_ICON[label] ?? null;
+                  return (
+                    <div key={label}>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                        {AreaIcon && <AreaIcon size={12} />}
+                        {label}
+                      </p>
+                      <div className="flex flex-wrap gap-2">{types.map(typeButton)}</div>
+                    </div>
+                  );
+                };
                 const sections: React.ReactNode[] = [];
                 for (const area of AREA_ORDER) {
                   const types = grouped.get(area);
@@ -2284,7 +2361,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   ← All types
                 </button>
                 <span className="text-xs text-gray-300">·</span>
-                <span className="text-sm font-medium text-gray-700">{browseSelectedType}</span>
+                <span className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                  {(() => { const I = BROWSE_TYPE_ICON[browseSelectedType]; return I ? <I size={13} className="text-gray-500" /> : null; })()}
+                  {browseSelectedType}
+                </span>
               </div>
               {/* Browse search + filter chips */}
               {!browseLoading && browseProducts.length > 0 && (() => {

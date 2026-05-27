@@ -29397,8 +29397,52 @@ if a face wash has acids or chelating agents does the note need to change if a u
 
 
 
+yes implement this.
 
 
+
+
+● Pushed. The logic is:
+
+  ┌─────────────┬───────────┬──────────────────────────┐
+  │  Cleanser   │  Water    │                          │
+  │  contains   │ concern   │     Opening sentence     │
+  │             │  active?  │                          │
+  ├─────────────┼───────────┼──────────────────────────┤
+  │             │           │ Both effects combine —   │
+  │ Chelating + │ ✓         │ significantly reduced    │
+  │  exfoliant  │           │ disruption, shorter      │
+  │             │           │ window                   │
+  ├─────────────┼───────────┼──────────────────────────┤
+  │             │           │ Minerals bound during    │
+  │ Chelating   │ ✓         │ rinse — window less      │
+  │ only        │           │ critical but still       │
+  │             │           │ beneficial               │
+  ├─────────────┼───────────┼──────────────────────────┤
+  │             │           │ Hard water pH still      │
+  │ Exfoliant   │ ✓         │ raised, but exfoliant    │
+  │ only        │           │ acids partially offset   │
+  │             │           │ it                       │
+  ├─────────────┼───────────┼──────────────────────────┤
+  │             │           │ Original: acid mantle    │
+  │ Neither     │ ✓         │ takes 20–30 min to       │
+  │             │           │ recover                  │
+  ├─────────────┼───────────┼──────────────────────────┤
+  │             │           │ Faster recovery than     │
+  │ Exfoliant   │ ✗         │ standard cleanser,       │
+  │ only        │           │ applying quickly still   │
+  │             │           │ helps                    │
+  ├─────────────┼───────────┼──────────────────────────┤
+  │             │           │ Original: acid mantle    │
+  │ Neither     │ ✗         │ takes 20–30 min to       │
+  │             │           │ recover                  │
+  └─────────────┴───────────┴──────────────────────────┘
+
+  The C. acnes / Malassezia / TEWL sentences and the
+  30-second closing line follow unchanged — the opening sets
+   the right expectation level for how urgent the rest of
+  the advice is. The browse panel (no product scanned)
+  always uses the generic path.
 
 
 
@@ -29414,9 +29458,89 @@ product types - some of the body areas and product types don't have an icon in a
 
 
 
+● Now I have a complete picture. Here's what's missing and
+  the options for browse:
+
+  ---
+  Missing admin icons (these need fixing regardless):
+
+  Gap: BODY_AREAS list missing Hands, Nails, Home
+  Fix: Add them so the body area picker shows them
+  ────────────────────────────────────────
+  Gap: BODY_AREA_ICON missing Hands, Nails, Home
+  Fix: Hands → Hand, Home → Home, Nails → Fingerprint or
+    PaintBucket (no nail icon in Lucide)
+  ────────────────────────────────────────
+  Gap: PRODUCT_TYPE_ICON missing Dish Soap, Laundry
+    Detergent, Fabric Softener, and any nail types
+  Fix: Dish Soap → Droplets, Laundry/Fabric Softener → Shirt
+
+    / Wind, nail types → TBD
+  ────────────────────────────────────────
+  Gap: BODY_AREAS uses "Lips" but Scanner.tsx uses "Lip"
+  Fix: Align the spelling
+
+  ---
+  Ideas for browse display:
+
+  Idea 1 — Emoji on area headers only
+  Add an emoji character before each area section header.
+  Product type chips stay as text+count. Zero new imports —
+  just a lookup table like { Face: "🧴",  Makeup: "💄", Lip:
+  "👄", Hands: "🤲", Nails: "💅", Hair: "💇", Body: "🛁",
+  Home: "🏠" }. Fast to add, but emoji rendering varies
+  slightly by OS.
+
+  Idea 2 — Lucide icons on area headers (consistent with
+  admin)
+  Reuse the same BODY_AREA_ICON map from admin in
+  Scanner.tsx — same icons, same visual language. Import the
+   8 area icons into Scanner.tsx and render a small <Icon
+  size={12} /> before each area label. Cleaner than emoji,
+  consistent across the app.
+
+  Idea 3 — Lucide icon on each product type chip
+  Full treatment: small icon before the type name on every
+  chip (🧴  Face Wash · 12, 💧 Serum · 8). Reuses
+  PRODUCT_TYPE_ICON. More visual weight; could feel busy
+  with many chips in a row, but gives browse the same
+  density of information as a catalog app.
+
+  Idea 4 — Icon in the "back" header when a type is selected
+  Currently when you drill into a type it shows ← All types
+  · Face Wash. A small icon here (<FaceWashIcon /> Face
+  Wash) is lower-stakes than on every chip and still gives
+  visual identity at the point where the user most needs
+  orientation.
+
+  ---
+  My recommendation: Idea 2 for areas + Idea 4 for the
+  selected-type header — area-level icons give clear section
+   anchoring without cluttering the chip grid, and the
+  selected-type icon reinforces identity when browsing a
+  specific category. Then fix the missing admin gaps as a
+  prerequisite. Want to go with that, or a different
+  combination?
 
 
 
+
+
+
+let's go with ideas 2 and 3.
+
+
+
+
+
+
+
+
+can the skin profile text have similar styling to the browse text?
+
+for quick filters, can this section show up under browse before the first body area?
+
+is there a reason for the different types of water quality or can they be combined as poor water quality? 
 
 supplements - what ideas do you have if the user doesn't know which supplements profiles to click but do know the name of their supplements? 
 
