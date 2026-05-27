@@ -1988,8 +1988,26 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           onChange={(e) => setIngredients(e.target.value)}
           placeholder="Paste the full ingredients list here..."
           rows={6}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400 mb-3 resize-none font-mono leading-relaxed"
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400 mb-2 resize-none font-mono leading-relaxed"
         />
+      )}
+      {tab === "paste" && (
+        <div className="flex items-center gap-1 mb-3">
+          <button
+            type="button"
+            onClick={() => setIsRinseOff(false)}
+            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${!isRinseOff ? "bg-gray-800 text-white border-gray-800" : "text-gray-400 border-gray-200 hover:border-gray-400"}`}
+          >
+            Leave-on
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsRinseOff(true)}
+            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${isRinseOff ? "bg-gray-800 text-white border-gray-800" : "text-gray-400 border-gray-200 hover:border-gray-400"}`}
+          >
+            Rinse-off
+          </button>
+        </div>
       )}
       {tab === "add" && (
         <textarea
@@ -2458,26 +2476,26 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               {p.flaggedCount === 0 && p.sensoryCount === 0 && p.photoCount === 0 ? (
                                 <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Neutral</span>
                               ) : (() => {
+                                const universalCount = p.universalConcernCount ?? 0;
+                                const total = p.flaggedCount + p.sensoryCount + p.photoCount;
+                                const nonUniversal = Math.max(0, total - universalCount);
                                 const hasProf = activeSkinTypes.size > 0 || activeClimates.size > 0;
                                 const pfc = p.profileFlaggedCount;
-                                const universalCount = p.universalConcernCount ?? 0;
                                 if (hasProf && pfc !== undefined) {
-                                  const profileCount = pfc + (p.profileSensoryCount ?? 0);
-                                  if (universalCount === 0 && profileCount === 0) {
+                                  if (universalCount === 0 && nonUniversal === 0) {
                                     return <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">Neutral for your profile</span>;
                                   }
                                   return (
                                     <>
-                                      {universalCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{universalCount} universal</span>}
-                                      {profileCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{profileCount} profile concerns</span>}
+                                      {universalCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700">{universalCount} universal concern{universalCount !== 1 ? "s" : ""}</span>}
+                                      {nonUniversal > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700">{nonUniversal} profile concern{nonUniversal !== 1 ? "s" : ""}</span>}
                                     </>
                                   );
                                 }
-                                const otherConcerns = p.flaggedCount + p.sensoryCount + p.photoCount - universalCount;
                                 return (
                                   <>
-                                    {universalCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700">{universalCount} universal</span>}
-                                    {otherConcerns > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700">{otherConcerns} concerns</span>}
+                                    {universalCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700">{universalCount} universal concern{universalCount !== 1 ? "s" : ""}</span>}
+                                    {nonUniversal > 0 && <span className="text-xs px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700">{nonUniversal} concerns</span>}
                                   </>
                                 );
                               })()}
@@ -3246,22 +3264,21 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
 
             if (hasProfile) {
-              let profileCount = 0;
-              let totalConcernCount = 0;
+              let universalCount = 0;
+              let profileMatchedCount = 0;
               for (const item of result.originalItems) {
                 const m = getItemMatch(item, result.safe, result.flagged);
                 const si = (result.sensoryTrigger ?? []).find(s => normalizeForMatch(s.rawName) === normalizeForMatch(item)) ?? null;
                 const pi = (result.photosensitive ?? []).find(p => normalizeForMatch(p.rawName) === normalizeForMatch(item)) ?? null;
                 const lv = getIngredientConcernLevel(m, si, pi, activeSkinTypes, activeClimates);
-                if (lv === "universal" || lv === "profile-matched") profileCount++;
-                if (lv !== "neutral" && lv !== "skip") totalConcernCount++;
+                if (lv === "universal") universalCount++;
+                else if (lv === "profile-matched") profileMatchedCount++;
               }
-              const qualLabel = profileCount === 0 ? "No concerns" : profileCount <= 2 ? "Low concern" : profileCount <= 5 ? "Some concerns" : "High concern";
-              const qualColor = profileCount === 0 ? "text-green-700" : profileCount <= 2 ? "text-yellow-700" : profileCount <= 5 ? "text-amber-700" : "text-rose-700";
               return (
                 <p className="text-xs -mt-2">
                   <span className="text-gray-700">{totalItems} ingredient{totalItems !== 1 ? "s" : ""} scanned</span>
-                  {profileCount > 0 && <>{" · "}<button type="button" className={`${qualColor} font-medium hover:underline underline-offset-2`} onClick={scrollToConcern}>{profileCount} profile concern{profileCount !== 1 ? "s" : ""}</button></>}
+                  {universalCount > 0 && <>{" · "}<button type="button" className="text-rose-700 font-medium hover:underline underline-offset-2" onClick={scrollToConcern}>{universalCount} universal concern{universalCount !== 1 ? "s" : ""}</button></>}
+                  {profileMatchedCount > 0 && <>{" · "}<button type="button" className="text-amber-700 font-medium hover:underline underline-offset-2" onClick={scrollToConcern}>{profileMatchedCount} profile concern{profileMatchedCount !== 1 ? "s" : ""}</button></>}
                   {" · "}
                   <button type="button" className="text-teal-700 hover:underline underline-offset-2" onClick={scrollToConcern}>{result.safe.length} neutral</button>
                   {result.unreviewed.length > 0 && <>{" · "}<button type="button" className="text-gray-400 hover:underline underline-offset-2" onClick={() => { setShowUnreviewed(true); requestAnimationFrame(() => { document.getElementById("section-unreviewed")?.scrollIntoView({ behavior: "smooth", block: "start" }); }); }}>{result.unreviewed.length} unreviewed</button></>}
@@ -3667,22 +3684,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   const match = getItemMatch(item, result.safe, result.flagged);
                   const photoItem = (result.photosensitive ?? []).find(
                     (p) => normalizeForMatch(p.rawName) === normalizeForMatch(item)
-                  );
+                  ) ?? null;
                   const sensoryItem = (result.sensoryTrigger ?? []).find(
                     (s) => normalizeForMatch(s.rawName) === normalizeForMatch(item)
-                  );
+                  ) ?? null;
                   const itemNorm = normalizeForMatch(item);
                   const onAvoidList = ingredientLists.some(l => l.type === "avoid" && l.items.some(av => itemNorm.includes(av)));
-                  const colorKey: keyof typeof paragraphColor =
-                    match?.status === "flagged" ? "flagged"
-                    : sensoryItem ? "sensory-trigger"
-                    : photoItem ? "photo-sensitive"
-                    : match?.status === "safe" ? "safe"
-                    : "unreviewed";
+                  const concernLevel = getIngredientConcernLevel(match, sensoryItem, photoItem, activeSkinTypes, activeClimates);
                   const colorClass =
-                    colorKey === "unreviewed" ? paragraphColor.unreviewed
-                    : colorKey === "safe" ? "text-gray-700 font-medium"
-                    : paragraphColor[colorKey];
+                    concernLevel === "skip"            ? "text-gray-400"
+                    : concernLevel === "neutral"       ? "text-gray-700 font-medium"
+                    : concernLevel === "universal"     ? "text-rose-700 font-medium"
+                    : concernLevel === "profile-matched" ? "text-amber-700 font-medium"
+                    : concernLevel === "non-matching"  ? "text-yellow-700 font-medium"
+                    : "text-gray-400";
                   return (
                     <Fragment key={i}>
                       <button
