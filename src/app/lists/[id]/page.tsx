@@ -283,14 +283,14 @@ export default function ListDetailPage() {
             </Link>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="space-y-2">
             {items.map((item) => {
               const product = item.products;
               if (!product) return null;
               const isEditing = editingNoteId === item.id;
 
               return (
-                <div key={item.id} className="py-4">
+                <div key={item.id} className="border border-gray-200 rounded-xl p-3">
                   <div className="flex items-start gap-3">
                     {product.image_url ? (
                       <Image
