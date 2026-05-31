@@ -510,7 +510,7 @@ export async function POST(req: NextRequest) {
       const variantIds = communityVariants.map((v) => v.id);
       const [{ data: variantData }, { data: allIngredientsDb }] = await Promise.all([
         supabase.from("products").select("id, image_url, ingredient_list").in("id", variantIds),
-        supabase.from("ingredients").select("id, name, inci_name, status, flagged_category, structural_category"),
+        supabase.from("ingredients").select("id, name, inci_name, status, flagged_category, secondary_flagged_categories, structural_category"),
       ]);
       const allIngredients = (allIngredientsDb ?? []) as import("@/lib/compute-concerns").IngredientRow[];
       const listMap = new Map((variantData ?? []).map((p) => [p.id, { list: p.ingredient_list as string | null, image_url: p.image_url as string | null }]));
@@ -701,6 +701,7 @@ export async function POST(req: NextRequest) {
             explanation_structured: null,
             category: "pore-clogger",
             flagged_category: "pore-clogger",
+            secondary_flagged_categories: [],
             structural_category: null,
             skin_climate_notes: null,
           },

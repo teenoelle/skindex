@@ -14,6 +14,7 @@ export type IngredientRow = {
   inci_name: string | null;
   status: string;
   flagged_category: string | null;
+  secondary_flagged_categories?: string[];
   structural_category: string | null;
 };
 
@@ -94,22 +95,23 @@ export function computeProductConcerns(
     if (match && match.status === "flagged") {
       const cat = match.flagged_category as string | null;
       const struct = match.structural_category as string | null;
+      const secondaryCats: string[] = match.secondary_flagged_categories ?? [];
+      const allCats = [cat, ...secondaryCats].filter(Boolean) as string[];
 
       // Always register name for comedogenic dedup, even if suppressed
       dbFlaggedNames.add(lower.trim());
 
-      // Rinse-off suppression: skip pore-clogger/occlusive/bacteria-trap
-      if (isRinseOff && cat && RINSE_OFF_SUPPRESS_CATS.has(cat)) continue;
+      // Rinse-off suppression: skip if ALL categories are suppressed
+      if (isRinseOff && allCats.length > 0 && allCats.every(c => RINSE_OFF_SUPPRESS_CATS.has(c))) continue;
 
       dbFlaggedCount++;
 
       // Universal rules — mirrors getIngredientConcernLevel() in Scanner.tsx
-      if (cat && UNIVERSAL_CONCERN_SET.has(cat)) {
+      if (allCats.some(c => UNIVERSAL_CONCERN_SET.has(c))) {
         universalConcernCount++;
-      } else if (cat === "sensitizer" && struct === "Fragrance") {
-        // Fragrance sensitizers are always a universal concern
+      } else if (allCats.includes("sensitizer") && struct === "Fragrance") {
         universalConcernCount++;
-      } else if (hasProfile && cat && profileConcernsSet.has(cat)) {
+      } else if (hasProfile && allCats.some(c => profileConcernsSet.has(c))) {
         profileMatchedCount++;
       }
     }

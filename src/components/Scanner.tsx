@@ -517,6 +517,26 @@ const RINSE_OFF_SUPPRESS_DB_CATS = new Set(["pore-clogger", "occlusive", "bacter
 const RINSE_OFF_SUPPRESS_SENSORY_CATS = new Set(["Pilling", "Film-forming", "Occlusive", "occlusive-itch", "comedogenic-itch"]);
 const RINSE_OFF_SUPPRESS_PHOTO_CATS = new Set(["photo-retinoid", "photo-BHA", "photo-brightening"]);
 
+function isFcProfileMatch(fc: string, activeSkinTypes: Set<SkinType>, activeClimates: Set<ClimateType>): boolean {
+  return (
+    (["pore-clogger", "occlusive", "bacteria-trap"].includes(fc) &&
+      (activeSkinTypes.has("acne_prone") || activeSkinTypes.has("oily") || activeSkinTypes.has("fungal_acne") || activeSkinTypes.has("body_acne") || activeSkinTypes.has("keratosis_pilaris"))) ||
+    (fc === "sensitizer" &&
+      (activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") || activeSkinTypes.has("eczema") || activeSkinTypes.has("rosacea") || activeSkinTypes.has("psoriasis"))) ||
+    (fc === "fragrance-allergen" &&
+      (activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") || activeSkinTypes.has("eczema"))) ||
+    (fc.toLowerCase() === "chemical sunscreen" &&
+      (activeSkinTypes.has("rosacea") || activeSkinTypes.has("lupus_rash"))) ||
+    (fc === "Drying Solvent" && (activeSkinTypes.has("rosacea") || activeClimates.has("heavy_metal_water"))) ||
+    (["photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical"].includes(fc) &&
+      (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv") || activeSkinTypes.has("lupus_rash"))) ||
+    (["photo-retinoid", "photo-AHA", "photo-BHA"].includes(fc) && activeSkinTypes.has("fast_shedding")) ||
+    (fc === "sensitizer" && activeSkinTypes.has("fast_shedding")) ||
+    (fc === "fragrance-allergen" && activeSkinTypes.has("fast_shedding")) ||
+    (fc === "Drying Solvent" && activeSkinTypes.has("fast_shedding"))
+  );
+}
+
 function getIngredientConcernLevel(
   match: { status: "safe" | "flagged"; ingredient: DbIngredient } | null,
   sensoryItem: SensoryTriggerItem | null,
@@ -527,7 +547,10 @@ function getIngredientConcernLevel(
 ): ConcernLevel | "skip" {
   // Suppress categories that don't apply to rinse-off products
   if (isRinseOff) {
-    if (match?.ingredient.status === "flagged" && RINSE_OFF_SUPPRESS_DB_CATS.has(match.ingredient.flagged_category ?? "")) match = null;
+    if (match?.ingredient.status === "flagged") {
+      const allCats = [match.ingredient.flagged_category, ...(match.ingredient.secondary_flagged_categories ?? [])].filter(Boolean);
+      if (allCats.length > 0 && allCats.every(c => RINSE_OFF_SUPPRESS_DB_CATS.has(c!))) match = null;
+    }
     if (sensoryItem && RINSE_OFF_SUPPRESS_SENSORY_CATS.has(sensoryItem.sensory_category ?? "")) sensoryItem = null;
     if (photoItem && RINSE_OFF_SUPPRESS_PHOTO_CATS.has(photoItem.photoCategory ?? "")) photoItem = null;
   }
@@ -539,31 +562,17 @@ function getIngredientConcernLevel(
   if (!hasConcern) return "neutral";
 
   const fc = match?.ingredient.flagged_category ?? "";
+  const allFcs = [fc, ...(match?.ingredient.secondary_flagged_categories ?? [])].filter(Boolean);
 
-  if (CONCERN_UNIVERSAL_CATEGORIES.has(fc)) return "universal";
+  if (allFcs.some(c => CONCERN_UNIVERSAL_CATEGORIES.has(c))) return "universal";
   if (photoItem?.sunLevel === "avoid") return "universal";
-  if (fc === "sensitizer" && match?.ingredient.structural_category === "Fragrance") return "universal";
+  if (allFcs.includes("sensitizer") && match?.ingredient.structural_category === "Fragrance") return "universal";
 
   const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
   if (!hasProfile) return "non-matching";
 
   if (match?.ingredient.status === "flagged") {
-    const isMatch =
-      (["pore-clogger", "occlusive", "bacteria-trap"].includes(fc) &&
-        (activeSkinTypes.has("acne_prone") || activeSkinTypes.has("oily") || activeSkinTypes.has("fungal_acne") || activeSkinTypes.has("body_acne") || activeSkinTypes.has("keratosis_pilaris"))) ||
-      (fc === "sensitizer" &&
-        (activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") || activeSkinTypes.has("eczema") || activeSkinTypes.has("rosacea") || activeSkinTypes.has("psoriasis"))) ||
-      (fc === "fragrance-allergen" &&
-        (activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") || activeSkinTypes.has("eczema"))) ||
-      (fc.toLowerCase() === "chemical sunscreen" &&
-        (activeSkinTypes.has("rosacea") || activeSkinTypes.has("lupus_rash"))) ||
-      (fc === "Drying Solvent" && (activeSkinTypes.has("rosacea") || activeClimates.has("heavy_metal_water"))) ||
-      (["photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical"].includes(fc) &&
-        (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv") || activeSkinTypes.has("lupus_rash"))) ||
-      (["photo-retinoid", "photo-AHA", "photo-BHA"].includes(fc) && activeSkinTypes.has("fast_shedding")) ||
-      (fc === "sensitizer" && activeSkinTypes.has("fast_shedding")) ||
-      (fc === "fragrance-allergen" && activeSkinTypes.has("fast_shedding")) ||
-      (fc === "Drying Solvent" && activeSkinTypes.has("fast_shedding"));
+    const isMatch = allFcs.some(c => isFcProfileMatch(c, activeSkinTypes, activeClimates));
     return isMatch ? "profile-matched" : "non-matching";
   }
 
@@ -3955,7 +3964,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-2 py-0.5 shrink-0">{structCat}</span>
                       )}
                       {concernLabel ? (
-                        <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${CONCERN_PILL[level]}`}>{concernLabel}</span>
+                        <>
+                          <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${CONCERN_PILL[level]}`}>{concernLabel}</span>
+                          {(match?.ingredient.secondary_flagged_categories ?? []).map((sc) => {
+                            const scLabel = CATEGORY_LABELS[sc] ?? null;
+                            return scLabel && scLabel !== concernLabel ? (
+                              <span key={sc} className="text-xs rounded-full px-2 py-0.5 shrink-0 bg-gray-100 text-gray-600">{scLabel}</span>
+                            ) : null;
+                          })}
+                        </>
                       ) : benefitLabel ? (
                         <span className="text-xs bg-teal-50 text-teal-700 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>
                       ) : null}
@@ -4062,20 +4079,29 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {level !== "neutral" && (
                         <div className={`pl-3 border-l-2 ${CONCERN_STRIPE[level]} space-y-1`}>
                           {(() => {
+                            const concernItems = structured?.concern_items ?? null;
                             const dbConcernText = isLoading ? null
-                              : (structured?.concern ?? (explanation && !structured ? explanation : null));
+                              : (concernItems ? null : (structured?.concern ?? (explanation && !structured ? explanation : null)));
                             const sensoryText = sensoryItem?.sensory_note ?? null;
                             const photoText = photoItem?.photo_note ?? null;
+                            const dbSourceCount = concernItems ? concernItems.length : (dbConcernText ? 1 : 0);
                             // Show source labels whenever 2+ concern sources are present
                             const showLabels =
-                              [dbConcernText, sensoryText, photoText].filter(Boolean).length +
+                              dbSourceCount + (sensoryText ? 1 : 0) + (photoText ? 1 : 0) +
                               profileCautionNotes.length > 1;
                             return (
                               <>
                                 {isLoading && (
                                   <p className="text-xs text-gray-400 italic">Generating explanation…</p>
                                 )}
-                                {dbConcernText && (
+                                {concernItems ? concernItems.map((ci) => (
+                                  <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
+                                    {showLabels && (
+                                      <span className="font-semibold">{CATEGORY_LABELS[ci.category] ?? ci.category} — </span>
+                                    )}
+                                    {ci.text}
+                                  </p>
+                                )) : dbConcernText && (
                                   <p className="text-xs text-gray-600 leading-relaxed">
                                     {showLabels && catLabel && (
                                       <span className="font-semibold">{catLabel} — </span>

@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
 
   const { data: ingredient } = await supabaseAdmin
     .from("ingredients")
-    .select("id, name, status, explanation, explanation_structured, structural_category, category, flagged_category")
+    .select("id, name, status, explanation, explanation_structured, structural_category, category, flagged_category, secondary_flagged_categories")
     .eq("id", id)
     .single();
 

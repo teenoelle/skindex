@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   // 2. All ingredients (id, name, inci_name, status, flagged_category, structural_category) for text matching
   const { data: allIngredientsDb } = await supabase
     .from("ingredients")
-    .select("id, name, inci_name, status, flagged_category, structural_category");
+    .select("id, name, inci_name, status, flagged_category, secondary_flagged_categories, structural_category");
   const allIngredients = (allIngredientsDb ?? []) as IngredientRow[];
 
   // 3. Candidate products (have an ingredient list, not excluded)

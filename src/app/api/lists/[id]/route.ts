@@ -49,7 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Fetch ALL ingredients once — same as matchIngredients() in @/lib/scanner
   const { data: ingredientsDb } = await supabaseAdmin
     .from("ingredients")
-    .select("id, name, inci_name, status, flagged_category, structural_category");
+    .select("id, name, inci_name, status, flagged_category, secondary_flagged_categories, structural_category");
   const allIngredients = (ingredientsDb ?? []) as IngredientRow[];
 
   type ProductRow = { id: string; name: string; brand: string | null; image_url: string | null; type: string | null; ingredient_list: string | null };

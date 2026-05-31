@@ -5,10 +5,16 @@ export type SkinClimateNote = {
   text: string;
 };
 
+export type ConcernItem = {
+  category: string;
+  text: string;
+};
+
 export type ExplanationStructured = {
   formula_role: string | null;
   benefit: string | null;
   concern: string | null;
+  concern_items?: ConcernItem[] | null;
 };
 
 export type DbIngredient = {
@@ -21,6 +27,7 @@ export type DbIngredient = {
   skin_climate_notes: SkinClimateNote[] | null;
   category: string | null;
   flagged_category: string | null;
+  secondary_flagged_categories: string[];
   structural_category: string | null;
 };
 
