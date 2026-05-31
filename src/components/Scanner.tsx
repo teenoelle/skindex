@@ -3992,6 +3992,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               <span key={sc} className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${CONCERN_PILL[scLevel]}`}>{scLabel}</span>
                             );
                           })}
+                          {sensoryLabel && sensoryLabel !== concernLabel && (
+                            <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${CONCERN_PILL["profile-matched"]}`}>{sensoryLabel}</span>
+                          )}
                         </>
                       ) : benefitLabel ? (
                         <span className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>
@@ -4111,58 +4114,59 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         const sensoryText = sensoryItem?.sensory_note ?? null;
                         const photoText = photoItem?.photo_note ?? null;
                         const isUniversalCat = (cat: string) => UNIVERSAL_FLAG_CATS.has(cat);
-                        // Suppress sensory note when AI explanation already covers the same concern
-                        const sensoryRedundant = sensoryItem ? (() => {
-                          const related = SENSORY_REDUNDANT_WITH[sensoryItem.sensory_category ?? ""] ?? [];
-                          if (!related.length) return false;
-                          const allFlagged = [
-                            fc,
-                            ...(match?.ingredient.secondary_flagged_categories ?? []),
-                            ...(concernItems?.map(ci => ci.category) ?? []),
-                          ].filter(Boolean) as string[];
-                          return allFlagged.some(f => related.includes(f));
-                        })() : false;
-                        const effectiveSensoryText = sensoryRedundant ? null : sensoryText;
+                        // Find which concern the sensory note should be merged into
+                        const sensoryRelated = sensoryItem ? (SENSORY_REDUNDANT_WITH[sensoryItem.sensory_category ?? ""] ?? []) : [];
+                        let sensoryMergedWith: string | null = null;
+                        if (sensoryText && sensoryLabel && sensoryRelated.length) {
+                          if (concernItems) {
+                            const matched = concernItems.find(ci => sensoryRelated.includes(ci.category));
+                            if (matched) sensoryMergedWith = matched.category;
+                          } else if (fc && sensoryRelated.includes(fc)) {
+                            sensoryMergedWith = fc;
+                          }
+                        }
                         return (
                           <>
                             <div className={`pl-3 border-l-2 ${CONCERN_STRIPE[level]} space-y-1`}>
                               {isLoading && (
                                 <p className="text-xs text-gray-400 italic">Generating explanation…</p>
                               )}
-                              {concernItems ? concernItems.map((ci) => (
-                                <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
-                                  <span className={`font-semibold ${isUniversalCat(ci.category) ? "text-rose-700" : "text-amber-700"}`}>
-                                    {CATEGORY_LABELS[ci.category] ?? ci.category} — </span>
-                                  {ci.text}
-                                </p>
-                              )) : dbConcernText && (
+                              {concernItems ? concernItems.map((ci) => {
+                                const isUniversal = isUniversalCat(ci.category);
+                                const ciLabel = CATEGORY_LABELS[ci.category] ?? ci.category;
+                                const merged = sensoryMergedWith === ci.category;
+                                return (
+                                  <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
+                                    <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>
+                                      {merged && sensoryLabel ? `${ciLabel}, ${sensoryLabel}` : ciLabel} — </span>
+                                    {ci.text}{merged && sensoryText ? ` ${sensoryText}` : ""}
+                                  </p>
+                                );
+                              }) : dbConcernText && (
                                 <p className="text-xs text-gray-600 leading-relaxed">
                                   {catLabel && (
                                     <span className={`font-semibold ${fc && isUniversalCat(fc) ? "text-rose-700" : "text-amber-700"}`}>
-                                      {catLabel} — </span>
+                                      {sensoryMergedWith === fc && sensoryLabel ? `${catLabel}, ${sensoryLabel}` : catLabel} — </span>
                                   )}
-                                  {dbConcernText}
+                                  {dbConcernText}{sensoryMergedWith === fc && sensoryText ? ` ${sensoryText}` : ""}
                                 </p>
                               )}
-                              {effectiveSensoryText && (
+                              {/* Sensory shown separately only when it wasn't merged with a concern */}
+                              {!sensoryMergedWith && sensoryText && (
                                 <p className="text-xs text-gray-600 leading-relaxed">
-                                  {sensoryLabel && (
-                                    <span className="font-semibold text-amber-700">{sensoryLabel} — </span>
-                                  )}
-                                  {effectiveSensoryText}
+                                  {sensoryLabel && <span className="font-semibold text-amber-700">{sensoryLabel} — </span>}
+                                  {sensoryText}
                                 </p>
                               )}
-                              {!sensoryRedundant && sensoryItem?.sensory_category === "Film-forming" && (
+                              {sensoryItem?.sensory_category === "Film-forming" && (
                                 <p className="text-xs text-gray-400">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
                               )}
-                              {!sensoryRedundant && sensoryItem?.sensory_category === "Occlusive" && (
+                              {sensoryItem?.sensory_category === "Occlusive" && (
                                 <p className="text-xs text-gray-400">Bump type: worsens existing congestion by sealing the skin surface.</p>
                               )}
                               {photoText && (
                                 <p className="text-xs text-gray-600 leading-relaxed">
-                                  {photoLabel && (
-                                    <span className="font-semibold text-amber-700">{photoLabel} — </span>
-                                  )}
+                                  {photoLabel && <span className="font-semibold text-amber-700">{photoLabel} — </span>}
                                   {photoText}
                                 </p>
                               )}
