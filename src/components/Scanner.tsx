@@ -4051,7 +4051,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         if (!roleText && !fullMatch?.comedogenicRating) return null;
                         return (
                           <div className="pl-3 border-l-2 border-gray-300">
-                            {roleText && <p className="text-xs text-gray-500 leading-relaxed">{roleText}</p>}
+                            {roleText && (
+                              <p className="text-xs text-gray-500 leading-relaxed">
+                                <span className="font-semibold text-gray-700">{structCat ?? "Function"} — </span>
+                                {roleText}
+                              </p>
+                            )}
                             {fullMatch?.comedogenicRating && (
                               <p className="text-xs text-gray-400 mt-0.5">
                                 <span className="font-medium">{fullMatch.comedogenicRating}</span>
@@ -4070,14 +4075,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         return (
                           <div className="pl-3 border-l-2 border-teal-500 space-y-0.5">
                             {benefitSentence && (
-                              <p className="text-xs text-gray-600 leading-relaxed">{benefitSentence}</p>
+                              <p className="text-xs text-gray-600 leading-relaxed">
+                                {benefitLabel && <span className="font-semibold text-teal-700">{benefitLabel} — </span>}
+                                {benefitSentence}
+                              </p>
                             )}
                             {benefitNote && (
                               <p className="text-xs text-gray-600 leading-relaxed">{benefitNote}</p>
                             )}
                             {benefitNotes.map((note, i) => (
                               <p key={i} className="text-xs text-gray-600 leading-relaxed">
-                                {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
+                                {noteLabel(note) && <span className="font-semibold text-teal-700">{noteLabel(note)} — </span>}
                                 {note.text}
                               </p>
                             ))}
@@ -4091,9 +4099,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           : (concernItems ? null : (structured?.concern ?? (explanation && !structured ? explanation : null)));
                         const sensoryText = sensoryItem?.sensory_note ?? null;
                         const photoText = photoItem?.photo_note ?? null;
-                        const dbSourceCount = concernItems ? concernItems.length : (dbConcernText ? 1 : 0);
-                        // Show labels when 2+ concern sources present (profile notes now live in their own stripe)
-                        const showLabels = dbSourceCount + (sensoryText ? 1 : 0) + (photoText ? 1 : 0) > 1;
                         const isUniversalCat = (cat: string) => UNIVERSAL_FLAG_CATS.has(cat);
                         return (
                           <>
@@ -4103,15 +4108,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               )}
                               {concernItems ? concernItems.map((ci) => (
                                 <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
-                                  {showLabels && (
-                                    <span className={`font-semibold ${isUniversalCat(ci.category) ? "text-rose-700" : "text-amber-700"}`}>
-                                      {CATEGORY_LABELS[ci.category] ?? ci.category} — </span>
-                                  )}
+                                  <span className={`font-semibold ${isUniversalCat(ci.category) ? "text-rose-700" : "text-amber-700"}`}>
+                                    {CATEGORY_LABELS[ci.category] ?? ci.category} — </span>
                                   {ci.text}
                                 </p>
                               )) : dbConcernText && (
                                 <p className="text-xs text-gray-600 leading-relaxed">
-                                  {showLabels && catLabel && (
+                                  {catLabel && (
                                     <span className={`font-semibold ${fc && isUniversalCat(fc) ? "text-rose-700" : "text-amber-700"}`}>
                                       {catLabel} — </span>
                                   )}
@@ -4120,7 +4123,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               )}
                               {sensoryText && (
                                 <p className="text-xs text-gray-600 leading-relaxed">
-                                  {showLabels && sensoryLabel && (
+                                  {sensoryLabel && (
                                     <span className="font-semibold text-amber-700">{sensoryLabel} — </span>
                                   )}
                                   {sensoryText}
@@ -4134,7 +4137,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               )}
                               {photoText && (
                                 <p className="text-xs text-gray-600 leading-relaxed">
-                                  {showLabels && photoLabel && (
+                                  {photoLabel && (
                                     <span className="font-semibold text-amber-700">{photoLabel} — </span>
                                   )}
                                   {photoText}
