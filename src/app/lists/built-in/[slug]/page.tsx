@@ -35,7 +35,7 @@ type Group = {
 const SKIN_TYPE_LABELS: Record<string, string> = {
   oily: "Oily", dry: "Dry", reactive: "Reactive", damaged_barrier: "Damaged barrier",
   acne_prone: "Acne", mature: "Mature", hyperpigmentation_prone: "Hyperpigmentation",
-  fungal_acne: "Fungal acne", rosacea: "Rosacea", seborrheic: "Seborrheic",
+  fungal_acne: "Fungal acne", rosacea: "Rosacea", seborrheic: "Seborrheic dermatitis",
   eczema: "Eczema", psoriasis: "Psoriasis", lupus_rash: "Lupus rash",
   keratosis_pilaris: "Keratosis pilaris", body_acne: "Body acne",
 };
