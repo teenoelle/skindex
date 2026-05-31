@@ -209,10 +209,10 @@ const ENVIRONMENTAL_CATS_SET = new Set(ENVIRONMENTAL_GROUPS.map(g => g.cat));
 
 function catBadgeColor(cat: string, isSafePage: boolean): string {
   if (!cat) return "bg-gray-100 text-gray-500";
-  if (UNIVERSAL_CATS_SET.has(cat)) return "border border-rose-200 text-rose-600";
-  if (ENVIRONMENTAL_CATS_SET.has(cat)) return "border border-emerald-200 text-emerald-600";
-  if (isSafePage) return "border border-teal-200 text-teal-600";
-  return "border border-amber-200 text-amber-600";
+  if (UNIVERSAL_CATS_SET.has(cat)) return "text-rose-700";
+  if (ENVIRONMENTAL_CATS_SET.has(cat)) return "text-emerald-700";
+  if (isSafePage) return "text-teal-700";
+  return "text-amber-700";
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
