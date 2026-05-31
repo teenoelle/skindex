@@ -3974,10 +3974,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               neutral:           "border-teal-500",
             };
             const CONCERN_PILL: Record<ConcernLevel, string> = {
-              universal:         "bg-rose-100 text-rose-800",
-              "profile-matched": "bg-amber-100 text-amber-800",
-              "non-matching":    "bg-yellow-100 text-yellow-800",
-              neutral:           "bg-teal-100 text-teal-800",
+              universal:         "bg-rose-50 text-rose-700",
+              "profile-matched": "bg-amber-50 text-amber-700",
+              "non-matching":    "bg-gray-100 text-gray-500",
+              neutral:           "bg-teal-50 text-teal-700",
             };
             const GROUP_HEADER_COLOR: Record<ConcernLevel, string> = {
               universal:         "text-rose-700",
@@ -3988,7 +3988,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             const GROUP_BORDER: Record<ConcernLevel, string> = {
               universal:         "border-rose-100 divide-rose-100",
               "profile-matched": "border-amber-100 divide-amber-100",
-              "non-matching":    "border-yellow-100 divide-yellow-100",
+              "non-matching":    "border-gray-100 divide-gray-100",
               neutral:           "border-teal-100 divide-teal-100",
             };
 
@@ -4092,9 +4092,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         </>
                       ) : (benefitLabel || secondaryBenefitLabels.length > 0) ? (
                         <>
-                          {benefitLabel && <span className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>}
+                          {benefitLabel && <span className="text-xs bg-teal-50 text-teal-700 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>}
                           {secondaryBenefitLabels.map(sl => (
-                            <span key={sl} className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5 shrink-0">{sl}</span>
+                            <span key={sl} className="text-xs bg-teal-50 text-teal-700 rounded-full px-2 py-0.5 shrink-0">{sl}</span>
                           ))}
                         </>
                       ) : null}
@@ -4359,6 +4359,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </>
                 )}
                 {renderGroup("Neutral", groups.neutral, "neutral", true)}
+                {result.originalItems.some(i => i.includes("*")) && (
+                  <p className="text-[11px] text-gray-400 mt-2">* From organically certified sources (COSMOS / Ecocert)</p>
+                )}
               </section>
             );
           })()}
