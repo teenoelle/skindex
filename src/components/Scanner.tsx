@@ -8,6 +8,7 @@ import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, B
 import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 import { SENSORY_PROFILE_MAP } from "@/lib/sensory";
+import { tokenFuzzyFilter } from "@/lib/search";
 import ConcernChips from "@/components/ConcernChips";
 
 function slugify(text: string): string {
@@ -2313,9 +2314,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 const wantLists = ingredientLists.filter(l => (l.type === "want" || listModes[l.id] === "include") && l.items.length > 0);
                 const newLists = ingredientLists.filter(l => !l.type && l.items.length > 0);
                 const profileCats = profileMatchedCategories(activeSkinTypes, activeClimates);
-                const searchLower = browseSearch.trim().toLowerCase();
-                const filtered = browseProducts.filter(p => {
-                  if (searchLower && !p.name.toLowerCase().includes(searchLower) && !(p.brand ?? "").toLowerCase().includes(searchLower)) return false;
+                const searchCandidates = browseSearch.trim()
+                  ? tokenFuzzyFilter(browseProducts, browseSearch, ["name", "brand"])
+                  : browseProducts;
+                const filtered = searchCandidates.filter(p => {
                   if (browsePhotosafe && p.photoCount > 0) return false;
                   if (browseProfileLinked && ((p.profileFlaggedCount ?? 0) + (p.profileSensoryCount ?? 0)) > 0) return false;
                   if (browseNoUniversal && (p.universalConcernCount ?? 0) > 0) return false;
@@ -2326,7 +2328,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   return true;
                 });
                 const activeModes = newLists.filter(l => listModes[l.id] && listModes[l.id] !== "off").length;
-                const activeFilterCount = (searchLower ? 1 : 0) + (browsePhotosafe ? 1 : 0) + (browseProfileLinked ? 1 : 0) + (browseNoUniversal ? 1 : 0) + (browseCleanOnly ? 1 : 0) + avoidLists.filter(l => l.type === "avoid").length + wantLists.filter(l => l.type === "want").length + activeModes;
+                const activeFilterCount = (browseSearch.trim() ? 1 : 0) + (browsePhotosafe ? 1 : 0) + (browseProfileLinked ? 1 : 0) + (browseNoUniversal ? 1 : 0) + (browseCleanOnly ? 1 : 0) + avoidLists.filter(l => l.type === "avoid").length + wantLists.filter(l => l.type === "want").length + activeModes;
                 return (
                   <>
                     <input
@@ -2698,7 +2700,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     {[typeBodyAreaMap.get(result.product.type), result.product.type].filter(Boolean).join(" · ")}
                   </p>
                 )}
-                {(result.product.brand || result.product.iherb_url || (isSignedIn && result.product.id)) && (
+                {(result.product.brand || result.product.iherb_url || result.product.name) && (
                   <div className="flex flex-col gap-0.5">
                     <p className="text-sm text-gray-400 flex items-center gap-2 flex-wrap">
                       {result.product.brand && (
@@ -2722,16 +2724,26 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             iHerb ↗
                           </a>
                         </>
-                      ) : (isSignedIn && result.product.id && !suggestLinkOpen) ? (
+                      ) : !suggestLinkOpen ? (
                         <>
                           {result.product.brand && <span className="text-gray-300">·</span>}
-                          <button
-                            type="button"
-                            onClick={() => setSuggestLinkOpen(true)}
-                            className="text-xs text-gray-300 hover:text-gray-500 underline underline-offset-2"
+                          <a
+                            href={`https://www.iherb.com/search?kw=${encodeURIComponent([result.product.brand, result.product.name].filter(Boolean).join(" "))}&rcode=DYT4743`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs hover:underline underline-offset-2 text-gray-400"
                           >
-                            + iHerb link
-                          </button>
+                            iHerb search ↗
+                          </a>
+                          {isAdmin && result.product.id && (
+                            <button
+                              type="button"
+                              onClick={() => setSuggestLinkOpen(true)}
+                              className="text-xs text-gray-300 hover:text-gray-500 underline underline-offset-2"
+                            >
+                              + link
+                            </button>
+                          )}
                         </>
                       ) : null}
                     </p>

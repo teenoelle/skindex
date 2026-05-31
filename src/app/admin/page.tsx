@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/nextjs";
+import { tokenFuzzyFilter } from "@/lib/search";
 import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
 import {
@@ -1384,12 +1385,11 @@ export default function AdminPage() {
     }
   }), [allProducts, allSort]);
 
-  const filteredAllProducts = useMemo(() => sortedAllProducts
-    .filter((p) =>
-      !allSearch ||
-      p.name.toLowerCase().includes(allSearch.toLowerCase()) ||
-      (p.brand ?? "").toLowerCase().includes(allSearch.toLowerCase())
-    )
+  const filteredAllProducts = useMemo(() => (
+    allSearch
+      ? tokenFuzzyFilter(sortedAllProducts, allSearch, ["name", "brand", "type"])
+      : sortedAllProducts
+  )
     .filter((p) => !allBrandFilter || p.brand === allBrandFilter)
     .filter((p) => !filterMissingSource || !p.source_url)
     .filter((p) => !filterMissingIherb || !p.iherb_url)
