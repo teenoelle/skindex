@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
+import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, Routine, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 import { SENSORY_PROFILE_MAP } from "@/lib/sensory";
 import { tokenFuzzyFilter } from "@/lib/search";
 import { splitIngredientList } from "@/lib/scanner";
@@ -14,6 +14,25 @@ import ConcernChips from "@/components/ConcernChips";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+const STEP_SEQUENCE: { key: string; label: string; order: number; tag: string; timeOfDay: "am" | "pm" | null }[] = [
+  { key: "enhancer", label: "Toner",      order: 1, tag: "enhancer-caution", timeOfDay: null },
+  { key: "acid",     label: "Acid step",  order: 2, tag: "acid-step",        timeOfDay: null },
+  { key: "vitc",     label: "Vitamin C",  order: 3, tag: "low-ph-step",      timeOfDay: "am" },
+  { key: "retinoid", label: "Retinoid",   order: 6, tag: "retinoid",         timeOfDay: "pm" },
+  { key: "spf",      label: "SPF",        order: 7, tag: "spf-last",         timeOfDay: "am" },
+  { key: "seal",     label: "Seal",       order: 8, tag: "seal-last",        timeOfDay: "pm" },
+];
+
+function getStepOrder(stepTags: string[]): number {
+  if (stepTags.includes("enhancer-caution")) return 1;
+  if (stepTags.includes("acid-step")) return 2;
+  if (stepTags.includes("low-ph-step")) return 3;
+  if (stepTags.includes("retinoid")) return 6;
+  if (stepTags.includes("spf-last")) return 7;
+  if (stepTags.includes("seal-last")) return 8;
+  return 4.5; // serum / moisturizer range
 }
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
@@ -987,7 +1006,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [neutralGroupOpen, setNeutralGroupOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showStickyProduct, setShowStickyProduct] = useState(false);
-  const [routineProducts, setRoutineProducts] = useState<RoutineProduct[]>([]);
+  const [routines, setRoutines] = useState<Routine[]>([]);
+  const [activeRoutineId, setActiveRoutineId] = useState<string | null>(null);
+  const [routineRenaming, setRoutineRenaming] = useState(false);
+  const [routineRenameValue, setRoutineRenameValue] = useState("");
   const [addedToRoutine, setAddedToRoutine] = useState(false);
   const [routinePanelOpen, setRoutinePanelOpen] = useState(false);
   const [quickListProductId, setQuickListProductId] = useState<string | null>(null);
@@ -1006,6 +1028,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [stepTagHint, setStepTagHint] = useState<string | null>(null);
   const [routineStepHint, setRoutineStepHint] = useState<string | null>(null);
 
+  // Derived routine state — all reads of routineProducts work unchanged
+  const activeRoutine = routines.find(r => r.id === activeRoutineId) ?? routines[0] ?? null;
+  const routineProducts = activeRoutine?.products ?? [];
 
   const initialProductIdRef = useRef(initialProductId);
   const scrollToProductRef = useRef(false);
@@ -1032,10 +1057,22 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     try {
       const st = localStorage.getItem("skindex:skinTypes");
       const cl = localStorage.getItem("skindex:climates");
-      const rt = localStorage.getItem("skindex:routine");
+      const routinesRaw = localStorage.getItem("skindex:routines");
+      const activeIdRaw = localStorage.getItem("skindex:activeRoutineId");
+      const legacyRt = localStorage.getItem("skindex:routine");
       if (st) setActiveSkinTypes(new Set(JSON.parse(st) as SkinType[]));
       if (cl) setActiveClimates(new Set(JSON.parse(cl) as ClimateType[]));
-      if (rt) setRoutineProducts(JSON.parse(rt) as RoutineProduct[]);
+      if (routinesRaw) {
+        const loaded = JSON.parse(routinesRaw) as Routine[];
+        setRoutines(loaded);
+        setActiveRoutineId(activeIdRaw ?? loaded[0]?.id ?? null);
+      } else if (legacyRt) {
+        // Migrate from old single-routine format
+        const products = JSON.parse(legacyRt) as RoutineProduct[];
+        const migrated: Routine = { id: crypto.randomUUID(), name: "My Routine", products };
+        setRoutines([migrated]);
+        setActiveRoutineId(migrated.id);
+      }
       // Ingredient lists: guests load from localStorage; signed-in users load from DB below
       if (!isSignedIn) {
         const il = localStorage.getItem("skindex:ingredientLists");
@@ -1076,8 +1113,45 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   }, [isSignedIn]);
 
   useEffect(() => {
-    try { localStorage.setItem("skindex:routine", JSON.stringify(routineProducts)); } catch {}
-  }, [routineProducts]);
+    try {
+      localStorage.setItem("skindex:routines", JSON.stringify(routines));
+      if (activeRoutineId) localStorage.setItem("skindex:activeRoutineId", activeRoutineId);
+    } catch {}
+  }, [routines, activeRoutineId]);
+
+  // Load routines from DB when signed in; migrate from localStorage if DB is empty
+  useEffect(() => {
+    if (!isSignedIn) return;
+    fetch("/api/routines")
+      .then(r => r.json())
+      .then(async (d) => {
+        const dbRoutines: Routine[] = (d.routines ?? []).map((r: { id: string; name: string; products: RoutineProduct[] }) => ({
+          id: r.id, name: r.name, products: r.products ?? [],
+        }));
+        if (dbRoutines.length > 0) {
+          setRoutines(dbRoutines);
+          setActiveRoutineId(prev => dbRoutines.find(r => r.id === prev)?.id ?? dbRoutines[0].id);
+        } else {
+          // Migrate localStorage routines to DB
+          const localRaw = localStorage.getItem("skindex:routines");
+          const localRoutines: Routine[] = localRaw ? JSON.parse(localRaw) : [];
+          if (localRoutines.length > 0) {
+            const created = await Promise.all(
+              localRoutines.map((r, i) =>
+                fetch("/api/routines", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name: r.name, products: r.products, display_order: i }),
+                }).then(res => res.json()).then(j => j.routine as Routine)
+              )
+            );
+            const valid = created.filter(Boolean);
+            if (valid.length > 0) { setRoutines(valid); setActiveRoutineId(valid[0].id); }
+          }
+        }
+      })
+      .catch(() => {});
+  }, [isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep localStorage as a local cache (used when signed out on other devices)
   useEffect(() => {
@@ -1761,6 +1835,65 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setTimeout(() => { setSaveListOpen(false); setSavedTo(null); }, 1800);
   }
 
+  function ensureActiveRoutine(prev: Routine[]): { routines: Routine[]; id: string } {
+    if (prev.length > 0 && (activeRoutineId ?? prev[0]?.id)) {
+      const id = activeRoutineId ?? prev[0].id;
+      return { routines: prev, id };
+    }
+    const newR: Routine = { id: crypto.randomUUID(), name: "My Routine", products: [] };
+    return { routines: [newR], id: newR.id };
+  }
+
+  function updateActiveProducts(updater: (p: RoutineProduct[]) => RoutineProduct[]) {
+    setRoutines(prev => {
+      const { routines: base, id } = ensureActiveRoutine(prev);
+      const updated = base.map(r => r.id === id ? { ...r, products: updater(r.products) } : r);
+      if (isSignedIn) {
+        const target = updated.find(r => r.id === id);
+        if (target) fetch(`/api/routines/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ products: target.products }) }).catch(() => {});
+      }
+      return updated;
+    });
+  }
+
+  function createRoutine() {
+    const newR: Routine = { id: crypto.randomUUID(), name: "New Routine", products: [] };
+    setRoutines(prev => {
+      const updated = [...prev, newR];
+      if (isSignedIn) {
+        fetch("/api/routines", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newR.name, products: [], display_order: prev.length }) })
+          .then(r => r.json()).then(d => {
+            if (d.routine?.id) {
+              setRoutines(rr => rr.map(r => r.id === newR.id ? { ...r, id: d.routine.id } : r));
+              setActiveRoutineId(d.routine.id);
+            }
+          }).catch(() => {});
+      }
+      return updated;
+    });
+    setActiveRoutineId(newR.id);
+    setRoutineRenaming(true);
+    setRoutineRenameValue("New Routine");
+  }
+
+  function renameRoutine(id: string, name: string) {
+    setRoutines(prev => {
+      const updated = prev.map(r => r.id === id ? { ...r, name } : r);
+      if (isSignedIn) fetch(`/api/routines/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => {});
+      return updated;
+    });
+    setRoutineRenaming(false);
+  }
+
+  function deleteRoutine(id: string) {
+    setRoutines(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      if (isSignedIn) fetch(`/api/routines/${id}`, { method: "DELETE" }).catch(() => {});
+      if (activeRoutineId === id) setActiveRoutineId(updated[0]?.id ?? null);
+      return updated;
+    });
+  }
+
   function suggestTimeOfDay(stepTags: string[]): "am" | "pm" | null {
     if (stepTags.includes("spf-last")) return "am";
     if (stepTags.includes("retinoid") || stepTags.includes("seal-last")) return "pm";
@@ -1780,13 +1913,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       flaggedCategories: result.flagged.map((f) => f.ingredient.flagged_category ?? "").filter(Boolean),
       timeOfDay: timeOfDay ?? null,
     };
-    setRoutineProducts((prev) => [...prev, newEntry]);
+    updateActiveProducts(prev => [...prev, newEntry]);
     setAddedToRoutine(true);
     setTimeout(() => setAddedToRoutine(false), 2000);
   }
 
   function removeFromRoutine(routineId: string) {
-    setRoutineProducts((prev) => prev.filter((p) => p.routineId !== routineId));
+    updateActiveProducts(prev => prev.filter(p => p.routineId !== routineId));
   }
 
   function addBareToRoutine(name: string, brand: string | null, ingredients: string[]) {
@@ -1799,7 +1932,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       flaggedCategories: [],
       timeOfDay: null,
     };
-    setRoutineProducts((prev) => [...prev, newEntry]);
+    updateActiveProducts(prev => [...prev, newEntry]);
     setRoutinePanelOpen(true);
   }
 
@@ -1960,77 +2093,154 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         }
       }
     }
-    const amProducts = routineProducts.filter(p => p.timeOfDay === "am");
-    const pmProducts = routineProducts.filter(p => p.timeOfDay === "pm");
-    const untaggedProducts = routineProducts.filter(p => !p.timeOfDay);
+
+    const sortByStep = (products: RoutineProduct[]) =>
+      [...products].sort((a, b) => getStepOrder(a.step_tags) - getStepOrder(b.step_tags));
+
+    const amProducts = sortByStep(routineProducts.filter(p => p.timeOfDay === "am"));
+    const pmProducts = sortByStep(routineProducts.filter(p => p.timeOfDay === "pm"));
+    const bothProducts = routineProducts.filter(p => !p.timeOfDay);
     const totalConcerns = routineProducts.reduce((n, p) => n + p.flaggedCategories.length, 0);
 
-    const renderProduct = (p: RoutineProduct) => (
-      <div key={p.routineId} className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
-            {(dupMap.get(p.routineId) ?? []).length > 0 && (() => {
-              const dups = dupMap.get(p.routineId) ?? [];
-              const highConcernPat = /retinol|retinyl|retinaldehyde|tretinoin|glycolic|lactic|mandelic|salicylic|benzoyl/i;
-              const highConcern = dups.some(d => highConcernPat.test(d));
-              const label = dups.length === 1 ? dups[0] : `${dups.slice(0, 2).join(", ")}${dups.length > 2 ? ` +${dups.length - 2}` : ""}`;
-              return (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${highConcern ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
-                  {label} × {dups.length > 1 ? `${dups.length} shared` : "shared"}
-                </span>
-              );
-            })()}
-          </div>
-          {p.brand && <p className="text-[10px] text-gray-400">{p.brand}</p>}
-          {p.step_tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {p.step_tags.map((tag) => {
-                const cfg = STEP_TAG_CONFIG[tag];
-                if (!cfg) return null;
-                const hintKey = `${p.routineId}-${tag}`;
+    const renderProduct = (p: RoutineProduct, sortedGroup: RoutineProduct[]) => {
+      const idx = sortedGroup.indexOf(p);
+      const prev = idx > 0 ? sortedGroup[idx - 1] : null;
+      const next = idx < sortedGroup.length - 1 ? sortedGroup[idx + 1] : null;
+      return (
+        <div key={p.routineId} className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
+              {(dupMap.get(p.routineId) ?? []).length > 0 && (() => {
+                const dups = dupMap.get(p.routineId) ?? [];
+                const highConcernPat = /retinol|retinyl|retinaldehyde|tretinoin|glycolic|lactic|mandelic|salicylic|benzoyl/i;
+                const highConcern = dups.some(d => highConcernPat.test(d));
+                const label = dups.length === 1 ? dups[0] : `${dups.slice(0, 2).join(", ")}${dups.length > 2 ? ` +${dups.length - 2}` : ""}`;
                 return (
-                  <span key={tag} className="inline-flex items-center gap-0.5">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${cfg.className}`}>{cfg.label}</span>
-                    <button type="button" onClick={() => setRoutineStepHint(h => h === hintKey ? null : hintKey)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none">ⓘ</button>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${highConcern ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                    {label} × {dups.length > 1 ? `${dups.length} shared` : "shared"}
                   </span>
                 );
-              })}
-              {p.step_tags.map(tag => {
-                const hintKey = `${p.routineId}-${tag}`;
-                if (routineStepHint !== hintKey) return null;
-                const cfg = STEP_TAG_CONFIG[tag];
-                if (!cfg) return null;
-                return (
-                  <div key={`hint-${hintKey}`} className="w-full mt-0.5 text-[10px] text-gray-600 bg-gray-50 rounded-lg px-2 py-1.5 leading-relaxed border border-gray-100">
-                    <span className="font-medium text-gray-700">{cfg.label} — </span>{cfg.desc}
-                  </div>
-                );
-              })}
+              })()}
             </div>
-          )}
+            {p.brand && <p className="text-[10px] text-gray-400">{p.brand}</p>}
+            {/* Order context */}
+            {(prev || next) && (
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {prev && <span>After: {prev.name}{p.step_tags.includes("acid-step") ? " — wait 15–20 min" : ""}</span>}
+                {prev && next && <span className="mx-1">·</span>}
+                {next && <span>Before: {next.name}</span>}
+              </p>
+            )}
+            {p.step_tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {p.step_tags.map((tag) => {
+                  const cfg = STEP_TAG_CONFIG[tag];
+                  if (!cfg) return null;
+                  const hintKey = `${p.routineId}-${tag}`;
+                  return (
+                    <span key={tag} className="inline-flex items-center gap-0.5">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${cfg.className}`}>{cfg.label}</span>
+                      <button type="button" onClick={() => setRoutineStepHint(h => h === hintKey ? null : hintKey)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none">ⓘ</button>
+                    </span>
+                  );
+                })}
+                {p.step_tags.map(tag => {
+                  const hintKey = `${p.routineId}-${tag}`;
+                  if (routineStepHint !== hintKey) return null;
+                  const cfg = STEP_TAG_CONFIG[tag];
+                  if (!cfg) return null;
+                  return (
+                    <div key={`hint-${hintKey}`} className="w-full mt-0.5 text-[10px] text-gray-600 bg-gray-50 rounded-lg px-2 py-1.5 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{cfg.label} — </span>{cfg.desc}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-0.5">
+            <button type="button" onClick={() => {
+              const tod = p.timeOfDay === "am" ? "pm" : p.timeOfDay === "pm" ? null : "am";
+              updateActiveProducts(prev => prev.map(q => q.routineId === p.routineId ? { ...q, timeOfDay: tod } : q));
+            }} className="text-[10px] text-gray-400 hover:text-teal-600 border border-gray-200 rounded-full px-1.5 py-0.5 transition-colors">
+              {p.timeOfDay === "am" ? "AM" : p.timeOfDay === "pm" ? "PM" : "Both"}
+            </button>
+            <button type="button" onClick={() => removeFromRoutine(p.routineId)} className="text-[10px] text-gray-300 hover:text-rose-400">Remove</button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0 mt-0.5">
-          <button type="button" onClick={() => {
-            const tod = p.timeOfDay === "am" ? "pm" : p.timeOfDay === "pm" ? null : "am";
-            setRoutineProducts(prev => prev.map(q => q.routineId === p.routineId ? { ...q, timeOfDay: tod } : q));
-          }} className="text-[10px] text-gray-400 hover:text-teal-600 border border-gray-200 rounded-full px-1.5 py-0.5 transition-colors">
-            {p.timeOfDay === "am" ? "AM" : p.timeOfDay === "pm" ? "PM" : "Both"}
-          </button>
-          <button type="button" onClick={() => removeFromRoutine(p.routineId)} className="text-[10px] text-gray-300 hover:text-rose-400">Remove</button>
+      );
+    };
+
+    const renderStepRail = (products: RoutineProduct[], tod: "am" | "pm") => {
+      const relevantSteps = STEP_SEQUENCE.filter(s => s.timeOfDay === null || s.timeOfDay === tod);
+      const coveredTags = new Set(products.flatMap(p => p.step_tags));
+      return (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {relevantSteps.map(step => {
+            const covered = coveredTags.has(step.tag);
+            return (
+              <span key={step.key} className={`text-[9px] px-1.5 py-0.5 rounded-full ${covered ? "bg-gray-700 text-white" : "text-gray-300"}`}>
+                {step.label}
+              </span>
+            );
+          })}
         </div>
+      );
+    };
+
+    const renderGroup = (label: string, products: RoutineProduct[], tod?: "am" | "pm") => products.length === 0 ? null : (
+      <div>
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
+        {tod && renderStepRail(products, tod)}
+        <div className="space-y-2.5">{products.map(p => renderProduct(p, products))}</div>
       </div>
     );
 
-    const renderGroup = (label: string, products: RoutineProduct[]) => products.length === 0 ? null : (
-      <div>
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
-        <div className="space-y-2.5">{products.map(renderProduct)}</div>
-      </div>
-    );
+    // Gap warnings
+    const amSpfMissing = amProducts.length > 0 && !amProducts.some(p => p.step_tags.includes("spf-last"));
 
     return (
       <div className="space-y-3">
+        {/* Routine picker */}
+        <div>
+          <div className="flex flex-wrap gap-1 items-center">
+            {routines.map(r => {
+              const isActive = r.id === (activeRoutineId ?? routines[0]?.id);
+              return (
+                <button key={r.id} type="button"
+                  onClick={() => { setActiveRoutineId(r.id); setRoutineRenaming(false); }}
+                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${isActive ? "bg-gray-800 text-white border-gray-800" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                  {r.name}
+                </button>
+              );
+            })}
+            <button type="button" onClick={createRoutine}
+              className="text-[10px] px-2 py-0.5 rounded-full border border-dashed border-gray-300 text-gray-400 hover:border-gray-500 hover:text-gray-600 transition-colors">
+              + New
+            </button>
+          </div>
+          {activeRoutine && (
+            <div className="flex items-center gap-2 mt-1">
+              {routineRenaming ? (
+                <form onSubmit={e => { e.preventDefault(); renameRoutine(activeRoutine.id, routineRenameValue || activeRoutine.name); }} className="flex items-center gap-1">
+                  <input autoFocus value={routineRenameValue} onChange={e => setRoutineRenameValue(e.target.value)}
+                    onBlur={() => renameRoutine(activeRoutine.id, routineRenameValue || activeRoutine.name)}
+                    className="text-[10px] border border-gray-300 rounded px-1.5 py-0.5 outline-none w-28" />
+                  <button type="submit" className="text-[10px] text-gray-400 hover:text-gray-700">Save</button>
+                </form>
+              ) : (
+                <button type="button" onClick={() => { setRoutineRenaming(true); setRoutineRenameValue(activeRoutine.name); }}
+                  className="text-[10px] text-gray-300 hover:text-gray-600">Rename</button>
+              )}
+              {routines.length > 1 && (
+                <button type="button" onClick={() => deleteRoutine(activeRoutine.id)}
+                  className="text-[10px] text-gray-300 hover:text-rose-400">Delete</button>
+              )}
+            </div>
+          )}
+        </div>
+
         {routineProducts.length === 0 ? (
           <p className="text-xs text-gray-400">No products yet. Scan a product and tap &quot;+ Add to routine&quot; to start building.</p>
         ) : (
@@ -2041,14 +2251,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             <div className="space-y-3">
               {amProducts.length > 0 || pmProducts.length > 0 ? (
                 <>
-                  {renderGroup("AM", amProducts)}
-                  {renderGroup("PM", pmProducts)}
-                  {renderGroup("Both", untaggedProducts)}
+                  {renderGroup("AM", amProducts, "am")}
+                  {renderGroup("PM", pmProducts, "pm")}
+                  {renderGroup("Both", bothProducts)}
                 </>
               ) : (
-                <div className="space-y-2.5">{routineProducts.map(renderProduct)}</div>
+                <div className="space-y-2.5">{routineProducts.map(p => renderProduct(p, routineProducts))}</div>
               )}
             </div>
+            {amSpfMissing && (
+              <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2">
+                <p className="text-[10px] font-semibold text-yellow-800">⚠ No SPF in AM routine</p>
+                <p className="text-[10px] text-yellow-700">AHAs, retinoids, and brightening actives increase UV sensitivity — SPF is essential when using them.</p>
+              </div>
+            )}
             {routineWarns.length > 0 && (
               <div className="space-y-2 border-t border-gray-100 pt-2">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Interactions</p>
@@ -2060,7 +2276,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 ))}
               </div>
             )}
-            <button type="button" onClick={() => setRoutineProducts([])} className="text-[10px] text-gray-300 hover:text-rose-400">Clear routine</button>
+            <button type="button" onClick={() => updateActiveProducts(() => [])} className="text-[10px] text-gray-300 hover:text-rose-400">Clear routine</button>
           </>
         )}
       </div>

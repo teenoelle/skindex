@@ -106,6 +106,12 @@ export type RoutineProduct = {
   timeOfDay?: "am" | "pm" | null;
 };
 
+export type Routine = {
+  id: string;
+  name: string;
+  products: RoutineProduct[];
+};
+
 export type ScanResult = {
   product?: {
     id?: string | null;
