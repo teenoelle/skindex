@@ -32,6 +32,21 @@ const SKIN_TYPE_LABELS: Record<string, string> = {
 
 const SKIN_TYPE_VALUES = Object.keys(SKIN_TYPE_LABELS);
 
+const CLIMATE_TYPES = [
+  { value: "humid", label: "Humid" },
+  { value: "dry_climate", label: "Dry" },
+  { value: "cold", label: "Cold" },
+  { value: "hot", label: "Hot" },
+  { value: "high_uv", label: "High UV" },
+];
+const WATER_TYPES = [
+  { value: "hard_water", label: "Hard / mineral" },
+  { value: "chlorinated_water", label: "Chlorinated" },
+  { value: "iron_water", label: "Iron / rust" },
+  { value: "heavy_metal_water", label: "Lead / metals" },
+];
+const CLIMATE_WATER_VALUES = new Set([...CLIMATE_TYPES, ...WATER_TYPES].map(t => t.value));
+
 const SMART_LISTS = [
   {
     id: "universal-concerns",
@@ -67,7 +82,16 @@ export default function ListsPage() {
 
   // Profile (from localStorage)
   const [skinTypes, setSkinTypes] = useState<string[]>([]);
+  const [climates, setClimates] = useState<string[]>([]);
   const [editingProfile, setEditingProfile] = useState(false);
+
+  // Ingredient list actions
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [editingListName, setEditingListName] = useState("");
+  const [editingListLoading, setEditingListLoading] = useState(false);
+  const [deletingListId, setDeletingListId] = useState<string | null>(null);
+  const [copyListId, setCopyListId] = useState<string | null>(null);
+  const [copyFormat, setCopyFormat] = useState<"comma" | "line">("line");
 
   // Ingredient lists (localStorage)
   const [ingredientLists, setIngredientLists] = useState<IngredientList[]>([]);
@@ -93,10 +117,34 @@ export default function ListsPage() {
   useEffect(() => {
     try {
       const st = localStorage.getItem("skindex:skinTypes");
-      if (st) setSkinTypes(JSON.parse(st) as string[]);
-      const parsed = st ? JSON.parse(st) as string[] : [];
-      const stParam = parsed.length > 0 ? `?skinTypes=${parsed.join(",")}` : "";
-      fetch(`/api/ingredient-lists${stParam}`)
+      const cl = localStorage.getItem("skindex:climates");
+      const parsedSkinTypes = st ? JSON.parse(st) as string[] : [];
+      const parsedClimates = cl ? JSON.parse(cl) as string[] : [];
+      if (parsedSkinTypes.length) setSkinTypes(parsedSkinTypes);
+      if (parsedClimates.length) setClimates(parsedClimates);
+
+      const skinTypeSet = new Set(parsedSkinTypes);
+      const climateSet = new Set(parsedClimates);
+      const cats = new Set<string>();
+      if (skinTypeSet.has("acne_prone") || skinTypeSet.has("oily") || skinTypeSet.has("fungal_acne") || skinTypeSet.has("body_acne") || skinTypeSet.has("keratosis_pilaris"))
+        ["pore-clogger", "occlusive", "bacteria-trap"].forEach(c => cats.add(c));
+      if (skinTypeSet.has("reactive") || skinTypeSet.has("damaged_barrier") || skinTypeSet.has("eczema") || skinTypeSet.has("rosacea") || skinTypeSet.has("psoriasis"))
+        cats.add("sensitizer");
+      if (skinTypeSet.has("reactive") || skinTypeSet.has("damaged_barrier") || skinTypeSet.has("eczema"))
+        cats.add("fragrance-allergen");
+      if (skinTypeSet.has("rosacea") || skinTypeSet.has("lupus_rash"))
+        cats.add("Chemical Sunscreen");
+      if (skinTypeSet.has("hyperpigmentation_prone") || skinTypeSet.has("lupus_rash") || climateSet.has("high_uv"))
+        ["photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical"].forEach(c => cats.add(c));
+      if (skinTypeSet.has("rosacea") || climateSet.has("heavy_metal_water"))
+        cats.add("Drying Solvent");
+
+      const params = new URLSearchParams();
+      if (parsedSkinTypes.length) params.set("skinTypes", parsedSkinTypes.join(","));
+      if (parsedClimates.length) params.set("climates", parsedClimates.join(","));
+      if (cats.size) params.set("concerns", [...cats].join(","));
+      const qs = params.toString();
+      fetch(`/api/ingredient-lists${qs ? `?${qs}` : ""}`)
         .then((r) => r.json())
         .then((d) => setSmartCounts(d))
         .catch(() => {});
@@ -156,7 +204,7 @@ export default function ListsPage() {
         const d = await res.json();
         setIngSuggestions((m) => ({
           ...m,
-          [listId]: ((d.results ?? []) as { name: string }[]).map((r) => r.name).slice(0, 6),
+          [listId]: ((d.suggestions ?? []) as string[]).slice(0, 6),
         }));
       }
     }, 180);
@@ -174,6 +222,27 @@ export default function ListsPage() {
   function dbDelete(id: string) {
     if (!isSignedIn) return;
     fetch(`/api/user-ingredient-lists/${id}`, { method: "DELETE" }).catch(() => {});
+  }
+
+  async function saveEditListName(list: IngredientList) {
+    if (!editingListName.trim() || editingListName.trim() === list.name) { setEditingListId(null); return; }
+    setEditingListLoading(true);
+    const newName = editingListName.trim();
+    setIngredientLists(prev => prev.map(l => l.id === list.id ? { ...l, name: newName } : l));
+    dbPatch(list.id, { name: newName });
+    setEditingListLoading(false);
+    setEditingListId(null);
+  }
+
+  function toggleClimate(value: string) {
+    const next = climates.includes(value) ? climates.filter(c => c !== value) : [...climates, value];
+    setClimates(next);
+    // Preserve device/supplement/diet values already in localStorage
+    try {
+      const all: string[] = JSON.parse(localStorage.getItem("skindex:climates") ?? "[]");
+      const preserved = all.filter(c => !CLIMATE_WATER_VALUES.has(c));
+      localStorage.setItem("skindex:climates", JSON.stringify([...preserved, ...next.filter(c => CLIMATE_WATER_VALUES.has(c))]));
+    } catch {}
   }
 
   async function createList() {
@@ -229,54 +298,69 @@ export default function ListsPage() {
 
           {/* Mini skin profile chips */}
           {editingProfile ? (
-            <div className="border border-gray-200 rounded-xl p-3 space-y-2.5">
-              <p className="text-xs font-medium text-gray-700">Skin types</p>
-              <div className="flex flex-wrap gap-1.5">
-                {SKIN_TYPE_VALUES.map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => {
-                      const next = skinTypes.includes(st) ? skinTypes.filter(s => s !== st) : [...skinTypes, st];
-                      setSkinTypes(next);
-                      try { localStorage.setItem("skindex:skinTypes", JSON.stringify(next)); } catch {}
-                    }}
-                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                      skinTypes.includes(st)
-                        ? "bg-amber-700 text-white border-amber-700"
-                        : "text-gray-500 border-gray-200 hover:border-gray-400"
-                    }`}
-                  >
-                    {SKIN_TYPE_LABELS[st]}
-                  </button>
-                ))}
+            <div className="border border-gray-200 rounded-xl p-3 space-y-3">
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-gray-700">Skin type</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {SKIN_TYPE_VALUES.map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => {
+                        const next = skinTypes.includes(st) ? skinTypes.filter(s => s !== st) : [...skinTypes, st];
+                        setSkinTypes(next);
+                        try { localStorage.setItem("skindex:skinTypes", JSON.stringify(next)); } catch {}
+                      }}
+                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${skinTypes.includes(st) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}
+                    >
+                      {SKIN_TYPE_LABELS[st]}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setEditingProfile(false)}
-                className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2"
-              >
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-gray-700">Climate</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {CLIMATE_TYPES.map(({ value, label }) => (
+                    <button key={value} type="button" onClick={() => toggleClimate(value)}
+                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${climates.includes(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-gray-700">Water quality</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {WATER_TYPES.map(({ value, label }) => (
+                    <button key={value} type="button" onClick={() => toggleClimate(value)}
+                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${climates.includes(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button type="button" onClick={() => setEditingProfile(false)} className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2">
                 Done
               </button>
             </div>
-          ) : skinTypes.length > 0 ? (
+          ) : skinTypes.length > 0 || climates.filter(c => CLIMATE_WATER_VALUES.has(c)).length > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-0.5">Profile:</span>
               {skinTypes.map((st) => (
-                <span key={st} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                  {SKIN_TYPE_LABELS[st] ?? st}
+                <span key={st} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{SKIN_TYPE_LABELS[st] ?? st}</span>
+              ))}
+              {climates.filter(c => CLIMATE_WATER_VALUES.has(c)).map((c) => (
+                <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                  {[...CLIMATE_TYPES, ...WATER_TYPES].find(t => t.value === c)?.label ?? c}
                 </span>
               ))}
-              <button type="button" onClick={() => setEditingProfile(true)} className="text-[10px] text-gray-400 hover:text-gray-700 underline underline-offset-2 ml-1">
-                Edit
-              </button>
+              <button type="button" onClick={() => setEditingProfile(true)} className="text-[10px] text-gray-400 hover:text-gray-700 underline underline-offset-2 ml-1">Edit</button>
             </div>
           ) : (
             <p className="text-xs text-gray-400">
               No skin profile set.{" "}
-              <button type="button" onClick={() => setEditingProfile(true)} className="underline underline-offset-2 hover:text-gray-700">
-                Set it here
-              </button>{" "}
+              <button type="button" onClick={() => setEditingProfile(true)} className="underline underline-offset-2 hover:text-gray-700">Set it here</button>{" "}
               to personalize your ingredient lists.
             </p>
           )}
@@ -421,8 +505,8 @@ export default function ListsPage() {
                           )}
                         </div>
                         <p className="text-xs text-gray-400 leading-relaxed">
-                          {sl.requiresProfile && skinTypes.length === 0
-                            ? "Set your skin profile on the home page to activate this list."
+                          {sl.requiresProfile && skinTypes.length === 0 && climates.filter(c => CLIMATE_WATER_VALUES.has(c)).length === 0
+                            ? "Set your skin profile above to activate this list."
                             : sl.description}
                         </p>
                         {sl.id === "neutral-beneficial" && smartCounts && (
@@ -441,7 +525,7 @@ export default function ListsPage() {
             {/* User-created lists */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Your Lists</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">My Lists</p>
                 {!newIngListOpen && (
                   <button
                     onClick={() => setNewIngListOpen(true)}
@@ -519,26 +603,90 @@ export default function ListsPage() {
                   {ingredientLists.map((list) => (
                     <div key={list.id} className="border border-gray-200 rounded-xl p-3 space-y-2">
                       {/* List header */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         {list.type && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
-                            list.type === "avoid" ? "bg-rose-50 text-rose-700" : "bg-teal-50 text-teal-700"
-                          }`}>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${list.type === "avoid" ? "bg-rose-50 text-rose-700" : "bg-teal-50 text-teal-700"}`}>
                             {list.type === "avoid" ? "Avoid" : "Want"}
                           </span>
                         )}
-                        <span className="text-sm font-medium text-gray-800 flex-1 leading-snug">{list.name}</span>
-                        <span className="text-xs text-gray-400">{list.items.length}</span>
-                        <button
-                          onClick={() => {
-                            setIngredientLists((ls) => ls.filter((l) => l.id !== list.id));
-                            dbDelete(list.id);
-                          }}
-                          className="text-[10px] text-gray-300 hover:text-rose-500 transition-colors"
-                        >
-                          Delete
-                        </button>
+                        {editingListId === list.id ? (
+                          <form
+                            onSubmit={(e) => { e.preventDefault(); saveEditListName(list); }}
+                            className="flex-1 flex gap-1 min-w-0"
+                          >
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editingListName}
+                              onChange={(e) => setEditingListName(e.target.value)}
+                              onKeyDown={(e) => e.key === "Escape" && setEditingListId(null)}
+                              className="flex-1 text-sm border border-gray-200 rounded-lg px-2 py-0.5 focus:outline-none focus:border-gray-400 min-w-0"
+                            />
+                            <button type="submit" disabled={editingListLoading || !editingListName.trim()} className="text-xs px-2 py-0.5 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0">Save</button>
+                            <button type="button" onClick={() => setEditingListId(null)} className="text-xs text-gray-400 hover:text-gray-700 shrink-0">Cancel</button>
+                          </form>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => { setEditingListId(list.id); setEditingListName(list.name); }}
+                              className="text-sm font-medium text-gray-800 flex-1 leading-snug text-left hover:text-gray-500 transition-colors truncate"
+                              title="Click to rename"
+                            >
+                              {list.name}
+                            </button>
+                            <span className="text-xs text-gray-400 shrink-0">{list.items.length}</span>
+                            <button
+                              type="button"
+                              title="Copy ingredients"
+                              onClick={() => { setCopyListId(copyListId === list.id ? null : list.id); }}
+                              className={`text-[10px] shrink-0 transition-colors ${copyListId === list.id ? "text-gray-700" : "text-gray-300 hover:text-gray-500"}`}
+                            >
+                              Copy
+                            </button>
+                            {deletingListId === list.id ? (
+                              <span className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[10px] text-gray-500">Delete?</span>
+                                <button
+                                  type="button"
+                                  onClick={() => { setIngredientLists(ls => ls.filter(l => l.id !== list.id)); dbDelete(list.id); setDeletingListId(null); }}
+                                  className="text-[10px] text-rose-600 hover:text-rose-800"
+                                >Yes</button>
+                                <button type="button" onClick={() => setDeletingListId(null)} className="text-[10px] text-gray-400 hover:text-gray-700">No</button>
+                              </span>
+                            ) : (
+                              <button type="button" onClick={() => setDeletingListId(list.id)} className="text-[10px] text-gray-300 hover:text-rose-500 transition-colors shrink-0">Delete</button>
+                            )}
+                          </>
+                        )}
                       </div>
+
+                      {/* Copy panel */}
+                      {copyListId === list.id && (
+                        <div className="border border-gray-100 rounded-xl p-2.5 space-y-2 bg-gray-50">
+                          <div className="flex gap-1.5">
+                            {(["line", "comma"] as const).map(fmt => (
+                              <button key={fmt} type="button" onClick={() => setCopyFormat(fmt)}
+                                className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${copyFormat === fmt ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+                                {fmt === "line" ? "One per line" : "Comma-separated"}
+                              </button>
+                            ))}
+                          </div>
+                          <textarea
+                            readOnly
+                            rows={3}
+                            value={copyFormat === "comma" ? list.items.join(", ") : list.items.join("\n")}
+                            className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 resize-none text-gray-600 bg-white focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => { navigator.clipboard.writeText(copyFormat === "comma" ? list.items.join(", ") : list.items.join("\n")); setCopyListId(null); }}
+                            className="text-xs px-2.5 py-1 bg-gray-900 text-white rounded-lg hover:bg-gray-700"
+                          >
+                            Copy to clipboard
+                          </button>
+                        </div>
+                      )}
 
                       {/* Ingredient chips */}
                       {list.items.length > 0 && (
