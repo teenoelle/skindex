@@ -4085,76 +4085,76 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         );
                       })()}
                       {/* Concern stripe — level-colored (non-neutral only) */}
-                      {level !== "neutral" && (
-                        <div className={`pl-3 border-l-2 ${CONCERN_STRIPE[level]} space-y-1`}>
-                          {(() => {
-                            const concernItems = structured?.concern_items ?? null;
-                            const dbConcernText = isLoading ? null
-                              : (concernItems ? null : (structured?.concern ?? (explanation && !structured ? explanation : null)));
-                            const sensoryText = sensoryItem?.sensory_note ?? null;
-                            const photoText = photoItem?.photo_note ?? null;
-                            const dbSourceCount = concernItems ? concernItems.length : (dbConcernText ? 1 : 0);
-                            // Show source labels whenever 2+ concern sources are present
-                            const showLabels =
-                              dbSourceCount + (sensoryText ? 1 : 0) + (photoText ? 1 : 0) +
-                              profileCautionNotes.length > 1;
-                            return (
-                              <>
-                                {isLoading && (
-                                  <p className="text-xs text-gray-400 italic">Generating explanation…</p>
-                                )}
-                                {concernItems ? concernItems.map((ci) => (
-                                  <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
-                                    {showLabels && (
-                                      <span className="font-semibold">{CATEGORY_LABELS[ci.category] ?? ci.category} — </span>
-                                    )}
-                                    {ci.text}
+                      {level !== "neutral" && (() => {
+                        const concernItems = structured?.concern_items ?? null;
+                        const dbConcernText = isLoading ? null
+                          : (concernItems ? null : (structured?.concern ?? (explanation && !structured ? explanation : null)));
+                        const sensoryText = sensoryItem?.sensory_note ?? null;
+                        const photoText = photoItem?.photo_note ?? null;
+                        const dbSourceCount = concernItems ? concernItems.length : (dbConcernText ? 1 : 0);
+                        // Show labels when 2+ concern sources present (profile notes now live in their own stripe)
+                        const showLabels = dbSourceCount + (sensoryText ? 1 : 0) + (photoText ? 1 : 0) > 1;
+                        const isUniversalCat = (cat: string) => UNIVERSAL_FLAG_CATS.has(cat);
+                        return (
+                          <>
+                            <div className={`pl-3 border-l-2 ${CONCERN_STRIPE[level]} space-y-1`}>
+                              {isLoading && (
+                                <p className="text-xs text-gray-400 italic">Generating explanation…</p>
+                              )}
+                              {concernItems ? concernItems.map((ci) => (
+                                <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
+                                  {showLabels && (
+                                    <span className={`font-semibold ${isUniversalCat(ci.category) ? "text-rose-700" : "text-amber-700"}`}>
+                                      {CATEGORY_LABELS[ci.category] ?? ci.category} — </span>
+                                  )}
+                                  {ci.text}
+                                </p>
+                              )) : dbConcernText && (
+                                <p className="text-xs text-gray-600 leading-relaxed">
+                                  {showLabels && catLabel && (
+                                    <span className={`font-semibold ${fc && isUniversalCat(fc) ? "text-rose-700" : "text-amber-700"}`}>
+                                      {catLabel} — </span>
+                                  )}
+                                  {dbConcernText}
+                                </p>
+                              )}
+                              {sensoryText && (
+                                <p className="text-xs text-gray-600 leading-relaxed">
+                                  {showLabels && sensoryLabel && (
+                                    <span className="font-semibold text-amber-700">{sensoryLabel} — </span>
+                                  )}
+                                  {sensoryText}
+                                </p>
+                              )}
+                              {sensoryItem?.sensory_category === "Film-forming" && (
+                                <p className="text-xs text-gray-400">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
+                              )}
+                              {sensoryItem?.sensory_category === "Occlusive" && (
+                                <p className="text-xs text-gray-400">Bump type: worsens existing congestion by sealing the skin surface.</p>
+                              )}
+                              {photoText && (
+                                <p className="text-xs text-gray-600 leading-relaxed">
+                                  {showLabels && photoLabel && (
+                                    <span className="font-semibold text-amber-700">{photoLabel} — </span>
+                                  )}
+                                  {photoText}
+                                </p>
+                              )}
+                            </div>
+                            {/* Profile caution notes — separate amber stripe */}
+                            {profileCautionNotes.length > 0 && (
+                              <div className="pl-3 border-l-2 border-amber-500 space-y-1">
+                                {profileCautionNotes.map((note, i) => (
+                                  <p key={i} className="text-xs text-gray-600 leading-relaxed">
+                                    {noteLabel(note) && <span className="font-semibold text-amber-700">{noteLabel(note)} — </span>}
+                                    {note.text}
                                   </p>
-                                )) : dbConcernText && (
-                                  <p className="text-xs text-gray-600 leading-relaxed">
-                                    {showLabels && catLabel && (
-                                      <span className="font-semibold">{catLabel} — </span>
-                                    )}
-                                    {dbConcernText}
-                                  </p>
-                                )}
-                                {sensoryText && (
-                                  <p className="text-xs text-gray-600 leading-relaxed">
-                                    {showLabels && sensoryLabel && (
-                                      <span className="font-semibold">{sensoryLabel} — </span>
-                                    )}
-                                    {sensoryText}
-                                  </p>
-                                )}
-                                {sensoryItem?.sensory_category === "Film-forming" && (
-                                  <p className="text-xs text-gray-400">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
-                                )}
-                                {sensoryItem?.sensory_category === "Occlusive" && (
-                                  <p className="text-xs text-gray-400">Bump type: worsens existing congestion by sealing the skin surface.</p>
-                                )}
-                                {photoText && (
-                                  <p className="text-xs text-gray-600 leading-relaxed">
-                                    {showLabels && photoLabel && (
-                                      <span className="font-semibold">{photoLabel} — </span>
-                                    )}
-                                    {photoText}
-                                  </p>
-                                )}
-                                {profileCautionNotes.length > 0 && (
-                                  <div className="space-y-0.5">
-                                    {profileCautionNotes.map((note, i) => (
-                                      <p key={i} className="text-xs text-gray-600 leading-relaxed">
-                                        {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
-                                        {note.text}
-                                      </p>
-                                    ))}
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                       {/* Neutral: loading state if no structured data yet */}
                       {level === "neutral" && isLoading && (
                         <div className="pl-3 border-l-2 border-teal-500">
