@@ -240,6 +240,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   "chelating": "Chelating",
 };
 
+const UNIVERSAL_FLAG_CATS = new Set([
+  "fragrance-allergen", "preservative-allergen", "formaldehyde releaser",
+  "sensitizing preservative", "biocide", "Sulfate Surfactant", "Drying Solvent",
+]);
+
 const STRUCTURAL_DESCRIPTIONS: Record<string, string> = {
   "Emulsifier": "Emulsifiers help oil and water blend together to keep the formula stable.",
   "Thickener": "Thickeners increase viscosity so the product spreads and feels even on skin.",
@@ -3968,9 +3973,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${CONCERN_PILL[level]}`}>{concernLabel}</span>
                           {(match?.ingredient.secondary_flagged_categories ?? []).map((sc) => {
                             const scLabel = CATEGORY_LABELS[sc] ?? null;
-                            return scLabel && scLabel !== concernLabel ? (
-                              <span key={sc} className="text-xs rounded-full px-2 py-0.5 shrink-0 bg-gray-100 text-gray-600">{scLabel}</span>
-                            ) : null;
+                            if (!scLabel || scLabel === concernLabel) return null;
+                            const scLevel = UNIVERSAL_FLAG_CATS.has(sc) ? "universal"
+                              : isFcProfileMatch(sc, activeSkinTypes, activeClimates) ? "profile-matched"
+                              : "non-matching";
+                            return (
+                              <span key={sc} className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${CONCERN_PILL[scLevel]}`}>{scLabel}</span>
+                            );
                           })}
                         </>
                       ) : benefitLabel ? (

@@ -148,6 +148,15 @@ function isProfileMatched(cat: string, skinTypes: string[], climates: string[]):
   return (PROFILE_CAT_MAP[cat] ?? []).some(pt => skinTypeSet.has(pt));
 }
 
+function getCategoryLabel(cat: string): string {
+  if (!cat) return "";
+  if (SENSITIVITY_GROUP[cat]) return SENSITIVITY_GROUP[cat].label;
+  const ug = UNIVERSAL_GROUPS.find(g => g.cat === cat);
+  if (ug) return ug.label;
+  if (BENEFIT_GROUP[cat]) return BENEFIT_GROUP[cat].label;
+  return cat;
+}
+
 function catBadgeColor(cat: string, isSafePage: boolean): string {
   if (!cat) return "bg-gray-100 text-gray-500";
   if (UNIVERSAL_CATS_SET.has(cat)) return "bg-rose-100 text-rose-800";
@@ -428,45 +437,50 @@ export default function BuiltInListPage() {
                           const concernBorder = isUniversal ? "border-rose-500" : "border-amber-500";
                           return (
                             <div key={item.id}>
-                              <button type="button" onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                                className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors">
-                                <span className="flex-1 text-sm text-gray-900">{item.name}</span>
-                                {item.secondary_categories.length > 0 && (
-                                  <span className="text-[9px] text-gray-300 shrink-0">+{item.secondary_categories.length} more</span>
-                                )}
-                                <span className="text-gray-300 text-[10px] shrink-0">{isExpanded ? "▲" : "▼"}</span>
+                              {/* Collapsed row — name + all category pills */}
+                            <button type="button" onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                                className="w-full flex items-start gap-2 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors">
+                                <span className="flex-1 text-sm text-gray-900 min-w-0 pt-0.5">{item.name}</span>
+                                <span className="flex flex-wrap gap-1 justify-end max-w-[55%]">
+                                  {[item.category, ...item.secondary_categories].filter(Boolean).map(cat => (
+                                    <span key={cat} className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${catBadgeColor(cat, isSafePage)}`}>
+                                      {getCategoryLabel(cat)}
+                                    </span>
+                                  ))}
+                                </span>
+                                <span className="text-gray-300 text-[10px] shrink-0 pt-0.5">{isExpanded ? "▲" : "▼"}</span>
                               </button>
 
+                              {/* Expanded detail — inline category label chips at start of each paragraph */}
                               {isExpanded && (
                                 <div className="px-4 pb-3 pt-2 bg-gray-50 border-t border-gray-100 space-y-2">
-                                  {/* Category badges */}
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {item.structural_category && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{item.structural_category}</span>
-                                    )}
-                                    {item.category && (
-                                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${catBadgeColor(item.category, isSafePage)}`}>{item.category}</span>
-                                    )}
-                                    {item.secondary_categories.map(sc => (
-                                      <span key={sc} className={`text-[10px] px-2 py-0.5 rounded-full ${catBadgeColor(sc, isSafePage)}`}>{sc}</span>
-                                    ))}
-                                  </div>
-
-                                  {/* Formula role */}
+                                  {/* Formula role — gray label + gray text */}
                                   {structured?.formula_role && (
                                     <div className="pl-3 border-l-2 border-gray-300">
-                                      <p className="text-xs text-gray-500 leading-relaxed">{structured.formula_role}</p>
+                                      <div className="flex items-start gap-1.5">
+                                        {item.structural_category && (
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 shrink-0 mt-0.5">{item.structural_category}</span>
+                                        )}
+                                        <p className="text-xs text-gray-500 leading-relaxed">{structured.formula_role}</p>
+                                      </div>
                                     </div>
                                   )}
 
-                                  {/* Benefit */}
+                                  {/* Benefit — teal label + gray text */}
                                   {structured?.benefit && (
                                     <div className="pl-3 border-l-2 border-teal-500">
-                                      <p className="text-xs text-gray-600 leading-relaxed">{structured.benefit}</p>
+                                      <div className="flex items-start gap-1.5">
+                                        {isSafePage && item.category && (
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-800 shrink-0 mt-0.5">
+                                            {BENEFIT_GROUP[item.category]?.label ?? item.category}
+                                          </span>
+                                        )}
+                                        <p className="text-xs text-gray-600 leading-relaxed">{structured.benefit}</p>
+                                      </div>
                                     </div>
                                   )}
 
-                                  {/* Concern */}
+                                  {/* Concern — rose (universal) or amber (profile) label + gray text */}
                                   {!isSafePage && (() => {
                                     const isUniversalPage = slug === "universal-concerns";
                                     const universalItems = isUniversalPage && structured?.concern_items
@@ -479,20 +493,35 @@ export default function BuiltInListPage() {
                                     return (
                                       <>
                                         {showUniversal && (
-                                          <div className={`pl-3 border-l-2 ${concernBorder} space-y-1`}>
+                                          <div className={`pl-3 border-l-2 ${concernBorder} space-y-1.5`}>
                                             {structured?.concern_items ? universalItems.map(ci => (
-                                              <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
-                                            )) : structured?.concern ? (
-                                              <p className="text-xs text-gray-600 leading-relaxed">{structured.concern}</p>
-                                            ) : (
-                                              <p className="text-xs text-gray-600 leading-relaxed">{item.explanation}</p>
+                                              <div key={ci.category} className="flex items-start gap-1.5">
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${catBadgeColor(ci.category, false)}`}>
+                                                  {getCategoryLabel(ci.category)}
+                                                </span>
+                                                <p className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
+                                              </div>
+                                            )) : (
+                                              <div className="flex items-start gap-1.5">
+                                                {item.category && (
+                                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${catBadgeColor(item.category, false)}`}>
+                                                    {getCategoryLabel(item.category)}
+                                                  </span>
+                                                )}
+                                                <p className="text-xs text-gray-600 leading-relaxed">{structured?.concern ?? item.explanation}</p>
+                                              </div>
                                             )}
                                           </div>
                                         )}
                                         {profileItems.length > 0 && (
-                                          <div className="pl-3 border-l-2 border-amber-500 space-y-1">
+                                          <div className="pl-3 border-l-2 border-amber-500 space-y-1.5">
                                             {profileItems.map(ci => (
-                                              <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
+                                              <div key={ci.category} className="flex items-start gap-1.5">
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 bg-amber-100 text-amber-800">
+                                                  {getCategoryLabel(ci.category)}
+                                                </span>
+                                                <p className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
+                                              </div>
                                             ))}
                                           </div>
                                         )}
@@ -503,7 +532,12 @@ export default function BuiltInListPage() {
                                   {/* Safe plain explanation fallback */}
                                   {isSafePage && !structured && item.explanation && (
                                     <div className="pl-3 border-l-2 border-gray-300">
-                                      <p className="text-xs text-gray-600 leading-relaxed">{item.explanation}</p>
+                                      <div className="flex items-start gap-1.5">
+                                        {item.structural_category && (
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 shrink-0 mt-0.5">{item.structural_category}</span>
+                                        )}
+                                        <p className="text-xs text-gray-600 leading-relaxed">{item.explanation}</p>
+                                      </div>
                                     </div>
                                   )}
 
