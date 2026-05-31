@@ -510,7 +510,7 @@ export default function ListsPage() {
                 onClick={() => setBuiltInOpen(v => !v)}
                 className="flex items-center gap-2 w-full mb-3"
               >
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Built-in</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Built-in Ingredient Lists</p>
                 <span className="text-xs text-gray-300 ml-auto">{builtInOpen ? "▲" : "▼"}</span>
               </button>
               {builtInOpen && (
@@ -565,7 +565,7 @@ export default function ListsPage() {
             {/* User-created lists */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">My Lists</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">My Ingredient Lists</p>
                 {!newIngListOpen && (
                   <button
                     onClick={() => setNewIngListOpen(true)}
