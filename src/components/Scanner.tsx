@@ -3979,7 +3979,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     </span>
                     <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                   </button>
-                  <div className="relative shrink-0">
+                  <div className="shrink-0">
                     <button
                       type="button"
                       title="Add to ingredient list"
@@ -3988,52 +3988,52 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     >
                       +
                     </button>
-                    {inList && (
-                      <div className="absolute right-0 top-full z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-1.5 min-w-[140px]">
-                        {ingredientLists.map((lst) => {
-                          const already = lst.items.includes(itemKey);
-                          return (
-                            <button
-                              key={lst.id}
-                              type="button"
-                              className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-50 rounded-lg flex items-center gap-1.5"
-                              onClick={() => {
-                                if (!already) {
-                                  const newItems = [...lst.items, itemKey];
-                                  setIngredientLists(ls => ls.map(l => l.id === lst.id ? { ...l, items: newItems } : l));
-                                  syncIngredientListItems(lst.id, newItems);
-                                }
-                                setAddToListMenu(null);
-                              }}
-                            >
-                              <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${lst.type === "avoid" ? "bg-rose-400" : "bg-teal-500"}`} />
-                              <span className="flex-1 truncate">{lst.name}</span>
-                              {already && <span className="text-teal-600 shrink-0">✓</span>}
-                            </button>
-                          );
-                        })}
-                        {ingredientNewListOpen ? (
-                          <div className="pt-1 mt-1 border-t border-gray-100 flex gap-1">
-                            <input
-                              autoFocus
-                              type="text"
-                              value={ingredientNewListName}
-                              onChange={(e) => setIngredientNewListName(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && quickCreateIngredientList(ingredientNewListName, itemKey)}
-                              placeholder="New list…"
-                              className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400 min-w-0"
-                            />
-                            <button type="button" disabled={!ingredientNewListName.trim()} onClick={() => quickCreateIngredientList(ingredientNewListName, itemKey)} className="text-xs px-1.5 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0">+</button>
-                          </div>
-                        ) : (
-                          <button type="button" onClick={() => setIngredientNewListOpen(true)} className="w-full text-left text-xs px-2 py-1.5 text-gray-400 hover:text-gray-600 border-t border-gray-100 mt-1">
-                            + New list
+                  </div>
+                  </div>
+                  {inList && (
+                    <div className="border-t border-gray-100 px-2 py-1.5 space-y-0.5">
+                      {ingredientLists.map((lst) => {
+                        const already = lst.items.includes(itemKey);
+                        return (
+                          <button
+                            key={lst.id}
+                            type="button"
+                            className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-50 rounded-lg flex items-center gap-1.5"
+                            onClick={() => {
+                              if (!already) {
+                                const newItems = [...lst.items, itemKey];
+                                setIngredientLists(ls => ls.map(l => l.id === lst.id ? { ...l, items: newItems } : l));
+                                syncIngredientListItems(lst.id, newItems);
+                              }
+                              setAddToListMenu(null);
+                            }}
+                          >
+                            <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${lst.type === "avoid" ? "bg-rose-400" : "bg-teal-500"}`} />
+                            <span className="flex-1 truncate">{lst.name}</span>
+                            {already && <span className="text-teal-600 shrink-0">✓</span>}
                           </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  </div>
+                        );
+                      })}
+                      {ingredientNewListOpen ? (
+                        <div className="pt-1 mt-1 border-t border-gray-100 flex gap-1">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={ingredientNewListName}
+                            onChange={(e) => setIngredientNewListName(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && quickCreateIngredientList(ingredientNewListName, itemKey)}
+                            placeholder="New list…"
+                            className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400 min-w-0"
+                          />
+                          <button type="button" disabled={!ingredientNewListName.trim()} onClick={() => quickCreateIngredientList(ingredientNewListName, itemKey)} className="text-xs px-1.5 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0">+</button>
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => setIngredientNewListOpen(true)} className="w-full text-left text-xs px-2 py-1.5 text-gray-400 hover:text-gray-600 border-t border-gray-100 mt-1">
+                          + New list
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {isOpen && (
                     <div className="px-3 pb-3 space-y-2">
                       {/* Formula role stripe — gray */}
