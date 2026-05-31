@@ -513,13 +513,25 @@ const STEP_TAG_CONFIG: Record<string, { label: string; desc: string; className: 
   "enhancer-caution": { label: "Penetration enhancer", desc: "Contains drying alcohol that drives co-applied ingredients deeper — avoid applying immediately before fragrance-heavy or sensitizer-containing products", className: "border-rose-200 bg-rose-50 text-rose-700" },
 };
 
+const RINSE_OFF_SUPPRESS_DB_CATS = new Set(["pore-clogger", "occlusive", "bacteria-trap"]);
+const RINSE_OFF_SUPPRESS_SENSORY_CATS = new Set(["Pilling", "Film-forming", "Occlusive", "occlusive-itch", "comedogenic-itch"]);
+const RINSE_OFF_SUPPRESS_PHOTO_CATS = new Set(["photo-retinoid", "photo-BHA", "photo-brightening"]);
+
 function getIngredientConcernLevel(
   match: { status: "safe" | "flagged"; ingredient: DbIngredient } | null,
   sensoryItem: SensoryTriggerItem | null,
   photoItem: PhotosensitiveItem | null,
   activeSkinTypes: Set<SkinType>,
-  activeClimates: Set<ClimateType>
+  activeClimates: Set<ClimateType>,
+  isRinseOff = false,
 ): ConcernLevel | "skip" {
+  // Suppress categories that don't apply to rinse-off products
+  if (isRinseOff) {
+    if (match?.ingredient.status === "flagged" && RINSE_OFF_SUPPRESS_DB_CATS.has(match.ingredient.flagged_category ?? "")) match = null;
+    if (sensoryItem && RINSE_OFF_SUPPRESS_SENSORY_CATS.has(sensoryItem.sensory_category ?? "")) sensoryItem = null;
+    if (photoItem && RINSE_OFF_SUPPRESS_PHOTO_CATS.has(photoItem.photoCategory ?? "")) photoItem = null;
+  }
+
   const hasConcern =
     match?.ingredient.status === "flagged" || sensoryItem !== null || photoItem !== null;
 
@@ -3187,7 +3199,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 const m = getItemMatch(item, result.safe, result.flagged);
                 const si = (result.sensoryTrigger ?? []).find(s => normalizeForMatch(s.rawName) === normalizeForMatch(item)) ?? null;
                 const pi = (result.photosensitive ?? []).find(p => normalizeForMatch(p.rawName) === normalizeForMatch(item)) ?? null;
-                const lv = getIngredientConcernLevel(m, si, pi, activeSkinTypes, activeClimates);
+                const lv = getIngredientConcernLevel(m, si, pi, activeSkinTypes, activeClimates, isRinseOff);
                 if (lv === "universal") universalCount++;
                 else if (lv === "profile-matched") profileMatchedCount++;
                 else if (lv === "non-matching") nonMatchingCount++;
@@ -3610,7 +3622,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   ) ?? null;
                   const itemNorm = normalizeForMatch(item);
                   const onAvoidList = ingredientLists.some(l => l.type === "avoid" && l.items.some(av => itemNorm.includes(av)));
-                  const concernLevel = getIngredientConcernLevel(match, sensoryItem, photoItem, activeSkinTypes, activeClimates);
+                  const concernLevel = getIngredientConcernLevel(match, sensoryItem, photoItem, activeSkinTypes, activeClimates, isRinseOff);
                   const colorClass =
                     concernLevel === "skip"            ? "text-gray-400"
                     : concernLevel === "neutral"       ? "text-gray-700 font-medium"
@@ -3691,10 +3703,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {result.originalItems.length > 0 && (() => {
             const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
 
-            const RINSE_OFF_SUPPRESS_SENSORY_CATS = new Set(["Pilling", "Film-forming", "Occlusive", "occlusive-itch", "comedogenic-itch"]);
-            const RINSE_OFF_SUPPRESS_PHOTO_CATS = new Set(["photo-retinoid", "photo-BHA", "photo-brightening"]);
-            const RINSE_OFF_SUPPRESS_DB_CATS = new Set(["pore-clogger", "occlusive", "bacteria-trap"]);
-
             type GroupItem = {
               item: string;
               match: ReturnType<typeof getItemMatch>;
@@ -3712,21 +3720,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               const fullMatch = result.flagged.find((m) => normalizeForMatch(m.displayName) === cleaned)
                 ?? result.safe.find((m) => normalizeForMatch(m.displayName) === cleaned)
                 ?? null;
-              let sensoryItem = (result.sensoryTrigger ?? []).find(
+              const sensoryItem = (result.sensoryTrigger ?? []).find(
                 (s) => normalizeForMatch(s.rawName) === normalizeForMatch(item)
               ) ?? null;
-              if (isRinseOff && sensoryItem && RINSE_OFF_SUPPRESS_SENSORY_CATS.has(sensoryItem.sensory_category ?? "")) {
-                sensoryItem = null;
-              }
-              let photoItem = (result.photosensitive ?? []).find(
+              const photoItem = (result.photosensitive ?? []).find(
                 (p) => normalizeForMatch(p.rawName) === normalizeForMatch(item)
               ) ?? null;
-              if (isRinseOff && photoItem && RINSE_OFF_SUPPRESS_PHOTO_CATS.has(photoItem.photoCategory ?? "")) {
-                photoItem = null;
-              }
-              const effectiveMatch = isRinseOff && match?.ingredient.status === "flagged" && RINSE_OFF_SUPPRESS_DB_CATS.has(match.ingredient.flagged_category ?? "") ? null : match;
-              const level = getIngredientConcernLevel(effectiveMatch, sensoryItem, photoItem, activeSkinTypes, activeClimates);
-              if (level !== "skip") groups[level].push({ item, match: effectiveMatch, fullMatch, sensoryItem, photoItem });
+              const level = getIngredientConcernLevel(match, sensoryItem, photoItem, activeSkinTypes, activeClimates, isRinseOff);
+              // Suppress display-side fields for rinse-off so rows don't show suppressed labels
+              const displayMatch = isRinseOff && match?.ingredient.status === "flagged" && RINSE_OFF_SUPPRESS_DB_CATS.has(match.ingredient.flagged_category ?? "") ? null : match;
+              const displaySensory = isRinseOff && sensoryItem && RINSE_OFF_SUPPRESS_SENSORY_CATS.has(sensoryItem.sensory_category ?? "") ? null : sensoryItem;
+              const displayPhoto = isRinseOff && photoItem && RINSE_OFF_SUPPRESS_PHOTO_CATS.has(photoItem.photoCategory ?? "") ? null : photoItem;
+              if (level !== "skip") groups[level].push({ item, match: displayMatch, fullMatch, sensoryItem: displaySensory, photoItem: displayPhoto });
             }
 
             const CONCERN_STRIPE: Record<ConcernLevel, string> = {
