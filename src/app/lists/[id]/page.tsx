@@ -334,8 +334,12 @@ export default function ListDetailPage() {
               const isEditing = editingNoteId === item.id;
 
               return (
-                <div key={item.id} className="border border-gray-200 rounded-xl p-3">
-                  <div className="flex items-start gap-3">
+                <div key={item.id} className="border border-gray-200 rounded-xl overflow-hidden">
+                  {/* Clickable product area — navigates to scan */}
+                  <Link
+                    href={`/product/${productSlug(product)}`}
+                    className="flex items-start gap-3 p-3 hover:bg-gray-50 transition-colors"
+                  >
                     {product.image_url ? (
                       <Image
                         src={proxyImage(product.image_url)!}
@@ -363,64 +367,64 @@ export default function ListDetailPage() {
                           />
                         </div>
                       )}
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <Link
-                          href={`/product/${productSlug(product)}`}
-                          className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
-                        >
-                          Scan
-                        </Link>
-                        {isOwner && !isEditing && (
-                          <button
-                            onClick={() => startEditNote(item)}
-                            className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
-                          >
-                            {item.note ? "Edit note" : "Add note"}
-                          </button>
-                        )}
-                        {isOwner && (
-                          <button
-                            onClick={() => removeItem(product.id, item.id)}
-                            disabled={removingId === item.id}
-                            className="text-xs text-gray-400 hover:text-rose-600 disabled:opacity-40"
-                          >
-                            {removingId === item.id ? "Removing…" : "Remove"}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Note */}
-                      {isEditing ? (
-                        <div className="mt-2 flex flex-col gap-1.5">
-                          <textarea
-                            ref={noteInputRef}
-                            value={noteText}
-                            onChange={(e) => setNoteText(e.target.value)}
-                            placeholder="Add a note about this product…"
-                            rows={2}
-                            className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-gray-400 resize-none"
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => saveNote(item)}
-                              disabled={noteLoading}
-                              className="text-xs px-2.5 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40"
-                            >
-                              {noteLoading ? "Saving…" : "Save"}
-                            </button>
-                            <button
-                              onClick={() => setEditingNoteId(null)}
-                              className="text-xs text-gray-400 hover:text-gray-700"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : item.note ? (
-                        <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">{item.note}</p>
-                      ) : null}
                     </div>
-                  </div>
+                    <span className="text-gray-300 self-center shrink-0">›</span>
+                  </Link>
+
+                  {/* Note display */}
+                  {!isEditing && item.note && (
+                    <p className="px-3 pb-2 text-xs text-gray-500 leading-relaxed border-t border-gray-100 pt-2">
+                      {item.note}
+                    </p>
+                  )}
+
+                  {/* Note editing */}
+                  {isEditing && (
+                    <div className="px-3 pb-3 pt-2 border-t border-gray-100 flex flex-col gap-1.5">
+                      <textarea
+                        ref={noteInputRef}
+                        value={noteText}
+                        onChange={(e) => setNoteText(e.target.value)}
+                        placeholder="Add a note about this product…"
+                        rows={2}
+                        className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-gray-400 resize-none"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => saveNote(item)}
+                          disabled={noteLoading}
+                          className="text-xs px-2.5 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40"
+                        >
+                          {noteLoading ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          onClick={() => setEditingNoteId(null)}
+                          className="text-xs text-gray-400 hover:text-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action strip — owners only, hidden while editing */}
+                  {isOwner && !isEditing && (
+                    <div className="flex items-center gap-3 px-3 py-2 border-t border-gray-100">
+                      <button
+                        onClick={() => startEditNote(item)}
+                        className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700"
+                      >
+                        {item.note ? "Edit note" : "Add note"}
+                      </button>
+                      <button
+                        onClick={() => removeItem(product.id, item.id)}
+                        disabled={removingId === item.id}
+                        className="text-xs text-gray-400 hover:text-rose-600 disabled:opacity-40"
+                      >
+                        {removingId === item.id ? "Removing…" : "Remove"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
