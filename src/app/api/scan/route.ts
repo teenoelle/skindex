@@ -702,6 +702,7 @@ export async function POST(req: NextRequest) {
             category: "pore-clogger",
             flagged_category: "pore-clogger",
             secondary_flagged_categories: [],
+            secondary_benefit_categories: [],
             structural_category: null,
             skin_climate_notes: null,
           },

@@ -6,6 +6,10 @@ const UNIVERSAL_CATS = [
   "sensitizing preservative", "biocide", "Sulfate Surfactant", "Drying Solvent",
 ];
 
+const ENVIRONMENTAL_CATS = [
+  "reef harmful", "PFAS", "endocrine disruptor", "environmental persistent",
+];
+
 const RINSE_OFF_SUPPRESS = new Set(["pore-clogger", "occlusive", "bacteria-trap"]);
 
 const PROFILE_CAT_MAP: Record<string, string[]> = {
@@ -152,6 +156,34 @@ export async function GET(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       secondary_categories: ((r as any).secondary_benefit_categories ?? []) as string[],
     }));
+    const filtered = q ? items.filter(i => i.name.toLowerCase().includes(q)) : items;
+    return NextResponse.json({ items: filtered });
+  }
+
+  if (list === "environmental-concerns") {
+    const { data } = await supabase
+      .from("ingredients")
+      .select(`${SELECT}, flagged_category, secondary_flagged_categories`)
+      .order("name");
+    const items = (data ?? [])
+      .filter(ing => {
+        const allCats = [ing.flagged_category, ...((ing.secondary_flagged_categories ?? []) as string[])].filter(Boolean) as string[];
+        return allCats.some(c => ENVIRONMENTAL_CATS.includes(c));
+      })
+      .map(r => {
+        const allCats = [r.flagged_category, ...((r.secondary_flagged_categories ?? []) as string[])].filter(Boolean) as string[];
+        const envCat = allCats.find(c => ENVIRONMENTAL_CATS.includes(c)) ?? "";
+        return {
+          id: r.id as string,
+          name: r.name as string,
+          category: envCat,
+          structural_category: (r.structural_category ?? null) as string | null,
+          explanation: (r.explanation ?? null) as string | null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          explanation_structured: (r as any).explanation_structured ?? null,
+          secondary_categories: allCats.filter(c => ENVIRONMENTAL_CATS.includes(c) && c !== envCat),
+        };
+      });
     const filtered = q ? items.filter(i => i.name.toLowerCase().includes(q)) : items;
     return NextResponse.json({ items: filtered });
   }

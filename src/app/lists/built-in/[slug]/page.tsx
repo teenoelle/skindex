@@ -62,6 +62,13 @@ const UNIVERSAL_CATS_SET = new Set([
   "sensitizing preservative", "biocide", "Sulfate Surfactant", "Drying Solvent",
 ]);
 
+const ENVIRONMENTAL_GROUPS: { cat: string; label: string; description: string }[] = [
+  { cat: "reef harmful",             label: "Reef-Harmful UV Filters",    description: "Oxybenzone, octinoxate, and octocrylene are banned in reef-protected areas for documented coral toxicity. Mineral sunscreens (zinc oxide, titanium dioxide) are reef-safe alternatives." },
+  { cat: "PFAS",                     label: "PFAS / Fluorinated",          description: "Per- and polyfluoroalkyl substances (PTFE, fluorinated polymers) that do not break down in the environment and accumulate in living organisms and waterways." },
+  { cat: "endocrine disruptor",      label: "Endocrine Disruptors",        description: "Interfere with hormone signaling in aquatic wildlife and accumulate in water systems. Includes certain UV filters, parabens at high aquatic concentrations, and cyclic silicones." },
+  { cat: "environmental persistent", label: "Environmentally Persistent",  description: "Persist in the environment and accumulate in living organisms. Cyclic silicones (D4, D5, D6) are restricted in EU rinse-off products for this reason." },
+];
+
 const PROFILE_CAT_MAP: Record<string, string[]> = {
   "pore-clogger":            ["oily","acne_prone","fungal_acne","body_acne","keratosis_pilaris"],
   "occlusive":               ["oily","acne_prone","fungal_acne","body_acne","keratosis_pilaris"],
@@ -143,9 +150,10 @@ const BENEFIT_GROUP: Record<string, { label: string; description: string }> = {
 };
 
 const META: Record<string, { title: string; color: string; description: string }> = {
-  "universal-concerns": { title: "Universal Concerns",   color: "text-rose-700",  description: "Flagged for all skin types — contact allergens, biocides, sulfate surfactants, formaldehyde releasers, and drying solvents." },
-  "my-sensitivities":   { title: "My Sensitivities",     color: "text-amber-700", description: "Ingredients flagged specifically for your skin profile." },
-  "neutral-beneficial": { title: "Neutral & Beneficial", color: "text-teal-700",  description: "All reviewed-safe ingredients — neutral (no category) and beneficial (positive category)." },
+  "universal-concerns":    { title: "Universal Concerns",   color: "text-rose-700",    description: "Flagged for all skin types — contact allergens, biocides, sulfate surfactants, formaldehyde releasers, and drying solvents." },
+  "my-sensitivities":      { title: "My Sensitivities",     color: "text-amber-700",   description: "Ingredients flagged specifically for your skin profile." },
+  "neutral-beneficial":    { title: "Neutral & Beneficial", color: "text-teal-700",    description: "All reviewed-safe ingredients — neutral (no category) and beneficial (positive category)." },
+  "environmental-concerns":{ title: "Environmental Impact", color: "text-emerald-700", description: "Ingredients with documented environmental concerns — reef toxicity, PFAS persistence, endocrine disruption in aquatic systems." },
 };
 
 // ── Badge color helper ────────────────────────────────────────────────────────
@@ -167,9 +175,12 @@ function getCategoryLabel(cat: string): string {
   return cat;
 }
 
+const ENVIRONMENTAL_CATS_SET = new Set(ENVIRONMENTAL_GROUPS.map(g => g.cat));
+
 function catBadgeColor(cat: string, isSafePage: boolean): string {
   if (!cat) return "bg-gray-100 text-gray-500";
   if (UNIVERSAL_CATS_SET.has(cat)) return "bg-rose-100 text-rose-800";
+  if (ENVIRONMENTAL_CATS_SET.has(cat)) return "bg-emerald-100 text-emerald-800";
   if (isSafePage) return "bg-teal-100 text-teal-800";
   return "bg-amber-100 text-amber-800";
 }
@@ -187,6 +198,11 @@ function readProfile() {
 function buildGroups(items: Item[], slug: string, skinTypes: string[], climates: string[]): Group[] {
   if (slug === "universal-concerns") {
     return UNIVERSAL_GROUPS
+      .map(g => ({ ...g, items: items.filter(i => i.category === g.cat) }))
+      .filter(g => g.items.length > 0);
+  }
+  if (slug === "environmental-concerns") {
+    return ENVIRONMENTAL_GROUPS
       .map(g => ({ ...g, items: items.filter(i => i.category === g.cat) }))
       .filter(g => g.items.length > 0);
   }
@@ -418,6 +434,7 @@ export default function BuiltInListPage() {
                 const isGroupExpanded = expandedGroups.has(group.cat);
                 const groupColor = slug === "universal-concerns" ? "text-rose-700"
                   : slug === "my-sensitivities" ? "text-amber-700"
+                  : slug === "environmental-concerns" ? "text-emerald-700"
                   : group.cat ? "text-teal-700" : "text-gray-600";
                 return (
                   <div key={group.cat} className="border border-gray-200 rounded-xl overflow-hidden">
@@ -444,7 +461,8 @@ export default function BuiltInListPage() {
                           const isExpanded = expandedId === item.id;
                           const structured = item.explanation_structured;
                           const isUniversal = UNIVERSAL_CATS_SET.has(item.category);
-                          const concernBorder = isUniversal ? "border-rose-500" : "border-amber-500";
+                          const isEnvironmental = ENVIRONMENTAL_CATS_SET.has(item.category);
+                          const concernBorder = isUniversal ? "border-rose-500" : isEnvironmental ? "border-emerald-500" : "border-amber-500";
                           return (
                             <div key={item.id}>
                               {/* Collapsed row — name + all category pills */}

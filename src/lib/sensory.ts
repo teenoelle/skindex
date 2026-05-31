@@ -99,6 +99,7 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
     pattern: /^propylene glycol$/i,
     sensory_category: "Stinging",
     note: "Can cause a stinging or burning sensation on sensitized skin and around areas where the barrier is broken or compromised. As a penetration enhancer, it also drives co-applied ingredients deeper — amplifying the potency of any other irritants or sensitizers in the formula.",
+    maxPosition: 8,
   },
   {
     pattern: /^(butylene glycol|dipropylene glycol)$/i,
