@@ -3626,7 +3626,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         title={onAvoidList ? "On your avoid list" : undefined}
                         onClick={() => {
                           if (match || photoItem || sensoryItem) {
+                            if (concernLevel === "neutral") setNeutralGroupOpen(true);
                             handleIngredientClick(item, match, !!photoItem, !!sensoryItem);
+                            setTimeout(() => {
+                              document.getElementById(`concern-${item}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                            }, 50);
                           } else {
                             handleUnreviewedClick(item);
                           }
