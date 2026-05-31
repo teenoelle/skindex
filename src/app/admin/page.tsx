@@ -3,6 +3,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { tokenFuzzyFilter } from "@/lib/search";
+import { splitIngredientList } from "@/lib/scanner";
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
 import {
@@ -273,16 +277,62 @@ function isJunkIngredient(item: string): boolean {
 
 function hasSuspiciousIngredients(ingredientList: string | null): boolean {
   if (!ingredientList) return false;
-  return ingredientList.split(",").some((item) => isJunkIngredient(item.trim()));
+  return splitIngredientList(ingredientList).some((item) => isJunkIngredient(item));
+}
+
+function SortableIngredientChip({ id, item, onRemove }: { id: string; item: string; onRemove: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const junk = isJunkIngredient(item);
+  return (
+    <span
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      title={item}
+      className={`inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 border ${
+        junk ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-gray-50 border-gray-200 text-gray-700"
+      }`}
+    >
+      <span
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 leading-none select-none"
+        aria-label="Drag to reorder"
+      >
+        ⠿
+      </span>
+      {item.length > 40 ? item.slice(0, 40) + "…" : item}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="text-gray-400 hover:text-rose-500 leading-none ml-0.5 shrink-0"
+      >
+        ×
+      </button>
+    </span>
+  );
 }
 
 function IngredientChipEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const items = value.split(",").map((s) => s.trim()).filter(Boolean);
+  const items = splitIngredientList(value);
+  const ids = items.map((item, i) => `${i}::${item}`);
   const [addInput, setAddInput] = useState("");
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = ids.indexOf(active.id as string);
+      const newIndex = ids.indexOf(over.id as string);
+      onChange(arrayMove(items, oldIndex, newIndex).join(", "));
+    }
+  }
+
   function removeItem(idx: number) {
-    const next = items.filter((_, i) => i !== idx);
-    onChange(next.join(", "));
+    onChange(items.filter((_, i) => i !== idx).join(", "));
   }
 
   function addItem() {
@@ -294,30 +344,16 @@ function IngredientChipEditor({ value, onChange }: { value: string; onChange: (v
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-1">
-        {items.map((item, i) => {
-          const junk = isJunkIngredient(item);
-          return (
-            <span
-              key={i}
-              title={item}
-              className={`inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 border ${
-                junk ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-gray-50 border-gray-200 text-gray-700"
-              }`}
-            >
-              {item.length > 40 ? item.slice(0, 40) + "…" : item}
-              <button
-                type="button"
-                onClick={() => removeItem(i)}
-                className="text-gray-400 hover:text-rose-500 leading-none ml-0.5 shrink-0"
-              >
-                ×
-              </button>
-            </span>
-          );
-        })}
-        {items.length === 0 && <span className="text-xs text-gray-400 italic">No ingredients</span>}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={ids} strategy={rectSortingStrategy}>
+          <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-1">
+            {items.map((item, i) => (
+              <SortableIngredientChip key={ids[i]} id={ids[i]} item={item} onRemove={() => removeItem(i)} />
+            ))}
+            {items.length === 0 && <span className="text-xs text-gray-400 italic">No ingredients</span>}
+          </div>
+        </SortableContext>
+      </DndContext>
       <div className="flex gap-1.5">
         <input
           type="text"
@@ -1161,7 +1197,7 @@ export default function AdminPage() {
         name: edits.name || s.name,
         brand: edits.brand || null,
         type: edits.type || null,
-        ingredient_count: edits.ingredient_list ? edits.ingredient_list.split(",").filter((x) => x.trim()).length : s.ingredient_count,
+        ingredient_count: edits.ingredient_list ? splitIngredientList(edits.ingredient_list).length : s.ingredient_count,
       } : s));
       setSubmissionSaved((prev) => new Set([...prev, id]));
       setTimeout(() => setSubmissionSaved((prev) => { const n = new Set(prev); n.delete(id); return n; }), 2000);

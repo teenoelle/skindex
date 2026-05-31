@@ -270,7 +270,7 @@ function extractHtmlByClass(html: string, classPattern: string): string | null {
   const m = html.match(re);
   if (!m || m.index === undefined) return null;
   const start = m.index + m[0].length;
-  return html.slice(start, start + 8000);
+  return html.slice(start, start + 30000);
 }
 
 function extractIngredientBlock(text: string): string | null {
@@ -280,7 +280,7 @@ function extractIngredientBlock(text: string): string | null {
   if (!labelMatch) return null;
 
   const startPos = labelMatch.index + labelMatch[0].length;
-  let candidate = text.slice(startPos, startPos + 6000).trim();
+  let candidate = text.slice(startPos, startPos + 20000).trim();
 
   const sectionBreak =
     /\n\s*(?:[*•·▸►\-]\s*)?(?:directions?|how to use|how to apply|usage|warnings?|cautions?|shelf.?life|storage|disclaimer|about this|certif|reviews?|questions?|customer|contact|return|faq|similar|you may also|related|product details|overview|description)\b/i;

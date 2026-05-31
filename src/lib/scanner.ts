@@ -1,13 +1,20 @@
 import { supabase } from "./supabase";
 import type { DbIngredient, IngredientMatch } from "@/types";
 
-function parseIngredientList(raw: string): string[] {
+// Split on commas that are not inside parentheses and not between digits
+// with a following dash (e.g. "1,2-Hexanediol" must stay as one token).
+export function splitIngredientList(raw: string): string[] {
   return raw
-    .split(/,(?![^(]*\))/)
+    .split(/,(?![^(]*\))(?!\s*\d[-\d])/)
+    .map((s) => s.replace(/[​‌‍﻿]/g, "").trim())
+    .filter(Boolean);
+}
+
+function parseIngredientList(raw: string): string[] {
+  return splitIngredientList(raw)
     .map((s) =>
       s
         .replace(/\([^)]*\)/g, "")
-        .replace(/[​‌‍﻿]/g, "") // strip zero-width spaces injected by ingredient scrapers
         .trim()
         .replace(/\s+/g, " ")
     )

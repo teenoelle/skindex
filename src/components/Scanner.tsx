@@ -9,6 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 import { SENSORY_PROFILE_MAP } from "@/lib/sensory";
 import { tokenFuzzyFilter } from "@/lib/search";
+import { splitIngredientList } from "@/lib/scanner";
 import ConcernChips from "@/components/ConcernChips";
 
 function slugify(text: string): string {
@@ -2380,7 +2381,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {filtered.map((p) => {
                         const browseInRoutine = routineProducts.some(rp => rp.name === p.name);
                         const browseQuickListOpen = quickListProductId === p.id;
-                        const browseIngredients = (p.ingredient_list ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+                        const browseIngredients = splitIngredientList(p.ingredient_list ?? "");
                         return (
                         <div key={p.id} className="border border-gray-300 rounded-xl overflow-hidden hover:border-gray-400 transition-colors">
                           <button
