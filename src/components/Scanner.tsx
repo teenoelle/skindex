@@ -912,6 +912,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [addRoutinePickerOpen, setAddRoutinePickerOpen] = useState(false);
   const [quickListProductId, setQuickListProductId] = useState<string | null>(null);
   const [quickListSaving, setQuickListSaving] = useState<string | null>(null);
+  const [quickListNewOpen, setQuickListNewOpen] = useState(false);
+  const [quickListNewName, setQuickListNewName] = useState("");
+  const [ingredientNewListOpen, setIngredientNewListOpen] = useState(false);
+  const [ingredientNewListName, setIngredientNewListName] = useState("");
   const [skinTypeHint, setSkinTypeHint] = useState<SkinType | null>(null);
   const [climateHint, setClimateHint] = useState<ClimateType | null>(null);
   const [waterHint, setWaterHint] = useState<ClimateType | null>(null);
@@ -1573,6 +1577,49 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     }
   }
 
+  async function quickCreateListAndAdd(name: string, productId: string) {
+    if (!name.trim()) return;
+    setQuickListSaving("new");
+    const createRes = await fetch("/api/lists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    const createData = await createRes.json();
+    if (!createRes.ok) { setQuickListSaving(null); return; }
+    await fetch(`/api/lists/${createData.list.id}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId }),
+    });
+    setUserLists((prev) => [{ ...createData.list, itemCount: 1 }, ...prev]);
+    setQuickListSaving(null);
+    setQuickListNewOpen(false);
+    setQuickListNewName("");
+    setQuickListProductId(null);
+  }
+
+  async function quickCreateIngredientList(name: string, itemKey: string) {
+    if (!name.trim()) return;
+    let newList: IngredientList;
+    if (isSignedIn) {
+      const res = await fetch("/api/user-ingredient-lists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), items: [itemKey] }),
+      });
+      const data = await res.json();
+      if (!res.ok) return;
+      newList = data.list as IngredientList;
+    } else {
+      newList = { id: crypto.randomUUID(), name: name.trim(), items: [itemKey] };
+    }
+    setIngredientLists((prev) => [...prev, newList]);
+    setIngredientNewListOpen(false);
+    setIngredientNewListName("");
+    setAddToListMenu(null);
+  }
+
   function syncIngredientListItems(listId: string, newItems: string[]) {
     if (!isSignedIn) return;
     fetch(`/api/user-ingredient-lists/${listId}`, {
@@ -1666,6 +1713,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   }
 
   async function openQuickList(productId: string) {
+    setQuickListNewOpen(false);
+    setQuickListNewName("");
     setQuickListProductId((prev) => (prev === productId ? null : productId));
     if (!userListsLoaded) {
       const res = await fetch("/api/lists");
@@ -2471,8 +2520,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             <div className="px-3 pb-3 border-t border-gray-100">
                               {!userListsLoaded ? (
                                 <p className="text-xs text-gray-400 py-2">Loading…</p>
-                              ) : userLists.length === 0 ? (
-                                <p className="text-xs text-gray-400 py-2">No lists yet — <a href="/lists" className="underline">create one</a>.</p>
                               ) : (
                                 <div className="divide-y divide-gray-100">
                                   {userLists.map((l) => (
@@ -2481,6 +2528,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                       <span className="text-gray-400">{quickListSaving === l.id ? "Adding…" : l.itemCount}</span>
                                     </button>
                                   ))}
+                                  {quickListNewOpen ? (
+                                    <div className="pt-2 flex gap-1.5">
+                                      <input autoFocus type="text" value={quickListNewName} onChange={(e) => setQuickListNewName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && quickCreateListAndAdd(quickListNewName, p.id)} placeholder="New list name…" className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400 min-w-0" />
+                                      <button type="button" disabled={!quickListNewName.trim() || quickListSaving === "new"} onClick={() => quickCreateListAndAdd(quickListNewName, p.id)} className="text-xs px-2 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0">{quickListSaving === "new" ? "…" : "Create"}</button>
+                                      <button type="button" onClick={() => { setQuickListNewOpen(false); setQuickListNewName(""); }} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">✕</button>
+                                    </div>
+                                  ) : (
+                                    <button type="button" onClick={() => setQuickListNewOpen(true)} className="w-full text-left py-1.5 text-xs text-gray-400 hover:text-gray-600">+ New list</button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -2698,8 +2754,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     <div className="px-3 pb-3 border-t border-gray-100">
                       {!userListsLoaded ? (
                         <p className="text-xs text-gray-400 py-2">Loading…</p>
-                      ) : userLists.length === 0 ? (
-                        <p className="text-xs text-gray-400 py-2">No lists yet — <a href="/lists" className="underline">create one</a>.</p>
                       ) : (
                         <div className="divide-y divide-gray-100">
                           {userLists.map((l) => (
@@ -2708,6 +2762,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               <span className="text-gray-400">{quickListSaving === l.id ? "Adding…" : l.itemCount}</span>
                             </button>
                           ))}
+                          {quickListNewOpen ? (
+                            <div className="pt-2 flex gap-1.5">
+                              <input autoFocus type="text" value={quickListNewName} onChange={(e) => setQuickListNewName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && quickCreateListAndAdd(quickListNewName, v.id)} placeholder="New list name…" className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400 min-w-0" />
+                              <button type="button" disabled={!quickListNewName.trim() || quickListSaving === "new"} onClick={() => quickCreateListAndAdd(quickListNewName, v.id)} className="text-xs px-2 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0">{quickListSaving === "new" ? "…" : "Create"}</button>
+                              <button type="button" onClick={() => { setQuickListNewOpen(false); setQuickListNewName(""); }} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">✕</button>
+                            </div>
+                          ) : (
+                            <button type="button" onClick={() => setQuickListNewOpen(true)} className="w-full text-left py-1.5 text-xs text-gray-400 hover:text-gray-600">+ New list</button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -3453,8 +3516,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             <div className="px-3 pb-3 border-t border-gray-100">
                               {!userListsLoaded ? (
                                 <p className="text-xs text-gray-400 py-2">Loading…</p>
-                              ) : userLists.length === 0 ? (
-                                <p className="text-xs text-gray-400 py-2">No lists yet — <a href="/lists" className="underline">create one</a>.</p>
                               ) : (
                                 <div className="divide-y divide-gray-100">
                                   {userLists.map((l) => (
@@ -3463,6 +3524,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                       <span className="text-gray-400">{quickListSaving === l.id ? "Adding…" : l.itemCount}</span>
                                     </button>
                                   ))}
+                                  {quickListNewOpen ? (
+                                    <div className="pt-2 flex gap-1.5">
+                                      <input autoFocus type="text" value={quickListNewName} onChange={(e) => setQuickListNewName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && quickCreateListAndAdd(quickListNewName, alt.id)} placeholder="New list name…" className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400 min-w-0" />
+                                      <button type="button" disabled={!quickListNewName.trim() || quickListSaving === "new"} onClick={() => quickCreateListAndAdd(quickListNewName, alt.id)} className="text-xs px-2 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0">{quickListSaving === "new" ? "…" : "Create"}</button>
+                                      <button type="button" onClick={() => { setQuickListNewOpen(false); setQuickListNewName(""); }} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">✕</button>
+                                    </div>
+                                  ) : (
+                                    <button type="button" onClick={() => setQuickListNewOpen(true)} className="w-full text-left py-1.5 text-xs text-gray-400 hover:text-gray-600">+ New list</button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -3892,44 +3962,60 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     </span>
                     <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
                   </button>
-                  {ingredientLists.length > 0 && (
-                    <div className="relative shrink-0">
-                      <button
-                        type="button"
-                        title="Add to list"
-                        className={`px-2 py-1.5 text-sm leading-none transition-colors ${inList ? "text-gray-700" : "text-gray-300 hover:text-gray-500"}`}
-                        onClick={() => setAddToListMenu(inList ? null : itemKey)}
-                      >
-                        +
-                      </button>
-                      {inList && (
-                        <div className="absolute right-0 top-full z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-1.5 min-w-[130px]">
-                          {ingredientLists.map((lst) => {
-                            const already = lst.items.includes(itemKey);
-                            return (
-                              <button
-                                key={lst.id}
-                                type="button"
-                                className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-50 rounded-lg flex items-center gap-1.5"
-                                onClick={() => {
-                                  if (!already) {
-                                    const newItems = [...lst.items, itemKey];
-                                    setIngredientLists(ls => ls.map(l => l.id === lst.id ? { ...l, items: newItems } : l));
-                                    syncIngredientListItems(lst.id, newItems);
-                                  }
-                                  setAddToListMenu(null);
-                                }}
-                              >
-                                <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${lst.type === "avoid" ? "bg-rose-400" : "bg-teal-500"}`} />
-                                <span className="flex-1 truncate">{lst.name}</span>
-                                {already && <span className="text-teal-600 shrink-0">✓</span>}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      title="Add to ingredient list"
+                      className={`px-2 py-1.5 text-sm leading-none transition-colors ${inList ? "text-gray-700" : "text-gray-300 hover:text-gray-500"}`}
+                      onClick={() => { setIngredientNewListOpen(false); setIngredientNewListName(""); setAddToListMenu(inList ? null : itemKey); }}
+                    >
+                      +
+                    </button>
+                    {inList && (
+                      <div className="absolute right-0 top-full z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-1.5 min-w-[140px]">
+                        {ingredientLists.map((lst) => {
+                          const already = lst.items.includes(itemKey);
+                          return (
+                            <button
+                              key={lst.id}
+                              type="button"
+                              className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-50 rounded-lg flex items-center gap-1.5"
+                              onClick={() => {
+                                if (!already) {
+                                  const newItems = [...lst.items, itemKey];
+                                  setIngredientLists(ls => ls.map(l => l.id === lst.id ? { ...l, items: newItems } : l));
+                                  syncIngredientListItems(lst.id, newItems);
+                                }
+                                setAddToListMenu(null);
+                              }}
+                            >
+                              <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${lst.type === "avoid" ? "bg-rose-400" : "bg-teal-500"}`} />
+                              <span className="flex-1 truncate">{lst.name}</span>
+                              {already && <span className="text-teal-600 shrink-0">✓</span>}
+                            </button>
+                          );
+                        })}
+                        {ingredientNewListOpen ? (
+                          <div className="pt-1 mt-1 border-t border-gray-100 flex gap-1">
+                            <input
+                              autoFocus
+                              type="text"
+                              value={ingredientNewListName}
+                              onChange={(e) => setIngredientNewListName(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && quickCreateIngredientList(ingredientNewListName, itemKey)}
+                              placeholder="New list…"
+                              className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400 min-w-0"
+                            />
+                            <button type="button" disabled={!ingredientNewListName.trim()} onClick={() => quickCreateIngredientList(ingredientNewListName, itemKey)} className="text-xs px-1.5 py-1 bg-gray-900 text-white rounded-lg disabled:opacity-40 shrink-0">+</button>
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => setIngredientNewListOpen(true)} className="w-full text-left text-xs px-2 py-1.5 text-gray-400 hover:text-gray-600 border-t border-gray-100 mt-1">
+                            + New list
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   </div>
                   {isOpen && (
                     <div className="px-3 pb-3 space-y-2">
