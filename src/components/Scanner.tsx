@@ -2239,7 +2239,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             >
               Skin profile
               {(activeSkinTypes.size + activeClimates.size) > 0 && (
-                <span className="text-purple-800 font-medium normal-case tracking-normal">
+                <span className="text-amber-800 font-medium normal-case tracking-normal">
                   {activeSkinTypes.size + activeClimates.size} active
                 </span>
               )}
@@ -3655,7 +3655,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             >
               Skin profile
               {(activeSkinTypes.size + activeClimates.size) > 0 && (
-                <span className="text-purple-800 font-medium normal-case tracking-normal">
+                <span className="text-amber-800 font-medium normal-case tracking-normal">
                   {activeSkinTypes.size + activeClimates.size} active
                 </span>
               )}
@@ -4347,7 +4347,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               <section id="section-by-concern">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">By concern</p>
                 {renderGroup("Universal concerns", groups.universal, "universal")}
-                {hasProfile && renderGroup("Your profile", groups["profile-matched"], "profile-matched")}
+                {hasProfile && renderGroup("My profile", groups["profile-matched"], "profile-matched")}
                 {groups["non-matching"].length > 0 && (
                   <>
                     {renderGroup(hasProfile ? "Other concerns" : "Flagged", groups["non-matching"], "non-matching")}

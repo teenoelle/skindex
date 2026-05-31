@@ -39,6 +39,36 @@ const SKIN_TYPE_LABELS: Record<string, string> = {
   eczema: "Eczema", psoriasis: "Psoriasis", lupus_rash: "Lupus rash",
   keratosis_pilaris: "Keratosis pilaris", body_acne: "Body acne",
 };
+
+const SKIN_TYPE_NOTES: Record<string, string> = {
+  oily: "Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.",
+  dry: "Dry skin has a thinner lipid layer and loses water fastest in cold or dry air — drying solvents, sulfate surfactants, and clay are worth watching closely.",
+  reactive: "Reactive skin has a lower tolerance threshold — sensitizers, fragrance allergens, and chemical sunscreens are worth watching closely, especially in warm weather.",
+  damaged_barrier: "A compromised barrier lets ingredients penetrate faster and deeper — irritants and sensitizers hit harder and recovery takes longer than it would on intact skin.",
+  acne_prone: "For acne skin, pore-clogging ingredients and film-formers are the main risks — watch the Congestion section after scanning.",
+  mature: "Mature skin benefits most from peptides, ceramides, and emollients, and is more sensitive to the retinoid adjustment period — start at the lowest available concentration.",
+  hyperpigmentation_prone: "For hyperpigmentation-prone skin, UV exposure directly undoes progress — many brightening actives also increase UV sensitivity, making daily SPF essential.",
+  fungal_acne: "Fungal acne (Malassezia folliculitis) is caused by yeast, not bacteria — it looks like regular acne but doesn't respond to antibiotics or most OTC acne treatments. Many 'safe' moisturizing oils and fatty acid esters feed Malassezia. Scanning every formula matters more here than for almost any other skin type.",
+  rosacea: "Rosacea triggers vary but commonly include heat, vasodilation, and chemical absorption. Chemical UV filters, alcohol-based formulas, menthol, warming agents, and high fragrance load are the main ingredient triggers — mineral sunscreens (zinc oxide, titanium dioxide) are strongly preferred.",
+  seborrheic: "Seborrheic dermatitis is driven by Malassezia — a yeast that naturally colonizes everyone's skin and feeds on the fatty acids in sebum. In seborrheic dermatitis, the immune system overreacts to Malassezia's metabolic byproducts, triggering inflammation wherever sebaceous glands are densest. On the scalp it presents as dandruff: flaky, itchy scale that sheds onto shoulders. On the face it clusters in the T-zone — the sides of the nose, brows, and glabella — as reddish, slightly greasy patches with fine yellowish or white scale that clings to skin rather than falling away. All sites respond to the same actives: zinc pyrithione, piroctone olamine, selenium sulfide, ketoconazole, and low-dose salicylic acid. Certain plant oils and fatty acid esters feed Malassezia and worsen all sites.",
+  eczema: "Atopic eczema has specific preservative sensitivities. MI/MCI (methylisothiazolinone/methylchloroisothiazolinone) and IPBC are notorious eczema triggers. Ceramides, colloidal oatmeal, and thick emollients are specifically therapeutic here — unlike for acne, heavy barrier creams help rather than harm.",
+  psoriasis: "Psoriasis causes rapid cell turnover and thick scale. Keratolytics like salicylic acid can help remove scale. Fragrances and harsh surfactants trigger flares. Vitamin D analogues and antioxidants are specifically beneficial.",
+  lupus_rash: "The malar (butterfly) rash of lupus is highly photosensitive — UV exposure triggers flares. Chemical UV filters can also cause reactions; mineral-only sunscreens (zinc oxide, titanium dioxide) are strongly preferred. Photosensitizing ingredients carry significantly higher risk here than for any other type.",
+  keratosis_pilaris: "Keratosis pilaris (the rough, bumpy texture on upper arms and thighs) is caused by keratin plugging follicles. Gentle chemical exfoliants — urea, lactic acid, salicylic acid — dissolve plugs; physical scrubs and harsh stripping cleansers worsen the inflammation that keeps follicles blocked.",
+  body_acne: "Body acne is driven by the same pore-clogging and bacterial mechanisms as face acne, but friction and sweat occlusion under clothing are major amplifiers. The same pore-clogger flags that matter on face apply here.",
+};
+
+const CLIMATE_NOTES: Record<string, string> = {
+  humid: "In humid climates, film-forming and occlusive ingredients are more likely to trap heat and sebum against the skin — lighter formulations are preferable.",
+  dry_climate: "In dry climates, humectants need to be sealed in with an emollient or occlusive — without one, they can pull moisture from deeper skin layers instead of the air.",
+  cold: "Cold air depletes skin lipids fastest — barrier-repairing ingredients (ceramides, fatty acids, emollients) are most effective and most needed in this climate.",
+  hot: "In hot weather, skin permeability increases, making sensitizers and chemical UV filters absorb more readily and triggering stronger reactions.",
+  high_uv: "In high-UV environments, daily broad-spectrum SPF is essential — AHAs, retinoids, and many brightening ingredients all increase UV sensitivity.",
+  hard_water: "Hard (mineral-rich) water is alkaline (pH 7–9) and leaves a calcium/magnesium film on skin after rinsing. This disrupts the skin's natural acid mantle, impairs cleanser rinse-off, and is a documented eczema aggravator. Look for cleansers containing chelating agents (EDTA, phytic acid) and follow with a low-pH toner quickly after washing.",
+  chlorinated_water: "Chlorinated and chloramine-treated tap water can oxidize skin barrier lipids on contact — particularly relevant for eczema and reactive skin. A vitamin C (ascorbic acid) toner applied immediately after washing neutralizes residual disinfectant before it can damage the barrier.",
+  iron_water: "Iron-bearing water introduces ferrous and ferric ions that generate free radicals on contact with skin, accelerating barrier lipid oxidation. Chelating agents and antioxidants (especially vitamins C and E) counteract this.",
+  heavy_metal_water: "Lead or heavy metal contamination in tap water is a public health concern — filtering your water or using bottled/filtered water for face washing is the most effective intervention. Chelating cleansers bind surface metals, and penetration enhancers (drying alcohols) should be avoided as they increase absorption.",
+};
 const SKIN_TYPE_VALUES = Object.keys(SKIN_TYPE_LABELS);
 const CLIMATE_TYPES = [
   { value: "humid", label: "Humid" },
@@ -266,6 +296,9 @@ export default function BuiltInListPage() {
   const [climates, setClimates] = useState<string[]>([]);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileReady, setProfileReady] = useState(false);
+  const [skinTypeHint, setSkinTypeHint] = useState<string | null>(null);
+  const [climateHint, setClimateHint] = useState<string | null>(null);
+  const [waterHint, setWaterHint] = useState<string | null>(null);
 
   const hasProfile = skinTypes.length > 0 || climates.length > 0;
 
@@ -344,34 +377,63 @@ export default function BuiltInListPage() {
                     <p className="text-xs font-medium text-gray-700">Skin type</p>
                     <div className="flex flex-wrap gap-1.5">
                       {SKIN_TYPE_VALUES.map(st => (
-                        <button key={st} type="button" onClick={() => saveSkinTypes(skinTypes.includes(st) ? skinTypes.filter(s => s !== st) : [...skinTypes, st])}
-                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${skinTypes.includes(st) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                          {SKIN_TYPE_LABELS[st]}
-                        </button>
+                        <span key={st} className="inline-flex items-center gap-0.5">
+                          <button type="button" onClick={() => saveSkinTypes(skinTypes.includes(st) ? skinTypes.filter(s => s !== st) : [...skinTypes, st])}
+                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${skinTypes.includes(st) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                            {SKIN_TYPE_LABELS[st]}
+                          </button>
+                          {SKIN_TYPE_NOTES[st] && (
+                            <button type="button" onClick={() => setSkinTypeHint(h => h === st ? null : st)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${SKIN_TYPE_LABELS[st]}`}>ⓘ</button>
+                          )}
+                        </span>
                       ))}
                     </div>
+                    {skinTypeHint && SKIN_TYPE_NOTES[skinTypeHint] && (
+                      <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                        <span className="font-medium text-gray-700">{SKIN_TYPE_LABELS[skinTypeHint]} — </span>
+                        {SKIN_TYPE_NOTES[skinTypeHint]}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-gray-700">Climate</p>
                     <div className="flex flex-wrap gap-1.5">
                       {CLIMATE_TYPES.map(({ value, label }) => (
-                        <button key={value} type="button" onClick={() => saveClimates(climates.includes(value) ? climates.filter(c => c !== value) : [...climates, value])}
-                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${climates.includes(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                          {label}
-                        </button>
+                        <span key={value} className="inline-flex items-center gap-0.5">
+                          <button type="button" onClick={() => saveClimates(climates.includes(value) ? climates.filter(c => c !== value) : [...climates, value])}
+                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${climates.includes(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                            {label}
+                          </button>
+                          <button type="button" onClick={() => setClimateHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                        </span>
                       ))}
                     </div>
+                    {climateHint && CLIMATE_NOTES[climateHint] && (
+                      <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                        <span className="font-medium text-gray-700">{CLIMATE_TYPES.find(t => t.value === climateHint)?.label} — </span>
+                        {CLIMATE_NOTES[climateHint]}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-gray-700">Water quality</p>
                     <div className="flex flex-wrap gap-1.5">
                       {WATER_TYPES.map(({ value, label }) => (
-                        <button key={value} type="button" onClick={() => saveClimates(climates.includes(value) ? climates.filter(c => c !== value) : [...climates, value])}
-                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${climates.includes(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                          {label}
-                        </button>
+                        <span key={value} className="inline-flex items-center gap-0.5">
+                          <button type="button" onClick={() => saveClimates(climates.includes(value) ? climates.filter(c => c !== value) : [...climates, value])}
+                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${climates.includes(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                            {label}
+                          </button>
+                          <button type="button" onClick={() => setWaterHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                        </span>
                       ))}
                     </div>
+                    {waterHint && CLIMATE_NOTES[waterHint] && (
+                      <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                        <span className="font-medium text-gray-700">{WATER_TYPES.find(t => t.value === waterHint)?.label} — </span>
+                        {CLIMATE_NOTES[waterHint]}
+                      </div>
+                    )}
                   </div>
                   <button type="button" onClick={() => setEditingProfile(false)} className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2">Done</button>
                 </div>
