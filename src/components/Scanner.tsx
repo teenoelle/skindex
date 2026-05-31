@@ -3974,10 +3974,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               neutral:           "border-teal-500",
             };
             const CONCERN_PILL: Record<ConcernLevel, string> = {
-              universal:         "bg-rose-50 text-rose-700",
-              "profile-matched": "bg-amber-50 text-amber-700",
-              "non-matching":    "bg-gray-100 text-gray-500",
-              neutral:           "bg-teal-50 text-teal-700",
+              universal:         "border border-rose-200 text-rose-600",
+              "profile-matched": "border border-amber-200 text-amber-600",
+              "non-matching":    "border border-gray-200 text-gray-400",
+              neutral:           "border border-teal-200 text-teal-600",
             };
             const GROUP_HEADER_COLOR: Record<ConcernLevel, string> = {
               universal:         "text-rose-700",
@@ -4092,9 +4092,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         </>
                       ) : (benefitLabel || secondaryBenefitLabels.length > 0) ? (
                         <>
-                          {benefitLabel && <span className="text-xs bg-teal-50 text-teal-700 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>}
+                          {benefitLabel && <span className="text-xs border border-teal-200 text-teal-600 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>}
                           {secondaryBenefitLabels.map(sl => (
-                            <span key={sl} className="text-xs bg-teal-50 text-teal-700 rounded-full px-2 py-0.5 shrink-0">{sl}</span>
+                            <span key={sl} className="text-xs border border-teal-200 text-teal-600 rounded-full px-2 py-0.5 shrink-0">{sl}</span>
                           ))}
                         </>
                       ) : null}
