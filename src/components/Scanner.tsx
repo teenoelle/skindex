@@ -946,18 +946,53 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       const st = localStorage.getItem("skindex:skinTypes");
       const cl = localStorage.getItem("skindex:climates");
       const rt = localStorage.getItem("skindex:routine");
-      const il = localStorage.getItem("skindex:ingredientLists");
       if (st) setActiveSkinTypes(new Set(JSON.parse(st) as SkinType[]));
       if (cl) setActiveClimates(new Set(JSON.parse(cl) as ClimateType[]));
       if (rt) setRoutineProducts(JSON.parse(rt) as RoutineProduct[]);
-      if (il) setIngredientLists(JSON.parse(il) as IngredientList[]);
+      // Ingredient lists: guests load from localStorage; signed-in users load from DB below
+      if (!isSignedIn) {
+        const il = localStorage.getItem("skindex:ingredientLists");
+        if (il) setIngredientLists(JSON.parse(il) as IngredientList[]);
+      }
     } catch {}
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load ingredient lists from DB when signed in; migrate from localStorage if DB is empty
+  useEffect(() => {
+    if (!isSignedIn) return;
+    fetch("/api/user-ingredient-lists")
+      .then((r) => r.json())
+      .then(async (d) => {
+        const dbLists: IngredientList[] = d.lists ?? [];
+        if (dbLists.length > 0) {
+          setIngredientLists(dbLists);
+        } else {
+          try {
+            const il = localStorage.getItem("skindex:ingredientLists");
+            const local: IngredientList[] = il ? JSON.parse(il) : [];
+            if (local.length > 0) {
+              const created = await Promise.all(
+                local.map((l) =>
+                  fetch("/api/user-ingredient-lists", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: l.name, type: l.type, items: l.items }),
+                  }).then((r) => r.json()).then((j) => j.list as IngredientList)
+                )
+              );
+              setIngredientLists(created.filter(Boolean));
+            }
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, [isSignedIn]);
 
   useEffect(() => {
     try { localStorage.setItem("skindex:routine", JSON.stringify(routineProducts)); } catch {}
   }, [routineProducts]);
 
+  // Keep localStorage as a local cache (used when signed out on other devices)
   useEffect(() => {
     try { localStorage.setItem("skindex:ingredientLists", JSON.stringify(ingredientLists)); } catch {}
   }, [ingredientLists]);
@@ -1536,6 +1571,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       setUserLists(data.lists ?? []);
       setUserListsLoaded(true);
     }
+  }
+
+  function syncIngredientListItems(listId: string, newItems: string[]) {
+    if (!isSignedIn) return;
+    fetch(`/api/user-ingredient-lists/${listId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: newItems }),
+    }).catch(() => {});
   }
 
   async function addToList(listId: string, listName: string) {
@@ -3306,7 +3350,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       <button type="button" className="text-xs px-2.5 py-1 rounded-lg bg-rose-600 text-white hover:bg-rose-700"
                         onClick={() => {
                           const names = result.flagged.map(f => f.displayName.toLowerCase());
-                          setIngredientLists(ls => ls.map(l => l.id === bulkAddListId ? { ...l, items: [...new Set([...l.items, ...names])] } : l));
+                          const target = ingredientLists.find(l => l.id === bulkAddListId);
+                          const newItems = [...new Set([...(target?.items ?? []), ...names])];
+                          setIngredientLists(ls => ls.map(l => l.id === bulkAddListId ? { ...l, items: newItems } : l));
+                          if (bulkAddListId) syncIngredientListItems(bulkAddListId, newItems);
                           setBulkAddOpen(false);
                           setBulkAddListId(null);
                         }}>
@@ -3865,7 +3912,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                 type="button"
                                 className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-50 rounded-lg flex items-center gap-1.5"
                                 onClick={() => {
-                                  if (!already) setIngredientLists(ls => ls.map(l => l.id === lst.id ? { ...l, items: [...l.items, itemKey] } : l));
+                                  if (!already) {
+                                    const newItems = [...lst.items, itemKey];
+                                    setIngredientLists(ls => ls.map(l => l.id === lst.id ? { ...l, items: newItems } : l));
+                                    syncIngredientListItems(lst.id, newItems);
+                                  }
                                   setAddToListMenu(null);
                                 }}
                               >

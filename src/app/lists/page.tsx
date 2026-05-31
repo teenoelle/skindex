@@ -94,9 +94,6 @@ export default function ListsPage() {
     try {
       const st = localStorage.getItem("skindex:skinTypes");
       if (st) setSkinTypes(JSON.parse(st) as string[]);
-      const il = localStorage.getItem("skindex:ingredientLists");
-      if (il) setIngredientLists(JSON.parse(il) as IngredientList[]);
-
       const parsed = st ? JSON.parse(st) as string[] : [];
       const stParam = parsed.length > 0 ? `?skinTypes=${parsed.join(",")}` : "";
       fetch(`/api/ingredient-lists${stParam}`)
@@ -106,6 +103,46 @@ export default function ListsPage() {
     } catch {}
   }, []);
 
+  // Load ingredient lists — DB when signed in, localStorage for guests
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      try {
+        const il = localStorage.getItem("skindex:ingredientLists");
+        if (il) setIngredientLists(JSON.parse(il) as IngredientList[]);
+      } catch {}
+      return;
+    }
+    fetch("/api/user-ingredient-lists")
+      .then((r) => r.json())
+      .then(async (d) => {
+        const dbLists: IngredientList[] = d.lists ?? [];
+        if (dbLists.length > 0) {
+          setIngredientLists(dbLists);
+        } else {
+          // Migrate any existing localStorage lists to the DB
+          try {
+            const il = localStorage.getItem("skindex:ingredientLists");
+            const local: IngredientList[] = il ? JSON.parse(il) : [];
+            if (local.length > 0) {
+              const created = await Promise.all(
+                local.map((l) =>
+                  fetch("/api/user-ingredient-lists", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: l.name, type: l.type, items: l.items }),
+                  }).then((r) => r.json()).then((j) => j.list as IngredientList)
+                )
+              );
+              setIngredientLists(created.filter(Boolean));
+            }
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, [isLoaded, isSignedIn]);
+
+  // Keep localStorage in sync as a local cache
   useEffect(() => {
     try { localStorage.setItem("skindex:ingredientLists", JSON.stringify(ingredientLists)); } catch {}
   }, [ingredientLists]);
@@ -123,6 +160,20 @@ export default function ListsPage() {
         }));
       }
     }, 180);
+  }
+
+  function dbPatch(id: string, body: Record<string, unknown>) {
+    if (!isSignedIn) return;
+    fetch(`/api/user-ingredient-lists/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+  }
+
+  function dbDelete(id: string) {
+    if (!isSignedIn) return;
+    fetch(`/api/user-ingredient-lists/${id}`, { method: "DELETE" }).catch(() => {});
   }
 
   async function createList() {
@@ -403,13 +454,23 @@ export default function ListsPage() {
 
               {newIngListOpen && (
                 <form
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
                     if (!newIngListName.trim()) return;
-                    setIngredientLists((ls) => [
-                      ...ls,
-                      { id: crypto.randomUUID(), name: newIngListName.trim(), items: [] },
-                    ]);
+                    if (isSignedIn) {
+                      const res = await fetch("/api/user-ingredient-lists", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name: newIngListName.trim() }),
+                      });
+                      const data = await res.json();
+                      if (res.ok) setIngredientLists((ls) => [...ls, data.list]);
+                    } else {
+                      setIngredientLists((ls) => [
+                        ...ls,
+                        { id: crypto.randomUUID(), name: newIngListName.trim(), items: [] },
+                      ]);
+                    }
                     setNewIngListName("");
                     setNewIngListOpen(false);
                   }}
@@ -469,7 +530,10 @@ export default function ListsPage() {
                         <span className="text-sm font-medium text-gray-800 flex-1 leading-snug">{list.name}</span>
                         <span className="text-xs text-gray-400">{list.items.length}</span>
                         <button
-                          onClick={() => setIngredientLists((ls) => ls.filter((l) => l.id !== list.id))}
+                          onClick={() => {
+                            setIngredientLists((ls) => ls.filter((l) => l.id !== list.id));
+                            dbDelete(list.id);
+                          }}
                           className="text-[10px] text-gray-300 hover:text-rose-500 transition-colors"
                         >
                           Delete
@@ -486,13 +550,13 @@ export default function ListsPage() {
                             >
                               {item}
                               <button
-                                onClick={() =>
+                                onClick={() => {
+                                  const newItems = list.items.filter((i) => i !== item);
                                   setIngredientLists((ls) =>
-                                    ls.map((l) =>
-                                      l.id === list.id ? { ...l, items: l.items.filter((i) => i !== item) } : l
-                                    )
-                                  )
-                                }
+                                    ls.map((l) => l.id === list.id ? { ...l, items: newItems } : l)
+                                  );
+                                  dbPatch(list.id, { items: newItems });
+                                }}
                                 className="text-gray-400 hover:text-rose-500 leading-none ml-0.5"
                               >
                                 ×
@@ -520,12 +584,13 @@ export default function ListsPage() {
                               onClick={() => {
                                 const raw = pasteTexts[list.id] ?? "";
                                 const items = raw.split(/[,\n]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
-                                if (items.length > 0)
+                                if (items.length > 0) {
+                                  const newItems = [...new Set([...list.items, ...items])];
                                   setIngredientLists((ls) =>
-                                    ls.map((l) =>
-                                      l.id === list.id ? { ...l, items: [...new Set([...l.items, ...items])] } : l
-                                    )
+                                    ls.map((l) => l.id === list.id ? { ...l, items: newItems } : l)
                                   );
+                                  dbPatch(list.id, { items: newItems });
+                                }
                                 setPasteTexts((m) => ({ ...m, [list.id]: "" }));
                                 setPasteListId(null);
                               }}
@@ -547,9 +612,11 @@ export default function ListsPage() {
                               e.preventDefault();
                               const val = (addItemInputs[list.id] ?? "").trim().toLowerCase();
                               if (!val || list.items.includes(val)) return;
+                              const newItems = [...list.items, val];
                               setIngredientLists((ls) =>
-                                ls.map((l) => l.id === list.id ? { ...l, items: [...l.items, val] } : l)
+                                ls.map((l) => l.id === list.id ? { ...l, items: newItems } : l)
                               );
+                              dbPatch(list.id, { items: newItems });
                               setAddItemInputs((m) => ({ ...m, [list.id]: "" }));
                               setIngSuggestions((m) => ({ ...m, [list.id]: [] }));
                             }}
@@ -579,12 +646,13 @@ export default function ListsPage() {
                                         onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => {
                                           const val = s.toLowerCase();
-                                          if (!list.items.includes(val))
+                                          if (!list.items.includes(val)) {
+                                            const newItems = [...list.items, val];
                                             setIngredientLists((ls) =>
-                                              ls.map((l) =>
-                                                l.id === list.id ? { ...l, items: [...l.items, val] } : l
-                                              )
+                                              ls.map((l) => l.id === list.id ? { ...l, items: newItems } : l)
                                             );
+                                            dbPatch(list.id, { items: newItems });
+                                          }
                                           setAddItemInputs((m) => ({ ...m, [list.id]: "" }));
                                           setIngSuggestions((m) => ({ ...m, [list.id]: [] }));
                                         }}
