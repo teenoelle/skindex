@@ -116,11 +116,12 @@ function detectCombinationWarnings(items: string[], flaggedItems: { flagged_cate
   return warnings;
 }
 
-function detectStepTags(items: string[]): string[] {
+function detectStepTags(items: string[], isRinseOff = false): string[] {
   const joined = items.join(", ").toLowerCase();
   const tags: string[] = [];
-  if (/glycolic acid|lactic acid|mandelic acid|malic acid|salicylic acid/.test(joined)) tags.push("acid-step");
-  if (/\bascorbic acid\b/.test(joined)) tags.push("low-ph-step");
+  // Acid/pH step tags only make sense for leave-on products — suppress for rinse-off
+  if (!isRinseOff && /glycolic acid|lactic acid|mandelic acid|malic acid|salicylic acid/.test(joined)) tags.push("acid-step");
+  if (!isRinseOff && /\bascorbic acid\b/.test(joined)) tags.push("low-ph-step");
   if (/retinol|retinyl|retinaldehyde|tretinoin/.test(joined)) tags.push("retinoid");
   if (/zinc oxide|titanium dioxide/.test(joined)) tags.push("spf-last");
   if (/petrolatum|beeswax|cera alba|cera flava|\bparaffin\b/.test(joined)) tags.push("seal-last");
@@ -819,6 +820,11 @@ export async function POST(req: NextRequest) {
   }
 
   const formula_warnings = detectCombinationWarnings(originalItems, flagged.map((f) => ({ flagged_category: f.ingredient.flagged_category })));
-  const step_tags = detectStepTags(originalItems);
+  let productIsRinseOff = false;
+  if (product?.type) {
+    const { data: ptData } = await supabase.from("product_types").select("is_rinse_off").eq("name", product.type).maybeSingle();
+    productIsRinseOff = ptData?.is_rinse_off ?? false;
+  }
+  const step_tags = detectStepTags(originalItems, productIsRinseOff);
   return NextResponse.json({ product, safe: safeFiltered, flagged, unreviewed, photosensitive, sensoryTrigger, communityVariants, obfVariants, originalItems, isIncomplete, formula_warnings, step_tags });
 }

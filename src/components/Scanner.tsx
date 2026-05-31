@@ -990,7 +990,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [routineProducts, setRoutineProducts] = useState<RoutineProduct[]>([]);
   const [addedToRoutine, setAddedToRoutine] = useState(false);
   const [routinePanelOpen, setRoutinePanelOpen] = useState(false);
-  const [addRoutinePickerOpen, setAddRoutinePickerOpen] = useState(false);
   const [quickListProductId, setQuickListProductId] = useState<string | null>(null);
   const [quickListSaving, setQuickListSaving] = useState<string | null>(null);
   const [quickListNewOpen, setQuickListNewOpen] = useState(false);
@@ -1004,6 +1003,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [supplementHint, setSupplementHint] = useState<ClimateType | null>(null);
   const [dietHint, setDietHint] = useState<ClimateType | null>(null);
   const [hormoneHint, setHormoneHint] = useState<ClimateType | null>(null);
+  const [stepTagHint, setStepTagHint] = useState<string | null>(null);
+  const [routineStepHint, setRoutineStepHint] = useState<string | null>(null);
 
 
   const initialProductIdRef = useRef(initialProductId);
@@ -1760,6 +1761,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setTimeout(() => { setSaveListOpen(false); setSavedTo(null); }, 1800);
   }
 
+  function suggestTimeOfDay(stepTags: string[]): "am" | "pm" | null {
+    if (stepTags.includes("spf-last")) return "am";
+    if (stepTags.includes("retinoid") || stepTags.includes("seal-last")) return "pm";
+    if (stepTags.includes("acid-step")) return "pm";
+    if (stepTags.includes("low-ph-step")) return "am";
+    return null;
+  }
+
   function addToRoutine(timeOfDay?: "am" | "pm" | null) {
     if (!result?.product) return;
     const newEntry: RoutineProduct = {
@@ -1979,7 +1988,24 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               {p.step_tags.map((tag) => {
                 const cfg = STEP_TAG_CONFIG[tag];
                 if (!cfg) return null;
-                return <span key={tag} title={cfg.desc} className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-default ${cfg.className}`}>{cfg.label}</span>;
+                const hintKey = `${p.routineId}-${tag}`;
+                return (
+                  <span key={tag} className="inline-flex items-center gap-0.5">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${cfg.className}`}>{cfg.label}</span>
+                    <button type="button" onClick={() => setRoutineStepHint(h => h === hintKey ? null : hintKey)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none">ⓘ</button>
+                  </span>
+                );
+              })}
+              {p.step_tags.map(tag => {
+                const hintKey = `${p.routineId}-${tag}`;
+                if (routineStepHint !== hintKey) return null;
+                const cfg = STEP_TAG_CONFIG[tag];
+                if (!cfg) return null;
+                return (
+                  <div key={`hint-${hintKey}`} className="w-full mt-0.5 text-[10px] text-gray-600 bg-gray-50 rounded-lg px-2 py-1.5 leading-relaxed border border-gray-100">
+                    <span className="font-medium text-gray-700">{cfg.label} — </span>{cfg.desc}
+                  </div>
+                );
               })}
             </div>
           )}
@@ -1989,7 +2015,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             const tod = p.timeOfDay === "am" ? "pm" : p.timeOfDay === "pm" ? null : "am";
             setRoutineProducts(prev => prev.map(q => q.routineId === p.routineId ? { ...q, timeOfDay: tod } : q));
           }} className="text-[10px] text-gray-400 hover:text-teal-600 border border-gray-200 rounded-full px-1.5 py-0.5 transition-colors">
-            {p.timeOfDay === "am" ? "AM" : p.timeOfDay === "pm" ? "PM" : "—"}
+            {p.timeOfDay === "am" ? "AM" : p.timeOfDay === "pm" ? "PM" : "Both"}
           </button>
           <button type="button" onClick={() => removeFromRoutine(p.routineId)} className="text-[10px] text-gray-300 hover:text-rose-400">Remove</button>
         </div>
@@ -2017,7 +2043,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 <>
                   {renderGroup("AM", amProducts)}
                   {renderGroup("PM", pmProducts)}
-                  {renderGroup("Untagged", untaggedProducts)}
+                  {renderGroup("Both", untaggedProducts)}
                 </>
               ) : (
                 <div className="space-y-2.5">{routineProducts.map(renderProduct)}</div>
@@ -3022,11 +3048,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       const cfg = STEP_TAG_CONFIG[tag];
                       if (!cfg) return null;
                       return (
-                        <span key={tag} title={cfg.desc} className={`text-xs px-2 py-0.5 rounded-full border cursor-default ${cfg.className}`}>
-                          {cfg.label}
+                        <span key={tag} className="inline-flex items-center gap-0.5">
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.className}`}>{cfg.label}</span>
+                          <button type="button" onClick={() => setStepTagHint(h => h === tag ? null : tag)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none">ⓘ</button>
                         </span>
                       );
                     })}
+                    {stepTagHint && STEP_TAG_CONFIG[stepTagHint] && (
+                      <div className="w-full mt-0.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                        <span className="font-medium text-gray-700">{STEP_TAG_CONFIG[stepTagHint].label} — </span>
+                        {STEP_TAG_CONFIG[stepTagHint].desc}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3051,24 +3084,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     if (addedToRoutine) {
                       return <span className="text-xs px-3 py-1 rounded-full border border-teal-600 text-teal-600">Added to routine ✓</span>;
                     }
-                    if (addRoutinePickerOpen) {
-                      return (
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <span className="text-gray-500">Add as:</span>
-                          {(["am", "pm", null] as const).map((t) => (
-                            <button key={String(t)} type="button"
-                              onClick={() => { addToRoutine(t); setAddRoutinePickerOpen(false); }}
-                              className="px-2 py-0.5 rounded-full border border-gray-200 text-gray-600 hover:border-teal-600 hover:text-teal-600 transition-colors"
-                            >{t === "am" ? "AM" : t === "pm" ? "PM" : "Untagged"}</button>
-                          ))}
-                          <button type="button" onClick={() => setAddRoutinePickerOpen(false)} className="text-gray-300 hover:text-gray-500 ml-0.5">✕</button>
-                        </div>
-                      );
-                    }
                     return (
                       <button
                         type="button"
-                        onClick={() => setAddRoutinePickerOpen(true)}
+                        onClick={() => addToRoutine(suggestTimeOfDay(result.step_tags ?? []))}
                         className="text-xs px-3 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-teal-600 hover:text-teal-600 transition-colors"
                       >
                         + Add to routine
