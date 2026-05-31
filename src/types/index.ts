@@ -26,6 +26,7 @@ export type DbIngredient = {
   explanation_structured: ExplanationStructured | null;
   skin_climate_notes: SkinClimateNote[] | null;
   category: string | null;
+  secondary_benefit_categories: string[];
   flagged_category: string | null;
   secondary_flagged_categories: string[];
   structural_category: string | null;

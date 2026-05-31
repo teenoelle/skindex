@@ -46,7 +46,7 @@ function matchesProfile(
   return false;
 }
 
-const SELECT = "id, name, structural_category, explanation, explanation_structured, secondary_flagged_categories";
+const SELECT = "id, name, structural_category, explanation, explanation_structured, secondary_flagged_categories, secondary_benefit_categories";
 
 export async function GET(req: NextRequest) {
   const list = req.nextUrl.searchParams.get("list");
@@ -78,7 +78,10 @@ export async function GET(req: NextRequest) {
         explanation: row.explanation ?? null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         explanation_structured: (row as any).explanation_structured ?? null,
-        secondary_categories: (row.secondary_flagged_categories ?? []) as string[],
+        secondary_categories: (isFlagged
+          ? (row.secondary_flagged_categories ?? [])
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          : ((row as any).secondary_benefit_categories ?? [])) as string[],
       },
     });
   }
@@ -146,7 +149,8 @@ export async function GET(req: NextRequest) {
       explanation: (r.explanation ?? null) as string | null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       explanation_structured: (r as any).explanation_structured ?? null,
-      secondary_categories: [] as string[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      secondary_categories: ((r as any).secondary_benefit_categories ?? []) as string[],
     }));
     const filtered = q ? items.filter(i => i.name.toLowerCase().includes(q)) : items;
     return NextResponse.json({ items: filtered });

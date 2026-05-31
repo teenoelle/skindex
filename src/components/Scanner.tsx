@@ -138,6 +138,16 @@ type IngredientList = { id: string; name: string; type?: "avoid" | "want"; items
 
 const CATEGORY_LABELS: Record<string, string> = {
   // kebab-case (newer workflow)
+  "skin-replenishing":  "Skin-replenishing",
+  "cell-communicating": "Cell-communicating",
+  "wound-healing":      "Wound-healing",
+  "keratolytic":        "Keratolytic",
+  "antifungal":         "Antifungal",
+  "de-puffing":         "De-puffing",
+  "photostabilizer":    "Photostabilizer",
+  "antimicrobial":      "Antimicrobial",
+  "sebum-regulating":   "Sebum-regulating",
+  "chelating":          "Chelating",
   "sensitizer": "Sensitizer",
   "pore-clogger": "Pore-clogger",
   "occlusive": "Occlusive",
@@ -3953,6 +3963,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               const benefitLabel = safeCategory && (safeCategory !== "water-protective" || waterProtectiveActive)
                 ? (CATEGORY_LABELS[safeCategory] ?? safeCategory)
                 : null;
+              const secondaryBenefitLabels = (match?.ingredient.secondary_benefit_categories ?? [])
+                .map(c => CATEGORY_LABELS[c] ?? c)
+                .filter((l, i, arr) => l !== benefitLabel && arr.indexOf(l) === i);
 
               const rawClimateNotes = match?.ingredient.skin_climate_notes;
               const rawNotes: SkinClimateNote[] = Array.isArray(rawClimateNotes) ? rawClimateNotes : [];
@@ -3996,8 +4009,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${CONCERN_PILL["profile-matched"]}`}>{sensoryLabel}</span>
                           )}
                         </>
-                      ) : benefitLabel ? (
-                        <span className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>
+                      ) : (benefitLabel || secondaryBenefitLabels.length > 0) ? (
+                        <>
+                          {benefitLabel && <span className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>}
+                          {secondaryBenefitLabels.map(sl => (
+                            <span key={sl} className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5 shrink-0">{sl}</span>
+                          ))}
+                        </>
                       ) : null}
                     </span>
                     <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
@@ -4090,7 +4108,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           <div className="pl-3 border-l-2 border-teal-500 space-y-0.5">
                             {benefitSentence && (
                               <p className="text-xs text-gray-600 leading-relaxed">
-                                {benefitLabel && <span className="font-semibold text-teal-700">{benefitLabel} — </span>}
+                                {(benefitLabel || secondaryBenefitLabels.length > 0) && (
+                                  <span className="font-semibold text-teal-700">
+                                    {[benefitLabel, ...secondaryBenefitLabels].filter(Boolean).join(", ")} — </span>
+                                )}
                                 {benefitSentence}
                               </p>
                             )}
