@@ -636,7 +636,8 @@ function getIngredientConcernLevel(
   const allFcs = [fc, ...(match?.ingredient.secondary_flagged_categories ?? [])].filter(Boolean);
 
   if (allFcs.some(c => CONCERN_UNIVERSAL_CATEGORIES.has(c))) return "universal";
-  if (photoItem?.sunLevel === "avoid") return "universal";
+  // Position-based photo items (e.g. citric acid) only matter at high concentration — treat as profile, not universal
+  if (photoItem?.sunLevel === "avoid" && !photoItem.isPositionBased) return "universal";
   if (allFcs.includes("sensitizer") && match?.ingredient.structural_category === "Fragrance") return "universal";
 
   const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
@@ -661,7 +662,7 @@ function getIngredientConcernLevel(
     return "non-matching";
   }
 
-  if (photoItem?.sunLevel === "caution") {
+  if (photoItem?.sunLevel === "caution" || (photoItem?.sunLevel === "avoid" && photoItem.isPositionBased)) {
     if (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv")) return "profile-matched";
     return "non-matching";
   }
