@@ -62,6 +62,27 @@ const UNIVERSAL_CATS_SET = new Set([
   "sensitizing preservative", "biocide", "Sulfate Surfactant", "Drying Solvent",
 ]);
 
+const PROFILE_CAT_MAP: Record<string, string[]> = {
+  "pore-clogger":            ["oily","acne_prone","fungal_acne","body_acne","keratosis_pilaris"],
+  "occlusive":               ["oily","acne_prone","fungal_acne","body_acne","keratosis_pilaris"],
+  "bacteria-trap":           ["oily","acne_prone","fungal_acne","body_acne"],
+  "sensitizer":              ["reactive","damaged_barrier","eczema","rosacea","psoriasis"],
+  "fragrance-allergen":      ["reactive","damaged_barrier","eczema","rosacea","psoriasis"],
+  "preservative-allergen":   ["reactive","damaged_barrier","eczema","rosacea","psoriasis"],
+  "sensitizing preservative":["reactive","damaged_barrier","eczema","rosacea","psoriasis"],
+  "formaldehyde releaser":   ["reactive","damaged_barrier","eczema","rosacea","psoriasis"],
+  "biocide":                 ["reactive","damaged_barrier","eczema"],
+  "contact-allergen":        ["reactive","damaged_barrier","eczema"],
+  "Chemical Sunscreen":      ["rosacea","lupus_rash"],
+  "Drying Solvent":          ["dry","damaged_barrier","reactive","rosacea"],
+  "Sulfate Surfactant":      ["dry","damaged_barrier","eczema","psoriasis","rosacea","keratosis_pilaris"],
+  "photo-retinoid":          ["hyperpigmentation_prone","lupus_rash"],
+  "photo-AHA":               ["hyperpigmentation_prone","lupus_rash"],
+  "photo-BHA":               ["hyperpigmentation_prone","lupus_rash"],
+  "photo-brightening":       ["hyperpigmentation_prone","lupus_rash"],
+  "photo-botanical":         ["hyperpigmentation_prone","lupus_rash"],
+};
+
 const UNIVERSAL_GROUPS: { cat: string; label: string; description: string }[] = [
   { cat: "fragrance-allergen",       label: "Fragrance Allergens",       description: "Among the most common causes of contact dermatitis and sensitization, even at trace levels." },
   { cat: "preservative-allergen",    label: "Preservative Allergens",    description: "Preservatives with significant allergenic potential documented across all skin types." },
@@ -118,6 +139,14 @@ const META: Record<string, { title: string; color: string; description: string }
 };
 
 // ── Badge color helper ────────────────────────────────────────────────────────
+
+function isProfileMatched(cat: string, skinTypes: string[], climates: string[]): boolean {
+  const skinTypeSet = new Set(skinTypes);
+  const climateSet = new Set(climates);
+  if (cat === "Drying Solvent" && (skinTypeSet.has("rosacea") || climateSet.has("heavy_metal_water"))) return true;
+  if (["photo-retinoid","photo-AHA","photo-BHA","photo-brightening","photo-botanical"].includes(cat) && climateSet.has("high_uv")) return true;
+  return (PROFILE_CAT_MAP[cat] ?? []).some(pt => skinTypeSet.has(pt));
+}
 
 function catBadgeColor(cat: string, isSafePage: boolean): string {
   if (!cat) return "bg-gray-100 text-gray-500";
@@ -236,8 +265,8 @@ export default function BuiltInListPage() {
       .then(d => {
         const newItems: Item[] = d.items ?? [];
         setItems(newItems);
-        // Non-my-sensitivities pages start expanded; my-sensitivities starts collapsed
-        if (slug !== "my-sensitivities") {
+        // Only neutral-beneficial starts expanded; concern lists start collapsed
+        if (slug === "neutral-beneficial") {
           setExpandedGroups(new Set(newItems.map(i => i.category)));
         }
         setLoading(false);
@@ -438,17 +467,38 @@ export default function BuiltInListPage() {
                                   )}
 
                                   {/* Concern */}
-                                  {!isSafePage && (structured?.concern_items?.length || structured?.concern || (!structured && item.explanation)) && (
-                                    <div className={`pl-3 border-l-2 ${concernBorder} space-y-1`}>
-                                      {structured?.concern_items ? structured.concern_items.map(ci => (
-                                        <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
-                                      )) : structured?.concern ? (
-                                        <p className="text-xs text-gray-600 leading-relaxed">{structured.concern}</p>
-                                      ) : (
-                                        <p className="text-xs text-gray-600 leading-relaxed">{item.explanation}</p>
-                                      )}
-                                    </div>
-                                  )}
+                                  {!isSafePage && (() => {
+                                    const isUniversalPage = slug === "universal-concerns";
+                                    const universalItems = isUniversalPage && structured?.concern_items
+                                      ? structured.concern_items.filter(ci => UNIVERSAL_CATS_SET.has(ci.category))
+                                      : structured?.concern_items ?? [];
+                                    const profileItems = isUniversalPage && hasProfile && structured?.concern_items
+                                      ? structured.concern_items.filter(ci => !UNIVERSAL_CATS_SET.has(ci.category) && isProfileMatched(ci.category, skinTypes, climates))
+                                      : [];
+                                    const showUniversal = universalItems.length > 0 || structured?.concern || (!structured && item.explanation);
+                                    return (
+                                      <>
+                                        {showUniversal && (
+                                          <div className={`pl-3 border-l-2 ${concernBorder} space-y-1`}>
+                                            {structured?.concern_items ? universalItems.map(ci => (
+                                              <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
+                                            )) : structured?.concern ? (
+                                              <p className="text-xs text-gray-600 leading-relaxed">{structured.concern}</p>
+                                            ) : (
+                                              <p className="text-xs text-gray-600 leading-relaxed">{item.explanation}</p>
+                                            )}
+                                          </div>
+                                        )}
+                                        {profileItems.length > 0 && (
+                                          <div className="pl-3 border-l-2 border-amber-500 space-y-1">
+                                            {profileItems.map(ci => (
+                                              <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
 
                                   {/* Safe plain explanation fallback */}
                                   {isSafePage && !structured && item.explanation && (
