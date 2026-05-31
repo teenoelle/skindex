@@ -3867,10 +3867,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               neutral:           "border-teal-500",
             };
             const CONCERN_PILL: Record<ConcernLevel, string> = {
-              universal:         "bg-rose-50 text-rose-700",
-              "profile-matched": "bg-amber-50 text-amber-700",
-              "non-matching":    "bg-yellow-50 text-yellow-700",
-              neutral:           "bg-teal-50 text-teal-700",
+              universal:         "bg-rose-100 text-rose-800",
+              "profile-matched": "bg-amber-100 text-amber-800",
+              "non-matching":    "bg-yellow-100 text-yellow-800",
+              neutral:           "bg-teal-100 text-teal-800",
             };
             const GROUP_HEADER_COLOR: Record<ConcernLevel, string> = {
               universal:         "text-rose-700",
@@ -3974,7 +3974,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           })}
                         </>
                       ) : benefitLabel ? (
-                        <span className="text-xs bg-teal-50 text-teal-700 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>
+                        <span className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>
                       ) : null}
                     </span>
                     <span className="shrink-0 ml-2 text-gray-300 text-xs">{isOpen ? "▲" : "▼"}</span>
@@ -4061,13 +4061,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         return (
                           <div className="pl-3 border-l-2 border-teal-500 space-y-0.5">
                             {benefitSentence && (
-                              <p className="text-xs text-teal-700 leading-relaxed">{benefitSentence}</p>
+                              <p className="text-xs text-gray-600 leading-relaxed">{benefitSentence}</p>
                             )}
                             {benefitNote && (
-                              <p className="text-xs text-teal-700 leading-relaxed">{benefitNote}</p>
+                              <p className="text-xs text-gray-600 leading-relaxed">{benefitNote}</p>
                             )}
                             {benefitNotes.map((note, i) => (
-                              <p key={i} className="text-xs text-teal-700 leading-relaxed">
+                              <p key={i} className="text-xs text-gray-600 leading-relaxed">
                                 {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
                                 {note.text}
                               </p>

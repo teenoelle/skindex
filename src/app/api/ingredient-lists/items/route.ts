@@ -46,7 +46,7 @@ function matchesProfile(
   return false;
 }
 
-const SELECT = "id, name, structural_category, explanation, secondary_flagged_categories";
+const SELECT = "id, name, structural_category, explanation, explanation_structured, secondary_flagged_categories";
 
 export async function GET(req: NextRequest) {
   const list = req.nextUrl.searchParams.get("list");
@@ -56,6 +56,32 @@ export async function GET(req: NextRequest) {
   const climates = climatesParam ? climatesParam.split(",").filter(Boolean) : [];
   const isRinseOff = req.nextUrl.searchParams.get("rinseOff") === "true";
   const q = req.nextUrl.searchParams.get("q")?.trim().toLowerCase() ?? "";
+
+  if (list === "lookup") {
+    const name = req.nextUrl.searchParams.get("name") ?? "";
+    if (!name) return NextResponse.json({ item: null });
+    const { data } = await supabase
+      .from("ingredients")
+      .select(`${SELECT}, flagged_category, category, status`)
+      .ilike("name", name)
+      .limit(1);
+    const row = data?.[0];
+    if (!row) return NextResponse.json({ item: null });
+    const isFlagged = row.status === "flagged";
+    return NextResponse.json({
+      item: {
+        id: row.id,
+        name: row.name,
+        status: row.status,
+        category: (isFlagged ? row.flagged_category : row.category) ?? "",
+        structural_category: row.structural_category ?? null,
+        explanation: row.explanation ?? null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        explanation_structured: (row as any).explanation_structured ?? null,
+        secondary_categories: (row.secondary_flagged_categories ?? []) as string[],
+      },
+    });
+  }
 
   if (list === "universal-concerns") {
     const { data } = await supabase
@@ -69,6 +95,8 @@ export async function GET(req: NextRequest) {
       category: (r.flagged_category ?? "") as string,
       structural_category: (r.structural_category ?? null) as string | null,
       explanation: (r.explanation ?? null) as string | null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      explanation_structured: (r as any).explanation_structured ?? null,
       secondary_categories: (r.secondary_flagged_categories ?? []) as string[],
     }));
     const filtered = q ? items.filter(i => i.name.toLowerCase().includes(q)) : items;
@@ -96,6 +124,8 @@ export async function GET(req: NextRequest) {
         category: (r.flagged_category ?? "") as string,
         structural_category: (r.structural_category ?? null) as string | null,
         explanation: (r.explanation ?? null) as string | null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        explanation_structured: (r as any).explanation_structured ?? null,
         secondary_categories: (r.secondary_flagged_categories ?? []) as string[],
       }));
     const filtered = q ? items.filter(i => i.name.toLowerCase().includes(q)) : items;
@@ -114,6 +144,8 @@ export async function GET(req: NextRequest) {
       category: (r.category ?? "") as string,
       structural_category: (r.structural_category ?? null) as string | null,
       explanation: (r.explanation ?? null) as string | null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      explanation_structured: (r as any).explanation_structured ?? null,
       secondary_categories: [] as string[],
     }));
     const filtered = q ? items.filter(i => i.name.toLowerCase().includes(q)) : items;

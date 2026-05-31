@@ -20,6 +20,22 @@ type IngredientList = {
   items: string[];
 };
 
+type IngDetailItem = {
+  id: string;
+  name: string;
+  status: string;
+  category: string;
+  structural_category: string | null;
+  explanation: string | null;
+  explanation_structured: {
+    formula_role: string | null;
+    benefit: string | null;
+    concern: string | null;
+    concern_items?: { category: string; text: string }[] | null;
+  } | null;
+  secondary_categories: string[];
+};
+
 type Tab = "products" | "ingredients";
 
 const SKIN_TYPE_LABELS: Record<string, string> = {
@@ -116,6 +132,32 @@ export default function ListsPage() {
   const [pasteListId, setPasteListId] = useState<string | null>(null);
   const [pasteTexts, setPasteTexts] = useState<Record<string, string>>({});
   const suggestDebounce = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Ingredient detail expansion in user lists
+  const [expandedIngredients, setExpandedIngredients] = useState<Set<string>>(new Set());
+  const [ingredientCache, setIngredientCache] = useState<Map<string, IngDetailItem | null>>(new Map());
+  const [ingredientFetching, setIngredientFetching] = useState<Set<string>>(new Set());
+
+  function toggleIngredientExpand(name: string) {
+    setExpandedIngredients(prev => {
+      const s = new Set(prev);
+      s.has(name) ? s.delete(name) : s.add(name);
+      return s;
+    });
+    if (!ingredientCache.has(name) && !ingredientFetching.has(name)) {
+      setIngredientFetching(prev => new Set([...prev, name]));
+      fetch(`/api/ingredient-lists/items?list=lookup&name=${encodeURIComponent(name)}`)
+        .then(r => r.json())
+        .then(d => {
+          setIngredientCache(prev => new Map([...prev, [name, d.item ?? null]]));
+          setIngredientFetching(prev => { const s = new Set(prev); s.delete(name); return s; });
+        })
+        .catch(() => {
+          setIngredientCache(prev => new Map([...prev, [name, null]]));
+          setIngredientFetching(prev => { const s = new Set(prev); s.delete(name); return s; });
+        });
+    }
+  }
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) { setLoading(false); return; }
@@ -374,7 +416,7 @@ export default function ListsPage() {
                 <span key={st} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{SKIN_TYPE_LABELS[st] ?? st}</span>
               ))}
               {climates.filter(c => CLIMATE_WATER_VALUES.has(c)).map((c) => (
-                <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
                   {[...CLIMATE_TYPES, ...WATER_TYPES].find(t => t.value === c)?.label ?? c}
                 </span>
               ))}
@@ -730,27 +772,90 @@ export default function ListsPage() {
 
                       {/* Ingredient chips */}
                       {list.items.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {list.items.map((item) => (
-                            <span
-                              key={item}
-                              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600"
-                            >
-                              {item}
-                              <button
-                                onClick={() => {
-                                  const newItems = list.items.filter((i) => i !== item);
-                                  setIngredientLists((ls) =>
-                                    ls.map((l) => l.id === list.id ? { ...l, items: newItems } : l)
-                                  );
-                                  dbPatch(list.id, { items: newItems });
-                                }}
-                                className="text-gray-400 hover:text-rose-500 leading-none ml-0.5"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
+                        <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                          {list.items.map((item) => {
+                            const isExpanded = expandedIngredients.has(item);
+                            const detail = ingredientCache.get(item);
+                            const isFetching = ingredientFetching.has(item);
+                            const structured = detail?.explanation_structured ?? null;
+                            const isFlagged = detail?.status === "flagged";
+                            const isUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide","Sulfate Surfactant","Drying Solvent"].includes(detail?.category ?? "");
+                            const concernBorder = isUniversal ? "border-rose-500" : "border-amber-500";
+                            return (
+                              <div key={item}>
+                                <div className="flex items-center px-3 py-2 hover:bg-gray-50 transition-colors">
+                                  <button type="button" onClick={() => toggleIngredientExpand(item)} className="flex-1 text-left text-xs text-gray-800 leading-snug">{item}</button>
+                                  <button
+                                    onClick={() => {
+                                      const newItems = list.items.filter((i) => i !== item);
+                                      setIngredientLists((ls) => ls.map((l) => l.id === list.id ? { ...l, items: newItems } : l));
+                                      dbPatch(list.id, { items: newItems });
+                                    }}
+                                    className="text-gray-300 hover:text-rose-400 leading-none px-1.5 text-sm shrink-0"
+                                  >×</button>
+                                  <span onClick={() => toggleIngredientExpand(item)} className="text-gray-300 text-[9px] cursor-pointer shrink-0">{isExpanded ? "▲" : "▼"}</span>
+                                </div>
+                                {isExpanded && (
+                                  <div className="px-3 pb-3 pt-2 bg-gray-50 border-t border-gray-100 space-y-2">
+                                    {isFetching ? (
+                                      <p className="text-xs text-gray-400 italic">Loading…</p>
+                                    ) : !detail ? (
+                                      <p className="text-xs text-gray-400 italic">Not found in database.</p>
+                                    ) : (
+                                      <>
+                                        {/* Category badges */}
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {detail.structural_category && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{detail.structural_category}</span>
+                                          )}
+                                          {detail.category && (
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-full ${isUniversal ? "bg-rose-100 text-rose-800" : isFlagged ? "bg-amber-100 text-amber-800" : "bg-teal-100 text-teal-800"}`}>{detail.category}</span>
+                                          )}
+                                          {detail.secondary_categories.map(sc => {
+                                            const scUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide","Sulfate Surfactant","Drying Solvent"].includes(sc);
+                                            return <span key={sc} className={`text-[10px] px-2 py-0.5 rounded-full ${scUniversal ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"}`}>{sc}</span>;
+                                          })}
+                                        </div>
+                                        {/* Formula role */}
+                                        {structured?.formula_role && (
+                                          <div className="pl-3 border-l-2 border-gray-300">
+                                            <p className="text-xs text-gray-500 leading-relaxed">{structured.formula_role}</p>
+                                          </div>
+                                        )}
+                                        {/* Benefit */}
+                                        {structured?.benefit && (
+                                          <div className="pl-3 border-l-2 border-teal-500">
+                                            <p className="text-xs text-gray-600 leading-relaxed">{structured.benefit}</p>
+                                          </div>
+                                        )}
+                                        {/* Concern */}
+                                        {isFlagged && (structured?.concern_items?.length || structured?.concern || (!structured && detail.explanation)) && (
+                                          <div className={`pl-3 border-l-2 ${concernBorder} space-y-1`}>
+                                            {structured?.concern_items ? structured.concern_items.map(ci => (
+                                              <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
+                                            )) : structured?.concern ? (
+                                              <p className="text-xs text-gray-600 leading-relaxed">{structured.concern}</p>
+                                            ) : (
+                                              <p className="text-xs text-gray-600 leading-relaxed">{detail.explanation}</p>
+                                            )}
+                                          </div>
+                                        )}
+                                        {/* Safe plain explanation fallback */}
+                                        {!isFlagged && !structured && detail.explanation && (
+                                          <div className="pl-3 border-l-2 border-gray-300">
+                                            <p className="text-xs text-gray-600 leading-relaxed">{detail.explanation}</p>
+                                          </div>
+                                        )}
+                                        {!structured && !detail.explanation && (
+                                          <p className="text-xs text-gray-400 italic">No explanation available yet.</p>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
 
