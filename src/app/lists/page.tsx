@@ -803,47 +803,55 @@ export default function ListsPage() {
                                       <p className="text-xs text-gray-400 italic">Not found in database.</p>
                                     ) : (
                                       <>
-                                        {/* Category badges */}
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {detail.structural_category && (
-                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{detail.structural_category}</span>
-                                          )}
-                                          {detail.category && (
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full ${isUniversal ? "bg-rose-100 text-rose-800" : isFlagged ? "bg-amber-100 text-amber-800" : "bg-teal-100 text-teal-800"}`}>{detail.category}</span>
-                                          )}
-                                          {detail.secondary_categories.map(sc => {
-                                            const scUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide","Sulfate Surfactant","Drying Solvent"].includes(sc);
-                                            return <span key={sc} className={`text-[10px] px-2 py-0.5 rounded-full ${scUniversal ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"}`}>{sc}</span>;
-                                          })}
-                                        </div>
-                                        {/* Formula role */}
+                                        {/* Formula role — bold dark-gray label, gray text */}
                                         {structured?.formula_role && (
                                           <div className="pl-3 border-l-2 border-gray-300">
-                                            <p className="text-xs text-gray-500 leading-relaxed">{structured.formula_role}</p>
+                                            <p className="text-xs text-gray-500 leading-relaxed">
+                                              {detail.structural_category && <span className="font-semibold text-gray-700">{detail.structural_category} — </span>}
+                                              {structured.formula_role}
+                                            </p>
                                           </div>
                                         )}
-                                        {/* Benefit */}
+                                        {/* Benefit — bold dark-teal label, gray text */}
                                         {structured?.benefit && (
                                           <div className="pl-3 border-l-2 border-teal-500">
-                                            <p className="text-xs text-gray-600 leading-relaxed">{structured.benefit}</p>
+                                            <p className="text-xs text-gray-600 leading-relaxed">
+                                              {!isFlagged && detail.category && <span className="font-semibold text-teal-700">{detail.category} — </span>}
+                                              {structured.benefit}
+                                            </p>
                                           </div>
                                         )}
-                                        {/* Concern */}
+                                        {/* Concern — bold rose (universal) or amber label, gray text */}
                                         {isFlagged && (structured?.concern_items?.length || structured?.concern || (!structured && detail.explanation)) && (
                                           <div className={`pl-3 border-l-2 ${concernBorder} space-y-1`}>
-                                            {structured?.concern_items ? structured.concern_items.map(ci => (
-                                              <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
-                                            )) : structured?.concern ? (
-                                              <p className="text-xs text-gray-600 leading-relaxed">{structured.concern}</p>
+                                            {structured?.concern_items ? structured.concern_items.map(ci => {
+                                              const ciUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide","Sulfate Surfactant","Drying Solvent"].includes(ci.category);
+                                              return (
+                                                <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
+                                                  <span className={`font-semibold ${ciUniversal ? "text-rose-700" : "text-amber-700"}`}>{ci.category} — </span>
+                                                  {ci.text}
+                                                </p>
+                                              );
+                                            }) : structured?.concern ? (
+                                              <p className="text-xs text-gray-600 leading-relaxed">
+                                                {detail.category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{detail.category} — </span>}
+                                                {structured.concern}
+                                              </p>
                                             ) : (
-                                              <p className="text-xs text-gray-600 leading-relaxed">{detail.explanation}</p>
+                                              <p className="text-xs text-gray-600 leading-relaxed">
+                                                {detail.category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{detail.category} — </span>}
+                                                {detail.explanation}
+                                              </p>
                                             )}
                                           </div>
                                         )}
                                         {/* Safe plain explanation fallback */}
                                         {!isFlagged && !structured && detail.explanation && (
                                           <div className="pl-3 border-l-2 border-gray-300">
-                                            <p className="text-xs text-gray-600 leading-relaxed">{detail.explanation}</p>
+                                            <p className="text-xs text-gray-600 leading-relaxed">
+                                              {detail.structural_category && <span className="font-semibold text-gray-700">{detail.structural_category} — </span>}
+                                              {detail.explanation}
+                                            </p>
                                           </div>
                                         )}
                                         {!structured && !detail.explanation && (

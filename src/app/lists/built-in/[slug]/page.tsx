@@ -454,33 +454,29 @@ export default function BuiltInListPage() {
                               {/* Expanded detail — inline category label chips at start of each paragraph */}
                               {isExpanded && (
                                 <div className="px-4 pb-3 pt-2 bg-gray-50 border-t border-gray-100 space-y-2">
-                                  {/* Formula role — gray label + gray text */}
+                                  {/* Formula role — bold dark-gray label, gray text */}
                                   {structured?.formula_role && (
                                     <div className="pl-3 border-l-2 border-gray-300">
-                                      <div className="flex items-start gap-1.5">
-                                        {item.structural_category && (
-                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 shrink-0 mt-0.5">{item.structural_category}</span>
-                                        )}
-                                        <p className="text-xs text-gray-500 leading-relaxed">{structured.formula_role}</p>
-                                      </div>
+                                      <p className="text-xs text-gray-500 leading-relaxed">
+                                        {item.structural_category && <span className="font-semibold text-gray-700">{item.structural_category} — </span>}
+                                        {structured.formula_role}
+                                      </p>
                                     </div>
                                   )}
 
-                                  {/* Benefit — teal label + gray text */}
+                                  {/* Benefit — bold dark-teal label, gray text */}
                                   {structured?.benefit && (
                                     <div className="pl-3 border-l-2 border-teal-500">
-                                      <div className="flex items-start gap-1.5">
+                                      <p className="text-xs text-gray-600 leading-relaxed">
                                         {isSafePage && item.category && (
-                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-800 shrink-0 mt-0.5">
-                                            {BENEFIT_GROUP[item.category]?.label ?? item.category}
-                                          </span>
+                                          <span className="font-semibold text-teal-700">{BENEFIT_GROUP[item.category]?.label ?? item.category} — </span>
                                         )}
-                                        <p className="text-xs text-gray-600 leading-relaxed">{structured.benefit}</p>
-                                      </div>
+                                        {structured.benefit}
+                                      </p>
                                     </div>
                                   )}
 
-                                  {/* Concern — rose (universal) or amber (profile) label + gray text */}
+                                  {/* Concern — bold dark-rose (universal) or dark-amber (profile) label, gray text */}
                                   {!isSafePage && (() => {
                                     const isUniversalPage = slug === "universal-concerns";
                                     const universalItems = isUniversalPage && structured?.concern_items
@@ -493,35 +489,28 @@ export default function BuiltInListPage() {
                                     return (
                                       <>
                                         {showUniversal && (
-                                          <div className={`pl-3 border-l-2 ${concernBorder} space-y-1.5`}>
+                                          <div className={`pl-3 border-l-2 ${concernBorder} space-y-1`}>
                                             {structured?.concern_items ? universalItems.map(ci => (
-                                              <div key={ci.category} className="flex items-start gap-1.5">
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${catBadgeColor(ci.category, false)}`}>
-                                                  {getCategoryLabel(ci.category)}
-                                                </span>
-                                                <p className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
-                                              </div>
+                                              <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
+                                                <span className={`font-semibold ${UNIVERSAL_CATS_SET.has(ci.category) ? "text-rose-700" : "text-amber-700"}`}>
+                                                  {getCategoryLabel(ci.category)} — </span>
+                                                {ci.text}
+                                              </p>
                                             )) : (
-                                              <div className="flex items-start gap-1.5">
-                                                {item.category && (
-                                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${catBadgeColor(item.category, false)}`}>
-                                                    {getCategoryLabel(item.category)}
-                                                  </span>
-                                                )}
-                                                <p className="text-xs text-gray-600 leading-relaxed">{structured?.concern ?? item.explanation}</p>
-                                              </div>
+                                              <p className="text-xs text-gray-600 leading-relaxed">
+                                                {item.category && <span className="font-semibold text-rose-700">{getCategoryLabel(item.category)} — </span>}
+                                                {structured?.concern ?? item.explanation}
+                                              </p>
                                             )}
                                           </div>
                                         )}
                                         {profileItems.length > 0 && (
-                                          <div className="pl-3 border-l-2 border-amber-500 space-y-1.5">
+                                          <div className="pl-3 border-l-2 border-amber-500 space-y-1">
                                             {profileItems.map(ci => (
-                                              <div key={ci.category} className="flex items-start gap-1.5">
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 bg-amber-100 text-amber-800">
-                                                  {getCategoryLabel(ci.category)}
-                                                </span>
-                                                <p className="text-xs text-gray-600 leading-relaxed">{ci.text}</p>
-                                              </div>
+                                              <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
+                                                <span className="font-semibold text-amber-700">{getCategoryLabel(ci.category)} — </span>
+                                                {ci.text}
+                                              </p>
                                             ))}
                                           </div>
                                         )}
@@ -532,12 +521,10 @@ export default function BuiltInListPage() {
                                   {/* Safe plain explanation fallback */}
                                   {isSafePage && !structured && item.explanation && (
                                     <div className="pl-3 border-l-2 border-gray-300">
-                                      <div className="flex items-start gap-1.5">
-                                        {item.structural_category && (
-                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 shrink-0 mt-0.5">{item.structural_category}</span>
-                                        )}
-                                        <p className="text-xs text-gray-600 leading-relaxed">{item.explanation}</p>
-                                      </div>
+                                      <p className="text-xs text-gray-600 leading-relaxed">
+                                        {item.structural_category && <span className="font-semibold text-gray-700">{item.structural_category} — </span>}
+                                        {item.explanation}
+                                      </p>
                                     </div>
                                   )}
 
