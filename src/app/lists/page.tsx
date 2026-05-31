@@ -50,24 +50,27 @@ const CLIMATE_WATER_VALUES = new Set([...CLIMATE_TYPES, ...WATER_TYPES].map(t =>
 const SMART_LISTS = [
   {
     id: "universal-concerns",
-    name: "Avoid: Universal Concerns",
+    name: "Universal Concerns",
     description: "Contact allergens, biocides, sulfate surfactants, and drying solvents flagged for all skin types.",
-    type: "avoid" as const,
   },
   {
     id: "my-sensitivities",
-    name: "Avoid: My Sensitivities",
-    description: "Ingredients flagged specifically for your skin profile. Update your profile on the home page to change this list.",
-    type: "avoid" as const,
+    name: "My Sensitivities",
+    description: "Ingredients flagged specifically for your skin profile.",
     requiresProfile: true,
   },
   {
     id: "neutral-beneficial",
-    name: "Want: Neutral & Beneficial",
-    description: "All reviewed-safe ingredients — both neutral (no category) and beneficial (positive category). Profile-filtered to hide anything that conflicts with your skin types.",
-    type: "want" as const,
+    name: "Neutral & Beneficial",
+    description: "All reviewed-safe ingredients — both neutral (no category) and beneficial (positive category).",
   },
 ];
+
+const SMART_LIST_COLOR: Record<string, string> = {
+  "universal-concerns": "text-rose-700",
+  "my-sensitivities":   "text-amber-700",
+  "neutral-beneficial": "text-teal-700",
+};
 
 export default function ListsPage() {
   const { isSignedIn, isLoaded } = useUser();
@@ -84,6 +87,11 @@ export default function ListsPage() {
   const [skinTypes, setSkinTypes] = useState<string[]>([]);
   const [climates, setClimates] = useState<string[]>([]);
   const [editingProfile, setEditingProfile] = useState(false);
+
+  // Built-in list UI
+  const [builtInOpen, setBuiltInOpen] = useState(true);
+  const [rinseOff, setRinseOff] = useState(false);
+  const rinseOffMounted = useRef(false);
 
   // Ingredient list actions
   const [editingListId, setEditingListId] = useState<string | null>(null);
@@ -114,6 +122,34 @@ export default function ListsPage() {
     fetch("/api/lists").then((r) => r.json()).then((d) => { setLists(d.lists ?? []); setLoading(false); });
   }, [isLoaded, isSignedIn]);
 
+  function fetchSmartCounts(skinTypeArr: string[], climateArr: string[], isRinseOff: boolean) {
+    const skinTypeSet = new Set(skinTypeArr);
+    const climateSet = new Set(climateArr);
+    const cats = new Set<string>();
+    if (skinTypeSet.has("acne_prone") || skinTypeSet.has("oily") || skinTypeSet.has("fungal_acne") || skinTypeSet.has("body_acne") || skinTypeSet.has("keratosis_pilaris"))
+      ["pore-clogger", "occlusive", "bacteria-trap"].forEach(c => cats.add(c));
+    if (skinTypeSet.has("reactive") || skinTypeSet.has("damaged_barrier") || skinTypeSet.has("eczema") || skinTypeSet.has("rosacea") || skinTypeSet.has("psoriasis"))
+      cats.add("sensitizer");
+    if (skinTypeSet.has("reactive") || skinTypeSet.has("damaged_barrier") || skinTypeSet.has("eczema"))
+      cats.add("fragrance-allergen");
+    if (skinTypeSet.has("rosacea") || skinTypeSet.has("lupus_rash"))
+      cats.add("Chemical Sunscreen");
+    if (skinTypeSet.has("hyperpigmentation_prone") || skinTypeSet.has("lupus_rash") || climateSet.has("high_uv"))
+      ["photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical"].forEach(c => cats.add(c));
+    if (skinTypeSet.has("rosacea") || climateSet.has("heavy_metal_water"))
+      cats.add("Drying Solvent");
+    const params = new URLSearchParams();
+    if (skinTypeArr.length) params.set("skinTypes", skinTypeArr.join(","));
+    if (climateArr.length) params.set("climates", climateArr.join(","));
+    if (cats.size) params.set("concerns", [...cats].join(","));
+    if (isRinseOff) params.set("rinseOff", "true");
+    const qs = params.toString();
+    fetch(`/api/ingredient-lists${qs ? `?${qs}` : ""}`)
+      .then((r) => r.json())
+      .then((d) => setSmartCounts(d))
+      .catch(() => {});
+  }
+
   useEffect(() => {
     try {
       const st = localStorage.getItem("skindex:skinTypes");
@@ -122,34 +158,21 @@ export default function ListsPage() {
       const parsedClimates = cl ? JSON.parse(cl) as string[] : [];
       if (parsedSkinTypes.length) setSkinTypes(parsedSkinTypes);
       if (parsedClimates.length) setClimates(parsedClimates);
-
-      const skinTypeSet = new Set(parsedSkinTypes);
-      const climateSet = new Set(parsedClimates);
-      const cats = new Set<string>();
-      if (skinTypeSet.has("acne_prone") || skinTypeSet.has("oily") || skinTypeSet.has("fungal_acne") || skinTypeSet.has("body_acne") || skinTypeSet.has("keratosis_pilaris"))
-        ["pore-clogger", "occlusive", "bacteria-trap"].forEach(c => cats.add(c));
-      if (skinTypeSet.has("reactive") || skinTypeSet.has("damaged_barrier") || skinTypeSet.has("eczema") || skinTypeSet.has("rosacea") || skinTypeSet.has("psoriasis"))
-        cats.add("sensitizer");
-      if (skinTypeSet.has("reactive") || skinTypeSet.has("damaged_barrier") || skinTypeSet.has("eczema"))
-        cats.add("fragrance-allergen");
-      if (skinTypeSet.has("rosacea") || skinTypeSet.has("lupus_rash"))
-        cats.add("Chemical Sunscreen");
-      if (skinTypeSet.has("hyperpigmentation_prone") || skinTypeSet.has("lupus_rash") || climateSet.has("high_uv"))
-        ["photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical"].forEach(c => cats.add(c));
-      if (skinTypeSet.has("rosacea") || climateSet.has("heavy_metal_water"))
-        cats.add("Drying Solvent");
-
-      const params = new URLSearchParams();
-      if (parsedSkinTypes.length) params.set("skinTypes", parsedSkinTypes.join(","));
-      if (parsedClimates.length) params.set("climates", parsedClimates.join(","));
-      if (cats.size) params.set("concerns", [...cats].join(","));
-      const qs = params.toString();
-      fetch(`/api/ingredient-lists${qs ? `?${qs}` : ""}`)
-        .then((r) => r.json())
-        .then((d) => setSmartCounts(d))
-        .catch(() => {});
+      fetchSmartCounts(parsedSkinTypes, parsedClimates, false);
     } catch {}
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch when rinse-off is toggled
+  useEffect(() => {
+    if (!rinseOffMounted.current) { rinseOffMounted.current = true; return; }
+    try {
+      const st = localStorage.getItem("skindex:skinTypes");
+      const cl = localStorage.getItem("skindex:climates");
+      const parsedSkinTypes = st ? JSON.parse(st) as string[] : [];
+      const parsedClimates = cl ? JSON.parse(cl) as string[] : [];
+      fetchSmartCounts(parsedSkinTypes, parsedClimates, rinseOff);
+    } catch {}
+  }, [rinseOff]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load ingredient lists — DB when signed in, localStorage for guests
   useEffect(() => {
@@ -482,44 +505,61 @@ export default function ListsPage() {
           <div className="space-y-6">
             {/* Smart lists */}
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Built-in</p>
-              <div className="space-y-2">
-                {SMART_LISTS.map((sl) => {
-                const count = sl.id === "universal-concerns" ? smartCounts?.universalConcerns.count
-                  : sl.id === "my-sensitivities" ? smartCounts?.mySensitivities?.count
-                  : sl.id === "neutral-beneficial" ? smartCounts?.neutralBeneficial.count
-                  : undefined;
-                return (
-                  <div key={sl.id} className="border border-gray-200 rounded-xl px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
-                            sl.type === "avoid" ? "bg-rose-50 text-rose-700" : "bg-teal-50 text-teal-700"
-                          }`}>
-                            {sl.type === "avoid" ? "Avoid" : "Want"}
-                          </span>
-                          <p className="text-sm font-medium text-gray-900 leading-snug">{sl.name}</p>
+              <button
+                type="button"
+                onClick={() => setBuiltInOpen(v => !v)}
+                className="flex items-center gap-2 w-full mb-3"
+              >
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Built-in</p>
+                <span className="text-xs text-gray-300 ml-auto">{builtInOpen ? "▲" : "▼"}</span>
+              </button>
+              {builtInOpen && (
+                <div className="space-y-2">
+                  {SMART_LISTS.map((sl) => {
+                    const count = sl.id === "universal-concerns" ? smartCounts?.universalConcerns.count
+                      : sl.id === "my-sensitivities" ? smartCounts?.mySensitivities?.count
+                      : sl.id === "neutral-beneficial" ? smartCounts?.neutralBeneficial.count
+                      : undefined;
+                    const hasProfile = skinTypes.length > 0 || climates.filter(c => CLIMATE_WATER_VALUES.has(c)).length > 0;
+                    return (
+                      <div key={sl.id} className="border border-gray-200 rounded-xl px-4 py-3 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <Link href={`/lists/built-in/${sl.id}`} className={`text-sm font-medium leading-snug hover:underline underline-offset-2 ${SMART_LIST_COLOR[sl.id]}`}>{sl.name}</Link>
                           {count !== undefined && (
-                            <span className="text-[10px] text-gray-400 ml-auto shrink-0">{count.toLocaleString()} ingredients</span>
+                            <span className="text-[10px] text-gray-400 ml-auto shrink-0">{count.toLocaleString()}</span>
                           )}
+                          <Link href={`/lists/built-in/${sl.id}`} className="text-[10px] text-gray-300 hover:text-gray-500 shrink-0">View →</Link>
                         </div>
                         <p className="text-xs text-gray-400 leading-relaxed">
-                          {sl.requiresProfile && skinTypes.length === 0 && climates.filter(c => CLIMATE_WATER_VALUES.has(c)).length === 0
+                          {sl.requiresProfile && !hasProfile
                             ? "Set your skin profile above to activate this list."
                             : sl.description}
                         </p>
                         {sl.id === "neutral-beneficial" && smartCounts && (
-                          <p className="text-[10px] text-gray-400 mt-0.5">
+                          <p className="text-[10px] text-gray-400">
                             {smartCounts.neutralBeneficial.neutral.toLocaleString()} neutral · {smartCounts.neutralBeneficial.beneficial.toLocaleString()} beneficial
                           </p>
                         )}
+                        {sl.id === "my-sensitivities" && hasProfile && (
+                          <div className="flex items-center gap-2 pt-0.5">
+                            <span className="text-[11px] text-gray-400">Product type:</span>
+                            {(["Leave-on", "Rinse-off"] as const).map((label) => {
+                              const isRO = label === "Rinse-off";
+                              const active = rinseOff === isRO;
+                              return (
+                                <button key={label} type="button" onClick={() => setRinseOff(isRO)}
+                                  className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${active ? "bg-gray-800 text-white border-gray-800" : "text-gray-400 border-gray-200 hover:border-gray-400"}`}>
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* User-created lists */}

@@ -7,11 +7,14 @@ const UNIVERSAL_CATS = [
   "sensitizing preservative", "biocide", "Sulfate Surfactant", "Drying Solvent",
 ];
 
+const RINSE_OFF_SUPPRESS_CATS = new Set(["pore-clogger", "occlusive", "bacteria-trap"]);
+
 export async function GET(req: NextRequest) {
   const skinTypesParam = req.nextUrl.searchParams.get("skinTypes");
   const climatesParam = req.nextUrl.searchParams.get("climates");
   const skinTypes = skinTypesParam ? skinTypesParam.split(",").filter(Boolean) : [];
   const climates = climatesParam ? climatesParam.split(",").filter(Boolean) : [];
+  const isRinseOff = req.nextUrl.searchParams.get("rinseOff") === "true";
   const hasProfile = skinTypes.length > 0 || climates.length > 0;
 
   const [
@@ -53,6 +56,7 @@ export async function GET(req: NextRequest) {
     sensitivityCount = mySensitivitiesResult.data.filter((ing) => {
       const cat = ing.flagged_category;
       if (!cat) return false;
+      if (isRinseOff && RINSE_OFF_SUPPRESS_CATS.has(cat)) return false;
       const profileTypes = PROFILE_CAT_MAP[cat] ?? [];
       return profileTypes.some((pt) => skinTypeSet.has(pt));
     }).length;
