@@ -4061,35 +4061,63 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       {/* Concern stripe — level-colored (non-neutral only) */}
                       {level !== "neutral" && (
                         <div className={`pl-3 border-l-2 ${CONCERN_STRIPE[level]} space-y-1`}>
-                          {isLoading ? (
-                            <p className="text-xs text-gray-400 italic">Generating explanation…</p>
-                          ) : structured?.concern ? (
-                            <p className="text-xs text-gray-600 leading-relaxed">{structured.concern}</p>
-                          ) : explanation && !structured ? (
-                            <p className="text-xs text-gray-600 leading-relaxed">{explanation}</p>
-                          ) : null}
-                          {sensoryItem?.sensory_note && (
-                            <p className="text-xs text-gray-600 leading-relaxed">{sensoryItem.sensory_note}</p>
-                          )}
-                          {sensoryItem?.sensory_category === "Film-forming" && (
-                            <p className="text-xs text-gray-400">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
-                          )}
-                          {sensoryItem?.sensory_category === "Occlusive" && (
-                            <p className="text-xs text-gray-400">Bump type: worsens existing congestion by sealing the skin surface.</p>
-                          )}
-                          {photoItem?.photo_note && (
-                            <p className="text-xs text-gray-600 leading-relaxed">{photoItem.photo_note}</p>
-                          )}
-                          {profileCautionNotes.length > 0 && (
-                            <div className="space-y-0.5">
-                              {profileCautionNotes.map((note, i) => (
-                                <p key={i} className="text-xs text-gray-600 leading-relaxed">
-                                  {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
-                                  {note.text}
-                                </p>
-                              ))}
-                            </div>
-                          )}
+                          {(() => {
+                            const dbConcernText = isLoading ? null
+                              : (structured?.concern ?? (explanation && !structured ? explanation : null));
+                            const sensoryText = sensoryItem?.sensory_note ?? null;
+                            const photoText = photoItem?.photo_note ?? null;
+                            // Show source labels whenever 2+ concern sources are present
+                            const showLabels =
+                              [dbConcernText, sensoryText, photoText].filter(Boolean).length +
+                              profileCautionNotes.length > 1;
+                            return (
+                              <>
+                                {isLoading && (
+                                  <p className="text-xs text-gray-400 italic">Generating explanation…</p>
+                                )}
+                                {dbConcernText && (
+                                  <p className="text-xs text-gray-600 leading-relaxed">
+                                    {showLabels && catLabel && (
+                                      <span className="font-semibold">{catLabel} — </span>
+                                    )}
+                                    {dbConcernText}
+                                  </p>
+                                )}
+                                {sensoryText && (
+                                  <p className="text-xs text-gray-600 leading-relaxed">
+                                    {showLabels && sensoryLabel && (
+                                      <span className="font-semibold">{sensoryLabel} — </span>
+                                    )}
+                                    {sensoryText}
+                                  </p>
+                                )}
+                                {sensoryItem?.sensory_category === "Film-forming" && (
+                                  <p className="text-xs text-gray-400">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
+                                )}
+                                {sensoryItem?.sensory_category === "Occlusive" && (
+                                  <p className="text-xs text-gray-400">Bump type: worsens existing congestion by sealing the skin surface.</p>
+                                )}
+                                {photoText && (
+                                  <p className="text-xs text-gray-600 leading-relaxed">
+                                    {showLabels && photoLabel && (
+                                      <span className="font-semibold">{photoLabel} — </span>
+                                    )}
+                                    {photoText}
+                                  </p>
+                                )}
+                                {profileCautionNotes.length > 0 && (
+                                  <div className="space-y-0.5">
+                                    {profileCautionNotes.map((note, i) => (
+                                      <p key={i} className="text-xs text-gray-600 leading-relaxed">
+                                        {noteLabel(note) && <span className="font-semibold">{noteLabel(note)} — </span>}
+                                        {note.text}
+                                      </p>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
                       {/* Neutral: loading state if no structured data yet */}
