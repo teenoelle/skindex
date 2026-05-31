@@ -245,6 +245,17 @@ const UNIVERSAL_FLAG_CATS = new Set([
   "sensitizing preservative", "biocide", "Sulfate Surfactant", "Drying Solvent",
 ]);
 
+// Sensory categories that are redundant when the AI explanation already covers the same flagged concern
+const SENSORY_REDUNDANT_WITH: Record<string, string[]> = {
+  "Film-forming":     ["pore-clogger", "occlusive"],
+  "Occlusive":        ["occlusive", "pore-clogger"],
+  "comedogenic-itch": ["pore-clogger"],
+  "occlusive-itch":   ["occlusive"],
+  "chemical-itch":    ["sensitizer", "contact-allergen", "fragrance-allergen"],
+  "Stripping":        ["Drying Solvent", "Sulfate Surfactant", "sensitizer"],
+  "Stinging":         ["sensitizer", "Drying Solvent"],
+};
+
 const STRUCTURAL_DESCRIPTIONS: Record<string, string> = {
   "Emulsifier": "Emulsifiers help oil and water blend together to keep the formula stable.",
   "Thickener": "Thickeners increase viscosity so the product spreads and feels even on skin.",
@@ -4100,6 +4111,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         const sensoryText = sensoryItem?.sensory_note ?? null;
                         const photoText = photoItem?.photo_note ?? null;
                         const isUniversalCat = (cat: string) => UNIVERSAL_FLAG_CATS.has(cat);
+                        // Suppress sensory note when AI explanation already covers the same concern
+                        const sensoryRedundant = sensoryItem ? (() => {
+                          const related = SENSORY_REDUNDANT_WITH[sensoryItem.sensory_category ?? ""] ?? [];
+                          if (!related.length) return false;
+                          const allFlagged = [
+                            fc,
+                            ...(match?.ingredient.secondary_flagged_categories ?? []),
+                            ...(concernItems?.map(ci => ci.category) ?? []),
+                          ].filter(Boolean) as string[];
+                          return allFlagged.some(f => related.includes(f));
+                        })() : false;
+                        const effectiveSensoryText = sensoryRedundant ? null : sensoryText;
                         return (
                           <>
                             <div className={`pl-3 border-l-2 ${CONCERN_STRIPE[level]} space-y-1`}>
@@ -4121,18 +4144,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                   {dbConcernText}
                                 </p>
                               )}
-                              {sensoryText && (
+                              {effectiveSensoryText && (
                                 <p className="text-xs text-gray-600 leading-relaxed">
                                   {sensoryLabel && (
                                     <span className="font-semibold text-amber-700">{sensoryLabel} — </span>
                                   )}
-                                  {sensoryText}
+                                  {effectiveSensoryText}
                                 </p>
                               )}
-                              {sensoryItem?.sensory_category === "Film-forming" && (
+                              {!sensoryRedundant && sensoryItem?.sensory_category === "Film-forming" && (
                                 <p className="text-xs text-gray-400">Bump type: milia — small, hard, keratin-filled bumps just under the skin surface, not inside pores.</p>
                               )}
-                              {sensoryItem?.sensory_category === "Occlusive" && (
+                              {!sensoryRedundant && sensoryItem?.sensory_category === "Occlusive" && (
                                 <p className="text-xs text-gray-400">Bump type: worsens existing congestion by sealing the skin surface.</p>
                               )}
                               {photoText && (
