@@ -16,13 +16,36 @@ function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-const STEP_SEQUENCE: { key: string; label: string; order: number; tag: string; timeOfDay: "am" | "pm" | null }[] = [
-  { key: "enhancer", label: "Toner",      order: 1, tag: "enhancer-caution", timeOfDay: null },
-  { key: "acid",     label: "Acid step",  order: 2, tag: "acid-step",        timeOfDay: null },
-  { key: "vitc",     label: "Vitamin C",  order: 3, tag: "low-ph-step",      timeOfDay: "am" },
-  { key: "retinoid", label: "Retinoid",   order: 6, tag: "retinoid",         timeOfDay: "pm" },
+const STEP_SEQUENCE: { key: string; label: string; order: number; tag: string; timeOfDay: "am" | "pm" | null; cautionProfiles?: string[]; avoidProfiles?: string[] }[] = [
+  { key: "enhancer", label: "Toner",      order: 1, tag: "enhancer-caution", timeOfDay: null,
+    cautionProfiles: ["reactive", "damaged_barrier"] },
+  { key: "acid",     label: "Acid step",  order: 2, tag: "acid-step",        timeOfDay: null,
+    avoidProfiles: ["damaged_barrier"], cautionProfiles: ["reactive", "rosacea", "eczema", "psoriasis"] },
+  { key: "vitc",     label: "Vitamin C",  order: 3, tag: "low-ph-step",      timeOfDay: "am",
+    cautionProfiles: ["reactive", "damaged_barrier"] },
+  { key: "retinoid", label: "Retinoid",   order: 6, tag: "retinoid",         timeOfDay: "pm",
+    cautionProfiles: ["reactive", "damaged_barrier", "rosacea"] },
   { key: "spf",      label: "SPF",        order: 7, tag: "spf-last",         timeOfDay: "am" },
   { key: "seal",     label: "Seal",       order: 8, tag: "seal-last",        timeOfDay: "pm" },
+];
+
+const PROFILE_RAIL_STEPS: {
+  key: string; label: string; timeOfDay: "am" | "pm" | null;
+  forProfiles: string[];
+  isCovered: (products: RoutineProduct[]) => boolean;
+}[] = [
+  { key: "bha", label: "BHA", timeOfDay: null,
+    forProfiles: ["acne_prone", "oily", "seborrheic", "fungal_acne"],
+    isCovered: (prods) => prods.some(p => p.ingredients.some(i => /salicylic|willow bark|beta hydroxy/i.test(i))) },
+  { key: "ceramide", label: "Ceramide", timeOfDay: null,
+    forProfiles: ["damaged_barrier", "reactive", "eczema", "psoriasis", "rosacea"],
+    isCovered: (prods) => prods.some(p => p.ingredients.some(i => /ceramide|panthenol|centella|madecassoside|beta-glucan/i.test(i))) },
+  { key: "niacinamide", label: "Niacinamide", timeOfDay: null,
+    forProfiles: ["oily", "acne_prone", "hyperpigmentation_prone", "rosacea"],
+    isCovered: (prods) => prods.some(p => p.ingredients.some(i => /niacinamide/i.test(i))) },
+  { key: "brightener", label: "Brightener", timeOfDay: "am",
+    forProfiles: ["hyperpigmentation_prone"],
+    isCovered: (prods) => prods.some(p => p.step_tags.includes("low-ph-step") || p.ingredients.some(i => /kojic|arbutin|tranexamic|azelaic|alpha arbutin/i.test(i))) },
 ];
 
 function getStepOrder(stepTags: string[]): number {
@@ -1079,17 +1102,18 @@ function getSlotReasons(slot: typeof ROUTINE_SLOTS[0], skinTypes: Set<string>, c
 function getActiveLoads(products: RoutineProduct[], skinTypes: Set<string>, climates: Set<string>) {
   const all = [...skinTypes, ...climates];
   return ACTIVE_LOAD_CATEGORIES.map(cat => {
-    const count = products.filter(p =>
+    const contributors = products.filter(p =>
       cat.stepTags.some(t => p.step_tags.includes(t)) ||
       cat.ingredientPatterns.some(re => p.ingredients.some(ing => re.test(ing)))
-    ).length;
-    if (count === 0) return null;
+    );
+    if (contributors.length === 0) return null;
+    const count = contributors.length;
     const tensions = all
       .map(p => cat.profileThresholds[p] ? { ...cat.profileThresholds[p]!, over: count > cat.profileThresholds[p]!.max } : null)
       .filter(Boolean) as { max: number; note: string; over: boolean }[];
     const unique = tensions.filter((t, i, a) => a.findIndex(x => x.note === t.note) === i);
-    return { key: cat.key, label: cat.label, count, defaultMax: cat.defaultMax, tensions: unique };
-  }).filter(Boolean) as { key: string; label: string; count: number; defaultMax: number; tensions: { max: number; note: string; over: boolean }[] }[];
+    return { key: cat.key, label: cat.label, count, contributors, defaultMax: cat.defaultMax, tensions: unique };
+  }).filter(Boolean) as { key: string; label: string; count: number; contributors: RoutineProduct[]; defaultMax: number; tensions: { max: number; note: string; over: boolean }[] }[];
 }
 
 function getOverlapBadge(product: RoutineProduct, all: RoutineProduct[], skinTypes: Set<string>, climates: Set<string>): { label: string; high: boolean } | null {
@@ -2436,7 +2460,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     };
 
     const renderProduct = (p: RoutineProduct, sortedGroup: RoutineProduct[], waitTimeAfter?: string | null) => {
-      const overlap = getOverlapBadge(p, routineProducts, activeSkinTypes as Set<string>, activeClimates as Set<string>);
       const TypeIcon = (p.productType && CATEGORY_ICONS[p.productType]) ? CATEGORY_ICONS[p.productType] : null;
       const brandInName = p.brand && p.name.toLowerCase().startsWith(p.brand.toLowerCase());
       const displayName = !p.brand
@@ -2504,11 +2527,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   })}
                 </div>
               )}
-              {overlap && (
-                <p className={`text-[10px] mt-0.5 ${overlap.high ? "text-amber-800" : "text-gray-400"}`}>
-                  {overlap.high ? "⚠ " : "· "}{overlap.label}
-                </p>
-              )}
             </div>
             <div className="flex items-center gap-2 shrink-0 mt-0.5">
               <button type="button" onClick={() => {
@@ -2535,12 +2553,39 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     const renderStepRail = (products: RoutineProduct[], tod: "am" | "pm") => {
       const relevantSteps = STEP_SEQUENCE.filter(s => s.timeOfDay === null || s.timeOfDay === tod);
       const coveredTags = new Set(products.flatMap(p => p.step_tags));
+      const profiles = [...activeSkinTypes, ...activeClimates] as string[];
+
+      const profileSteps = PROFILE_RAIL_STEPS.filter(s =>
+        (s.timeOfDay === null || s.timeOfDay === tod) &&
+        s.forProfiles.some(pr => profiles.includes(pr))
+      );
+
       return (
         <div className="flex flex-wrap gap-1 mb-2">
           {relevantSteps.map(step => {
             const covered = coveredTags.has(step.tag);
+            const isAvoid = (step.avoidProfiles ?? []).some(pr => profiles.includes(pr));
+            const isCaution = !isAvoid && (step.cautionProfiles ?? []).some(pr => profiles.includes(pr));
+            const cls = covered
+              ? isAvoid ? "bg-rose-700 text-white line-through"
+              : isCaution ? "bg-amber-700 text-white"
+              : "bg-gray-700 text-white"
+              : isAvoid ? "border border-rose-300 text-rose-400"
+              : isCaution ? "border border-amber-300 text-amber-600"
+              : "text-gray-300";
             return (
-              <span key={step.key} className={`text-[9px] px-1.5 py-0.5 rounded-full ${covered ? "bg-gray-700 text-white" : "text-gray-300"}`}>
+              <span key={step.key} className={`text-[9px] px-1.5 py-0.5 rounded-full ${cls}`} title={
+                isAvoid ? "Avoid for your profile" : isCaution ? "Use with caution for your profile" : ""
+              }>
+                {step.label}
+              </span>
+            );
+          })}
+          {profileSteps.map(step => {
+            const covered = step.isCovered(products);
+            return (
+              <span key={step.key} className={`text-[9px] px-1.5 py-0.5 rounded-full border ${covered ? "bg-teal-700 text-white border-teal-700" : "border-teal-500 text-teal-600"}`}
+                title="Recommended for your profile">
                 {step.label}
               </span>
             );
@@ -2558,11 +2603,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             const overForAny = load.tensions.some(t => t.over);
             const atForAny = load.tensions.some(t => !t.over && load.count >= t.max);
             const dotColor = overForAny ? "bg-red-800" : atForAny ? "bg-amber-800" : "bg-green-800";
+            const shortNames = load.contributors.map(p => {
+              const comma = p.name.indexOf(", ");
+              return comma > -1 ? p.name.slice(comma + 2) : p.name;
+            });
             return (
               <div key={load.key}>
                 <div className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
-                  <span className="text-[10px] text-gray-600">{load.label} ×{load.count}</span>
+                  <span className="text-[10px] text-gray-600">
+                    {load.label} ×{load.count}
+                    {load.count > 0 && <span className="text-gray-400"> — {shortNames.join(", ")}</span>}
+                  </span>
                 </div>
                 {load.tensions.length > 0 && (
                   <div className="ml-3 mt-0.5 space-y-0.5">
@@ -2605,8 +2657,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       const reasons = getSlotReasons(slot, activeSkinTypes as Set<string>, activeClimates as Set<string>);
       return { slot, priority, reasons };
     }).filter(Boolean) as { slot: typeof ROUTINE_SLOTS[0]; priority: SlotPriority; reasons: string[] }[];
-    const priorityOrder: SlotPriority[] = ["essential", "beneficial", "optional", "avoid"];
-    const sortedSlots = uncoveredSlots.sort((a, b) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority));
+    const sortedSlots = uncoveredSlots; // preserved in ROUTINE_SLOTS application order
 
     return (
       <div className="space-y-3">
@@ -2727,6 +2778,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     );
                   })}
                 </div>
+                {sortedSlots.length > 0 && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 pt-1.5 border-t border-gray-100">
+                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-gray-100 border border-gray-700" /> essential</span>
+                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-white border border-gray-300" /> beneficial</span>
+                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-white border border-gray-200" /> optional</span>
+                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-rose-50 border border-rose-200" /> avoid</span>
+                  </div>
+                )}
               </div>
             )}
             {routineWarns.length > 0 && (
