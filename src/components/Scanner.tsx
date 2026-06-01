@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, Routine, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
-import { SENSORY_PROFILE_MAP } from "@/lib/sensory";
+import { SENSORY_PROFILE_MAP, CONCERN_PROFILE_TYPES } from "@/lib/sensory";
 import { tokenFuzzyFilter } from "@/lib/search";
 import { splitIngredientList } from "@/lib/scanner";
 import ConcernChips from "@/components/ConcernChips";
@@ -4829,9 +4829,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 ? (profileCautionNotes.find(n => n.concern != null && n.concern === fcLower && n.sentiment === "strong_caution")
                   ?? profileCautionNotes.find(n => n.concern != null && n.concern === fcLower && n.sentiment === "caution"))
                 : null;
-              const fcProfileLabel = fcProfileCautionNote?.dimensions.length
-                ? ` · ${fcProfileCautionNote.dimensions.filter(d => activeSkinTypes.has(d as SkinType)).map(d => SKIN_TYPES.find(s => s.value === d)?.label ?? d).join(", ")}`
-                : "";
+              const fcProfileLabel = (() => {
+                if (fcProfileCautionNote?.dimensions.length) {
+                  const matched = fcProfileCautionNote.dimensions.filter(d => activeSkinTypes.has(d as SkinType)).map(d => SKIN_TYPES.find(s => s.value === d)?.label ?? d);
+                  if (matched.length) return ` · ${matched.join(", ")}`;
+                }
+                if (fc) {
+                  const types = CONCERN_PROFILE_TYPES[fc.toLowerCase()] ?? [];
+                  const matched = types.filter(t => activeSkinTypes.has(t as SkinType)).map(t => SKIN_TYPES.find(s => s.value === t)?.label ?? t);
+                  if (matched.length) return ` · ${matched.join(", ")}`;
+                }
+                return "";
+              })();
               const filteredProfileCautionNotes = fcProfileCautionNote
                 ? profileCautionNotes.filter(n => n !== fcProfileCautionNote)
                 : profileCautionNotes;
@@ -5033,10 +5042,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                 const isUniversal = isUniversalCat(ci.category);
                                 const ciLabel = CATEGORY_LABELS[ci.category] ?? ci.category;
                                 const merged = sensoryMergedWith === ci.category;
+                                const ciProfileTypes = CONCERN_PROFILE_TYPES[ci.category.toLowerCase()] ?? [];
+                                const ciProfileLabel = !merged && ciProfileTypes.length
+                                  ? (() => {
+                                      const matched = ciProfileTypes.filter(t => activeSkinTypes.has(t as SkinType)).map(t => SKIN_TYPES.find(s => s.value === t)?.label ?? t);
+                                      return matched.length ? ` · ${matched.join(", ")}` : "";
+                                    })()
+                                  : "";
                                 return (
                                   <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
                                     <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>
-                                      {merged && sensoryLabel ? `${ciLabel}, ${sensoryLabel}${sensoryProfileLabel}` : ciLabel} — </span>
+                                      {merged && sensoryLabel ? `${ciLabel}, ${sensoryLabel}${sensoryProfileLabel}` : `${ciLabel}${ciProfileLabel}`} — </span>
                                     {ci.text}{merged && sensoryText ? ` ${sensoryText}` : ""}
                                   </p>
                                 );

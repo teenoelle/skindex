@@ -143,6 +143,80 @@ export function generateNotes(ing: {
     });
   }
 
+  if (fc === "vasodilator") {
+    notes.push({
+      dimensions: ["rosacea"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Vasodilating ingredients trigger local blood vessel dilation — in rosacea-prone skin this directly worsens flushing episodes and persistent background redness, even at low concentrations.",
+      concern: fc,
+    });
+  }
+
+  if (fc === "formaldehyde releaser") {
+    notes.push({
+      dimensions: ["reactive", "damaged_barrier", "eczema"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Formaldehyde-releasing preservatives continuously emit formaldehyde into the formula — on reactive, compromised, or eczema-prone skin, cumulative exposure substantially raises the risk of allergic contact dermatitis.",
+      concern: fc,
+    });
+  }
+
+  if (fc === "bha exfoliant") {
+    notes.push({
+      dimensions: [],
+      climate: ["high_uv"],
+      sentiment: "strong_caution",
+      text: "BHA exfoliants increase photosensitivity by exposing newer, less-protected skin cells — daily broad-spectrum SPF is essential when using these.",
+      concern: fc,
+    });
+    notes.push({
+      dimensions: ["reactive", "damaged_barrier"],
+      climate: [],
+      sentiment: "caution",
+      text: "On reactive or compromised skin, BHA exfoliants penetrate into oil-filled follicles but can increase barrier disruption — introduce at the lowest available concentration and limit frequency.",
+      concern: fc,
+    });
+  }
+
+  if (fc === "synthetic musk") {
+    notes.push({
+      dimensions: ["reactive", "damaged_barrier"],
+      climate: [],
+      sentiment: "caution",
+      text: "Synthetic musks are known sensitizers — on reactive or compromised skin, cumulative exposure raises the risk of contact sensitization and may cross-react with other fragrance compounds.",
+      concern: fc,
+    });
+  }
+
+  if (fc === "irritant") {
+    notes.push({
+      dimensions: ["reactive", "damaged_barrier"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Direct irritants cause dose-dependent inflammation on contact — reactive or barrier-compromised skin is particularly vulnerable since reduced barrier integrity allows deeper penetration and faster onset of irritant reactions.",
+      concern: fc,
+    });
+  }
+
+  if (fc === "phytoestrogen") {
+    notes.push({
+      dimensions: [],
+      climate: ["hormone_sensitive", "on_hrt"],
+      sentiment: "caution",
+      text: "Phytoestrogenic compounds have weak estrogen receptor activity that accumulates with dietary sources — for hormone-sensitive conditions or those on HRT, cumulative topical exposure is worth discussing with a prescriber.",
+      concern: fc,
+    });
+    notes.push({
+      dimensions: [],
+      climate: ["pregnant", "breastfeeding"],
+      sentiment: "caution",
+      text: "Phytoestrogenic activity has not been adequately studied in pregnancy and breastfeeding — most practitioners recommend minimizing unnecessary topical exposure as a precaution.",
+      concern: fc,
+    });
+  }
+
   // ── STRUCTURAL CATEGORIES ──────────────────────────────────────────────────
 
   if (sc === "Retinoid") {

@@ -230,6 +230,34 @@ export const SENSORY_PATTERNS: { pattern: RegExp; note: string; sensory_category
   },
 ];
 
+// Maps flagged concern categories (lowercase) to the skin profile types most affected.
+// Used at render time to add "· Reactive, Damaged barrier" suffixes to concern labels.
+export const CONCERN_PROFILE_TYPES: Record<string, string[]> = {
+  "pore-clogger":          ["acne_prone", "oily"],
+  "bacteria-trap":         ["acne_prone", "oily"],
+  "occlusive":             ["acne_prone", "oily"],
+  "sensitizer":            ["reactive", "damaged_barrier"],
+  "fragrance-allergen":    ["reactive", "damaged_barrier"],
+  "fragrance":             ["reactive", "damaged_barrier"],
+  "formaldehyde releaser": ["reactive", "damaged_barrier", "eczema"],
+  "synthetic musk":        ["reactive", "damaged_barrier"],
+  "irritant":              ["reactive", "damaged_barrier"],
+  "essential oil":         ["reactive", "damaged_barrier"],
+  "preservative":          ["reactive", "damaged_barrier"],
+  "preservative allergen": ["reactive", "damaged_barrier"],
+  "vasodilator":           ["rosacea"],
+  "stripping":             ["dry", "damaged_barrier"],
+  "barrier-disrupting":    ["reactive", "damaged_barrier"],
+  "drying solvent":        ["dry", "damaged_barrier"],
+  "sulfate surfactant":    ["dry", "damaged_barrier"],
+  "aha exfoliant":         ["reactive", "damaged_barrier"],
+  "bha exfoliant":         ["reactive", "damaged_barrier"],
+  "chemical sunscreen":    ["reactive"],
+  "retinoid":              ["reactive", "damaged_barrier"],
+  "photosensitizer":       ["hyperpigmentation_prone"],
+  "hyaluronic acid":       ["acne_prone", "oily"],
+};
+
 export const SENSORY_PROFILE_MAP: Record<string, string[]> = {
   "Stinging": ["reactive", "damaged_barrier", "eczema", "rosacea", "fast_shedding"],
   "chemical-itch": ["reactive", "damaged_barrier", "eczema"],
