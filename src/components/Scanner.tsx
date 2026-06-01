@@ -967,6 +967,56 @@ function detectSupplementWarnings(
   return warnings;
 }
 
+function detectCrossSessionWarnings(
+  amProducts: RoutineProduct[],
+  pmProducts: RoutineProduct[],
+  skinTypes: Set<SkinType>,
+  climates: Set<ClimateType>
+): { type: "danger" | "caution"; title: string; body: string }[] {
+  const warnings: { type: "danger" | "caution"; title: string; body: string }[] = [];
+  if (amProducts.length === 0 || pmProducts.length === 0) return warnings;
+
+  const amTags = new Set(amProducts.flatMap(p => p.step_tags));
+  const pmTags = new Set(pmProducts.flatMap(p => p.step_tags));
+  const sensitive = skinTypes.has("reactive") || skinTypes.has("damaged_barrier") || skinTypes.has("rosacea") || skinTypes.has("eczema") || skinTypes.has("psoriasis");
+
+  if (pmTags.has("retinoid") && amTags.has("low-ph-step"))
+    warnings.push({ type: sensitive ? "danger" : "caution", title: "Retinoid PM → Vitamin C AM", body: "Retinoids increase skin permeability overnight. Applying vitamin C (pH 3.0–3.5) the morning after means it contacts a more permeable barrier" + (sensitive ? " — on reactive or compromised skin this can cause significant stinging and redness. Consider alternating retinoid evenings with vitamin C mornings." : ". Fine for tolerant skin, but monitor for irritation.") });
+
+  if (pmTags.has("retinoid") && amTags.has("acid-step"))
+    warnings.push({ type: sensitive ? "danger" : "caution", title: "Retinoid PM → AHA/BHA AM", body: "Using both a retinoid in PM and an acid exfoliant in AM compounds exfoliation stress across the full 24-hour cycle" + (sensitive ? " — this is too much for reactive or compromised skin. Alternate: retinoid evenings on non-exfoliant days." : ". Tolerable for resilient skin but watch for dryness and peeling.") });
+
+  if (pmTags.has("acid-step") && amTags.has("low-ph-step") && sensitive)
+    warnings.push({ type: "caution", title: "AHA PM → Vitamin C AM", body: "AHA exfoliation in PM leaves the barrier thinned overnight. Adding vitamin C (low pH) the next morning extends the sensitization window. For reactive or compromised skin, consider spacing these — vitamin C on non-exfoliant nights, or switch to a gentler vitamin C derivative." });
+
+  if (pmTags.has("retinoid") && !amTags.has("spf-last")) {
+    const hasNoSpf = !amProducts.some(p => p.step_tags.includes("spf-last"));
+    if (hasNoSpf) warnings.push({ type: "caution", title: "Retinoid PM — SPF required next AM", body: "Retinoids accelerate cell turnover, removing the outermost UV-protective layer. The morning after retinoid use, broad-spectrum SPF is not optional — it is the most important step in your AM routine." });
+  }
+
+  const amActiveCount = ACTIVE_LOAD_CATEGORIES.filter(cat =>
+    amProducts.some(p => cat.stepTags.some(t => p.step_tags.includes(t)) || cat.ingredientPatterns.some(re => p.ingredients.some(i => re.test(i))))
+  ).length;
+  const pmActiveCount = ACTIVE_LOAD_CATEGORIES.filter(cat =>
+    pmProducts.some(p => cat.stepTags.some(t => p.step_tags.includes(t)) || cat.ingredientPatterns.some(re => p.ingredients.some(i => re.test(i))))
+  ).length;
+  if (sensitive && amActiveCount >= 2 && pmActiveCount >= 2)
+    warnings.push({ type: "caution", title: "High active load across both sessions", body: `Your AM routine has ${amActiveCount} active categories and PM has ${pmActiveCount}. For reactive or compromised skin, the skin's repair window between sessions may not be sufficient. Consider moving some actives to alternate days rather than using all daily.` });
+
+  return warnings;
+}
+
+function getOvernightState(pmProducts: RoutineProduct[]): { label: string; detail: string }[] {
+  const tags = new Set(pmProducts.flatMap(p => p.step_tags));
+  const states: { label: string; detail: string }[] = [];
+  if (tags.has("retinoid")) states.push({ label: "Retinoid recovery", detail: "Cell turnover is accelerated, barrier is more permeable and UV-sensitive by morning" });
+  if (tags.has("acid-step")) states.push({ label: "Post-exfoliation", detail: "Outer protective layer thinned; skin is more reactive to actives in the morning" });
+  if (tags.has("seal-last")) states.push({ label: "Sealed overnight", detail: "Occlusive film supports barrier repair through the night" });
+  if (tags.has("enhancer-caution") && !tags.has("retinoid") && !tags.has("acid-step"))
+    states.push({ label: "Enhanced penetration", detail: "Penetration-enhancing toner drove actives deeper — barrier is in recovery" });
+  return states;
+}
+
 function detectDietaryWarnings(
   skinTypes: Set<SkinType>,
   climates: Set<ClimateType>
@@ -1187,6 +1237,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [stepTagHint, setStepTagHint] = useState<string | null>(null);
   const [routineStepHint, setRoutineStepHint] = useState<string | null>(null);
   const [whatNextHint, setWhatNextHint] = useState<string | null>(null);
+  const [routineView, setRoutineView] = useState<"timeline" | "detail">("detail");
 
   // Derived routine state — all reads of routineProducts work unchanged
   const activeRoutine = routines.find(r => r.id === activeRoutineId) ?? routines[0] ?? null;
@@ -2266,6 +2317,124 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     const bothProducts = routineProducts.filter(p => !p.timeOfDay);
     const totalConcerns = routineProducts.reduce((n, p) => n + p.flaggedCategories.length, 0);
 
+    const amTimeline = sortByStep([...amProducts, ...bothProducts]);
+    const pmTimeline = sortByStep([...pmProducts, ...bothProducts]);
+    const crossSessionWarns = detectCrossSessionWarnings(amTimeline, pmTimeline, activeSkinTypes, activeClimates);
+    const overnightState = getOvernightState(pmTimeline);
+
+    const renderTimelineNode = (p: RoutineProduct, isLast: boolean) => {
+      const TypeIcon = (p.productType && CATEGORY_ICONS[p.productType]) ? CATEGORY_ICONS[p.productType] : null;
+      const brandInName = p.brand && p.name.toLowerCase().startsWith(p.brand.toLowerCase());
+      const displayName = !p.brand ? p.name : brandInName ? p.brand + ", " + p.name.slice(p.brand.length).trim() : p.brand + ", " + p.name;
+      const wait = isLast ? null : getWaitTimeAfter(p);
+      return (
+        <div key={p.routineId} className="relative ml-6 mb-1">
+          <div className="absolute -left-[18px] top-1.5 w-2 h-2 rounded-full bg-gray-300 z-10" />
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="w-5 h-5 rounded bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center shrink-0">
+              {p.image_url
+                ? <img src={proxyImage(p.image_url)!} alt="" className="w-full h-full object-contain" />
+                : TypeIcon ? <TypeIcon size={11} className="text-gray-300" /> : <Droplet size={11} className="text-gray-300" />}
+            </div>
+            <span className="text-[10px] text-gray-700 truncate max-w-[140px]">{displayName}</span>
+            {!p.timeOfDay && <span className="text-[9px] text-gray-400 border border-gray-200 rounded-full px-1">AM+PM</span>}
+            {p.step_tags.map(tag => {
+              const cfg = STEP_TAG_CONFIG[tag];
+              if (!cfg) return null;
+              return <span key={tag} className={`text-[9px] px-1 py-0 rounded-full border ${cfg.className}`}>{cfg.label}</span>;
+            })}
+          </div>
+          {wait && <p className="text-[9px] text-gray-300 ml-6 mt-0.5">{wait}</p>}
+        </div>
+      );
+    };
+
+    const renderTimeline = () => {
+      const hasBoth = amTimeline.length > 0 && pmTimeline.length > 0;
+      return (
+        <div className="relative">
+          <div className="absolute left-[3px] top-0 bottom-0 w-px bg-gray-100 z-0" />
+
+          {/* AM */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="w-3.5 h-3.5 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center z-10 shrink-0">
+                <Sun size={8} className="text-amber-600" />
+              </div>
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">AM</span>
+            </div>
+            {amTimeline.length > 0
+              ? amTimeline.map((p, i) => renderTimelineNode(p, i === amTimeline.length - 1))
+              : <p className="text-[10px] text-gray-300 ml-6">No AM products</p>}
+          </div>
+
+          {/* Day */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-3.5 h-3.5 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center z-10 shrink-0">
+              <Sun size={8} className="text-gray-400" />
+            </div>
+            <span className="text-[10px] text-gray-400">Day</span>
+            {activeSkinTypes.has("hyperpigmentation_prone" as SkinType) || activeClimates.has("high_uv" as ClimateType)
+              ? <span className="text-[9px] text-amber-700 border border-amber-200 rounded-full px-1.5">High UV risk — reapply SPF</span>
+              : null}
+          </div>
+
+          {/* PM */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="w-3.5 h-3.5 rounded-full bg-indigo-100 border border-indigo-300 flex items-center justify-center z-10 shrink-0">
+                <Moon size={8} className="text-indigo-600" />
+              </div>
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">PM</span>
+            </div>
+            {pmTimeline.length > 0
+              ? pmTimeline.map((p, i) => renderTimelineNode(p, i === pmTimeline.length - 1))
+              : <p className="text-[10px] text-gray-300 ml-6">No PM products</p>}
+          </div>
+
+          {/* Overnight */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="w-3.5 h-3.5 rounded-full bg-gray-800 flex items-center justify-center z-10 shrink-0">
+                <Moon size={8} className="text-gray-300" />
+              </div>
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Overnight</span>
+            </div>
+            {overnightState.length > 0
+              ? overnightState.map((s, i) => (
+                <div key={i} className="ml-6 mb-1">
+                  <span className="text-[10px] font-medium text-gray-600">{s.label} — </span>
+                  <span className="text-[10px] text-gray-500">{s.detail}</span>
+                </div>
+              ))
+              : pmTimeline.length > 0
+              ? <p className="text-[10px] text-gray-400 ml-6">Standard overnight repair</p>
+              : <p className="text-[10px] text-gray-300 ml-6">Add PM products to see overnight state</p>}
+          </div>
+
+          {/* AM next day — cross-session warnings */}
+          {hasBoth && (
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-3.5 h-3.5 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center z-10 shrink-0">
+                  <Sun size={8} className="text-amber-600" />
+                </div>
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">AM — next day</span>
+              </div>
+              {crossSessionWarns.length > 0
+                ? crossSessionWarns.map((w, i) => (
+                  <div key={i} className={`ml-6 mb-1.5 rounded-lg border px-2.5 py-1.5 ${w.type === "danger" ? "border-amber-800 bg-amber-50" : "border-gray-300 bg-gray-50"}`}>
+                    <p className={`text-[10px] font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : "text-gray-700"}`}>{w.type === "danger" ? "⚠ " : "· "}{w.title}</p>
+                    <p className={`text-[10px] leading-relaxed ${w.type === "danger" ? "text-amber-800" : "text-gray-600"}`}>{w.body}</p>
+                  </div>
+                ))
+                : <p className="text-[10px] text-gray-400 ml-6">No cross-session conflicts detected</p>}
+            </div>
+          )}
+        </div>
+      );
+    };
+
     const renderProduct = (p: RoutineProduct, sortedGroup: RoutineProduct[], waitTimeAfter?: string | null) => {
       const overlap = getOverlapBadge(p, routineProducts, activeSkinTypes as Set<string>, activeClimates as Set<string>);
       const TypeIcon = (p.productType && CATEGORY_ICONS[p.productType]) ? CATEGORY_ICONS[p.productType] : null;
@@ -2484,20 +2653,38 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           <p className="text-xs text-gray-400">No products yet. Scan a product and tap &quot;+ Add to routine&quot; to start building.</p>
         ) : (
           <>
-            {totalConcerns > 0 && (
-              <p className="text-[10px] text-gray-500">{totalConcerns} flagged ingredient{totalConcerns !== 1 ? "s" : ""} across routine</p>
-            )}
-            <div className="space-y-3">
-              {amProducts.length > 0 || pmProducts.length > 0 ? (
-                <>
-                  {renderGroup("AM", amProducts, "am")}
-                  {renderGroup("PM", pmProducts, "pm")}
-                  {renderGroup("Both", bothProducts)}
-                </>
-              ) : (
-                <div className="space-y-2.5">{routineProducts.map(p => renderProduct(p, routineProducts))}</div>
+            <div className="flex items-center justify-between">
+              {totalConcerns > 0 && (
+                <p className="text-[10px] text-gray-500">{totalConcerns} flagged ingredient{totalConcerns !== 1 ? "s" : ""} across routine</p>
+              )}
+              {(amProducts.length > 0 && pmProducts.length > 0) && (
+                <div className="flex rounded-full border border-gray-200 overflow-hidden ml-auto">
+                  <button type="button" onClick={() => setRoutineView("detail")}
+                    className={`text-[9px] px-2 py-0.5 transition-colors ${routineView === "detail" ? "bg-gray-800 text-white" : "text-gray-400 hover:text-gray-600"}`}>
+                    Detail
+                  </button>
+                  <button type="button" onClick={() => setRoutineView("timeline")}
+                    className={`text-[9px] px-2 py-0.5 transition-colors ${routineView === "timeline" ? "bg-gray-800 text-white" : "text-gray-400 hover:text-gray-600"}`}>
+                    24h
+                  </button>
+                </div>
               )}
             </div>
+            {routineView === "timeline" && amProducts.length > 0 && pmProducts.length > 0
+              ? renderTimeline()
+              : (
+              <div className="space-y-3">
+                {amProducts.length > 0 || pmProducts.length > 0 ? (
+                  <>
+                    {renderGroup("AM", amProducts, "am")}
+                    {renderGroup("PM", pmProducts, "pm")}
+                    {renderGroup("Both", bothProducts)}
+                  </>
+                ) : (
+                  <div className="space-y-2.5">{routineProducts.map(p => renderProduct(p, routineProducts))}</div>
+                )}
+              </div>
+            )}
             {sortedSlots.length > 0 && (
               <div className="border-t border-gray-100 pt-2">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">What&apos;s next</p>
