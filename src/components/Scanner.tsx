@@ -788,8 +788,9 @@ function getIngredientConcernLevel(
   const allFcs = [fc, ...(match?.ingredient.secondary_flagged_categories ?? [])].filter(Boolean);
 
   if (allFcs.some(c => CONCERN_UNIVERSAL_CATEGORIES.has(c))) return "universal";
-  // Position-based photo items (e.g. citric acid) only matter at high concentration — treat as profile, not universal
-  if (photoItem?.sunLevel === "avoid" && !photoItem.isPositionBased) return "universal";
+  // Only truly phototoxic botanicals (bergapten, psoralen, etc.) are universal — they cause reactions in anyone.
+  // AHA/BHA/retinoid/brightening photosensitivity is profile-matched below.
+  if (photoItem?.sunLevel === "avoid" && !photoItem.isPositionBased && photoItem.photoCategory === "photo-botanical") return "universal";
   if (allFcs.includes("sensitizer") && match?.ingredient.structural_category === "Fragrance") return "universal";
 
   const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
@@ -797,7 +798,14 @@ function getIngredientConcernLevel(
 
   if (match?.ingredient.status === "flagged") {
     const isMatch = allFcs.some(c => isFcProfileMatch(c, activeSkinTypes, activeClimates));
-    return isMatch ? "profile-matched" : "non-matching";
+    if (isMatch) return "profile-matched";
+    // Fallback for flagged photosensitizers (AHA, BHA, retinoid, brightening) whose fc isn't in isFcProfileMatch
+    if (photoItem && photoItem.photoCategory !== "photo-botanical") {
+      if (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv") ||
+          activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier")) return "profile-matched";
+      return "non-matching";
+    }
+    return "non-matching";
   }
 
   if (sensoryItem) {
@@ -814,7 +822,7 @@ function getIngredientConcernLevel(
     return "non-matching";
   }
 
-  if (photoItem?.sunLevel === "caution" || (photoItem?.sunLevel === "avoid" && photoItem.isPositionBased)) {
+  if (photoItem && photoItem.photoCategory !== "photo-botanical") {
     if (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv")) return "profile-matched";
     return "non-matching";
   }
