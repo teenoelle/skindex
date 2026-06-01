@@ -2677,8 +2677,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 {amProducts.length > 0 || pmProducts.length > 0 ? (
                   <>
                     {renderGroup("AM", amProducts, "am")}
-                    {renderGroup("PM", pmProducts, "pm")}
                     {renderGroup("Both", bothProducts)}
+                    {renderGroup("PM", pmProducts, "pm")}
                   </>
                 ) : (
                   <div className="space-y-2.5">{routineProducts.map(p => renderProduct(p, routineProducts))}</div>
