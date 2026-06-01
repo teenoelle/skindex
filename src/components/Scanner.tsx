@@ -373,6 +373,7 @@ const UNIVERSAL_FLAG_CATS = new Set([
 const SENSORY_REDUNDANT_WITH: Record<string, string[]> = {
   "Film-forming":     ["pore-clogger", "occlusive"],
   "Occlusive":        ["occlusive", "pore-clogger"],
+  "Pore-clogging":    ["pore-clogger"],
   "comedogenic-itch": ["pore-clogger"],
   "occlusive-itch":   ["occlusive"],
   "chemical-itch":    ["sensitizer", "contact-allergen", "fragrance-allergen"],
@@ -4834,7 +4835,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   const matched = fcProfileCautionNote.dimensions.filter(d => activeSkinTypes.has(d as SkinType)).map(d => SKIN_TYPES.find(s => s.value === d)?.label ?? d);
                   if (matched.length) return ` · ${matched.join(", ")}`;
                 }
-                if (fc) {
+                if (fcProfileCautionNote?.climate.length) {
+                  const matched = fcProfileCautionNote.climate.filter(c => activeClimates.has(c as ClimateType)).map(c => ALL_MODIFIER_TYPES.find(t => t.value === c)?.label ?? c);
+                  if (matched.length) return ` · ${matched.join(", ")}`;
+                }
+                if (!fcProfileCautionNote && fc) {
                   const types = CONCERN_PROFILE_TYPES[fc.toLowerCase()] ?? [];
                   const matched = types.filter(t => activeSkinTypes.has(t as SkinType)).map(t => SKIN_TYPES.find(s => s.value === t)?.label ?? t);
                   if (matched.length) return ` · ${matched.join(", ")}`;
@@ -5032,6 +5037,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           if (matched.length === 0) return "";
                           return ` · ${matched.join(", ")}`;
                         })();
+                        // True when sensory and concern labels describe the same concept (e.g. "Pore-clogging" ≈ "Pore-clogger").
+                        const norm = (s: string) => s.toLowerCase().replace(/[-\s]+/g, "").replace(/ing$|er$/, "");
+                        const sensoryLabelRedundant = !!(sensoryLabel && catLabel &&
+                          (norm(sensoryLabel).startsWith(norm(catLabel)) || norm(catLabel).startsWith(norm(sensoryLabel))));
+                        const photoProfileLabel = (() => {
+                          if (!photoItem) return "";
+                          const types = CONCERN_PROFILE_TYPES["photosensitizer"] ?? [];
+                          const matched = types.filter(t => activeSkinTypes.has(t as SkinType)).map(t => SKIN_TYPES.find(s => s.value === t)?.label ?? t);
+                          return matched.length ? ` · ${matched.join(", ")}` : "";
+                        })();
                         return (
                           <>
                             <div className={`pl-3 border-l-2 ${CONCERN_STRIPE[level]} space-y-1`}>
@@ -5052,7 +5067,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                 return (
                                   <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
                                     <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>
-                                      {merged && sensoryLabel ? `${ciLabel}, ${sensoryLabel}${sensoryProfileLabel}` : `${ciLabel}${ciProfileLabel}`} — </span>
+                                      {merged && sensoryLabel
+                                        ? (sensoryLabelRedundant ? `${ciLabel}${sensoryProfileLabel}` : `${ciLabel}, ${sensoryLabel}${sensoryProfileLabel}`)
+                                        : `${ciLabel}${ciProfileLabel}`} —</span>
                                     {ci.text}{merged && sensoryText ? ` ${sensoryText}` : ""}
                                   </p>
                                 );
@@ -5061,8 +5078,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                   {catLabel && (
                                     <span className={`font-semibold ${fc && isUniversalCat(fc) ? "text-rose-700" : "text-amber-700"}`}>
                                       {sensoryMergedWith === fc && sensoryLabel
-                                        ? `${catLabel}, ${sensoryLabel}${sensoryProfileLabel}`
-                                        : `${catLabel}${fcProfileLabel}`} — </span>
+                                        ? (sensoryLabelRedundant ? `${catLabel}${sensoryProfileLabel}` : `${catLabel}, ${sensoryLabel}${sensoryProfileLabel}`)
+                                        : `${catLabel}${fcProfileLabel}`} —</span>
                                   )}
                                   {(fcProfileCautionNote?.text ?? dbConcernText)}{sensoryMergedWith === fc && sensoryText ? ` ${sensoryText}` : ""}
                                 </p>
@@ -5082,7 +5099,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               )}
                               {photoText && (
                                 <p className="text-xs text-gray-600 leading-relaxed">
-                                  {photoLabel && <span className="font-semibold text-amber-700">{photoLabel} — </span>}
+                                  {photoLabel && <span className="font-semibold text-amber-700">{photoLabel}{photoProfileLabel} — </span>}
                                   {photoText}
                                 </p>
                               )}
