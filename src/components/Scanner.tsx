@@ -5002,6 +5002,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             sensoryMergedWith = fc;
                           }
                         }
+                        const sensoryProfileSuffix = (() => {
+                          if (!sensoryItem) return "";
+                          const sc = sensoryItem.sensory_category ?? "";
+                          const profileTypes = SENSORY_PROFILE_MAP[sc] ?? [];
+                          const matched = profileTypes
+                            .filter(st => activeSkinTypes.has(st as SkinType))
+                            .map(st => SKIN_TYPES.find(s => s.value === st)?.label ?? st);
+                          if (matched.length === 0) return "";
+                          return ` Relevant to your profile: ${matched.join(", ")}.`;
+                        })();
                         return (
                           <>
                             <div className={`pl-3 border-l-2 ${CONCERN_STRIPE[level]} space-y-1`}>
@@ -5016,7 +5026,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                   <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
                                     <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>
                                       {merged && sensoryLabel ? `${ciLabel}, ${sensoryLabel}` : ciLabel} — </span>
-                                    {ci.text}{merged && sensoryText ? ` ${sensoryText}` : ""}
+                                    {ci.text}{merged && sensoryText ? ` ${sensoryText}${sensoryProfileSuffix}` : ""}
                                   </p>
                                 );
                               }) : dbConcernText && (
@@ -5025,14 +5035,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                     <span className={`font-semibold ${fc && isUniversalCat(fc) ? "text-rose-700" : "text-amber-700"}`}>
                                       {sensoryMergedWith === fc && sensoryLabel ? `${catLabel}, ${sensoryLabel}` : catLabel} — </span>
                                   )}
-                                  {dbConcernText}{sensoryMergedWith === fc && sensoryText ? ` ${sensoryText}` : ""}
+                                  {dbConcernText}{sensoryMergedWith === fc && sensoryText ? ` ${sensoryText}${sensoryProfileSuffix}` : ""}
                                 </p>
                               )}
                               {/* Sensory shown separately only when it wasn't merged with a concern */}
                               {!sensoryMergedWith && sensoryText && (
                                 <p className="text-xs text-gray-600 leading-relaxed">
                                   {sensoryLabel && <span className="font-semibold text-amber-700">{sensoryLabel} — </span>}
-                                  {sensoryText}
+                                  {sensoryText}{sensoryProfileSuffix}
                                 </p>
                               )}
                               {sensoryItem?.sensory_category === "Film-forming" && (
