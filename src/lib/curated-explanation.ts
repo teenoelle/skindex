@@ -783,6 +783,160 @@ export function generateNotes(ing: {
     });
   }
 
+  // ── SENSITIZER NOTES FOR PROFILE-FLAGGED ACTIVES ─────────────────────────
+
+  // Vitamin C (ascorbic acid and ascorbyl derivatives) — sensitizer for reactive/damaged barrier
+  if (ingName.includes("ascorbic acid") || (ingName.includes("ascorbyl") && !ingName.includes("tetraisopalmitate"))) {
+    notes.push({
+      dimensions: ["reactive", "damaged_barrier"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Vitamin C is formulated at pH 3.0–3.5 for maximum stability and penetration. This acidity is enough to cause stinging, redness, and transient inflammation on reactive or barrier-compromised skin. Introduce at low frequency and consider stable derivatives (sodium ascorbyl phosphate, ascorbyl glucoside) formulated at higher pH.",
+    });
+    notes.push({
+      dimensions: ["rosacea"],
+      climate: [],
+      sentiment: "caution",
+      text: "Low-pH vitamin C formulas can trigger flushing and worsen background redness in rosacea-prone skin. Ascorbyl glucoside and sodium ascorbyl phosphate are higher-pH alternatives generally better tolerated.",
+    });
+  }
+
+  // Witch hazel — sensitizer and drying (tannins + alcohol content)
+  if (ingName.includes("hamamelis") || ingName.includes("witch hazel")) {
+    notes.push({
+      dimensions: ["reactive", "damaged_barrier", "rosacea"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Witch hazel combines tannins (astringent, barrier-stripping) with natural alcohol content. On reactive, compromised, or rosacea-prone skin this combination causes contact sensitization and vasodilation — typically worsening the conditions it is marketed to improve.",
+    });
+  }
+
+  // Citric acid — sensitizer at functional concentrations
+  if (ingName.includes("citric acid")) {
+    notes.push({
+      dimensions: ["reactive", "damaged_barrier"],
+      climate: [],
+      sentiment: "caution",
+      text: "At the concentrations used for exfoliation or pH adjustment, citric acid can cause transient stinging and redness on reactive or compromised skin. At low (buffering) concentrations it is generally well tolerated.",
+    });
+  }
+
+  // Kojic acid — sensitizer risk at effective concentrations
+  if (ingName.includes("kojic acid") || ingName.includes("kojic dipalmitate")) {
+    notes.push({
+      dimensions: ["reactive", "damaged_barrier"],
+      climate: [],
+      sentiment: "caution",
+      text: "Kojic acid can cause contact dermatitis at the concentrations needed for brightening efficacy. On reactive or compromised skin, introduce slowly and discontinue if redness or itching develops.",
+    });
+  }
+
+  // Benzoyl peroxide — strong oxidizer, significant barrier impact
+  if (ingName.includes("benzoyl peroxide")) {
+    notes.push({
+      dimensions: ["reactive", "damaged_barrier"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Benzoyl peroxide is a strong oxidizing agent that can severely dry and irritate reactive or compromised skin. It degrades the lipid barrier, worsening TEWL. If used, start at the lowest concentration (2.5%) and use only as a spot treatment over a repaired barrier.",
+    });
+    notes.push({
+      dimensions: ["rosacea"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Benzoyl peroxide causes significant oxidative irritation that can worsen rosacea flares. It should generally be avoided in favor of gentler alternatives (azelaic acid, niacinamide) for rosacea-associated acne.",
+    });
+  }
+
+  // Azelaic acid — mild sensitizer at higher concentrations
+  if (ingName.includes("azelaic acid")) {
+    notes.push({
+      dimensions: ["reactive", "damaged_barrier"],
+      climate: [],
+      sentiment: "caution",
+      text: "At concentrations above 10%, azelaic acid can cause a burning sensation and temporary redness on reactive or compromised skin. The 10% OTC formulation is better tolerated than prescription-strength 15–20% versions.",
+    });
+  }
+
+  // ── VASODILATOR NOTES ────────────────────────────────────────────────────
+
+  // Menthol, peppermint, mint — TRPM8 activation → vasodilation
+  if (ingName.includes("menthol") || ingName.includes("mentha") || ingName.includes("peppermint")) {
+    notes.push({
+      dimensions: ["rosacea"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Menthol activates cold-sensing TRPM8 receptors and triggers local vasodilation. In rosacea-prone skin this directly worsens flushing episodes and sustained background redness — even when the cooling sensation feels soothing.",
+    });
+  }
+
+  // Camphor — nerve stimulant, vasodilating
+  if (ingName.includes("camphor") || (ingName.includes("cinnamomum") && ingName.includes("camphora"))) {
+    notes.push({
+      dimensions: ["rosacea"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Camphor activates heat-sensing TRPV1 and TRPA1 receptors and causes local vasodilation. It is a well-documented rosacea trigger that can worsen both flushing and persistent facial redness.",
+    });
+  }
+
+  // Cinnamon bark and clove — cinnamaldehyde / eugenol → TRPA1 activation
+  if (ingName.includes("cinnamomum") || ingName.includes("cinnamon bark") || ingName.includes("eugenia caryophyllus") || ingName.includes("clove")) {
+    notes.push({
+      dimensions: ["rosacea"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Cinnamaldehyde (cinnamon) and eugenol (clove) activate TRPA1 heat-pain receptors and are potent vasodilators. Both are well-established rosacea triggers and can cause significant flushing even at low concentrations.",
+    });
+  }
+
+  // Capsicum / capsaicin — TRPV1 activator
+  if (ingName.includes("capsicum") || ingName.includes("capsaicin")) {
+    notes.push({
+      dimensions: ["rosacea"],
+      climate: [],
+      sentiment: "strong_caution",
+      text: "Capsaicin activates TRPV1 heat receptors and causes intense local vasodilation. It is one of the strongest known rosacea triggers and should be completely avoided in rosacea-prone skin.",
+    });
+  }
+
+  // ── PHYTOESTROGEN NOTES ───────────────────────────────────────────────────
+
+  // Resveratrol — SERM activity
+  if (ingName.includes("resveratrol")) {
+    notes.push({
+      dimensions: [],
+      climate: ["hormone_sensitive", "on_hrt"],
+      sentiment: "caution",
+      text: "Resveratrol acts as a selective estrogen receptor modulator (SERM) with weak phytoestrogenic activity. For hormone-sensitive conditions or those on HRT, topical contribution is small but cumulative with dietary sources. Discuss with your prescriber if concerned.",
+    });
+    notes.push({
+      dimensions: [],
+      climate: ["pregnant"],
+      sentiment: "caution",
+      text: "Resveratrol's SERM activity has not been adequately studied in pregnancy. Its use in topical products is generally considered lower risk than oral supplements, but many practitioners recommend avoiding it during pregnancy as a precaution.",
+    });
+  }
+
+  // Licorice root — glabridin phytoestrogenic activity + androgen metabolism
+  if (ingName.includes("glycyrrhiza") || ingName.includes("licorice")) {
+    notes.push({
+      dimensions: [],
+      climate: ["hormone_sensitive", "on_hrt", "pregnant"],
+      sentiment: "caution",
+      text: "Licorice root (glabridin) has documented phytoestrogenic activity and inhibits 17β-hydroxysteroid dehydrogenase, altering androgen and estrogen metabolism. For hormone-sensitive conditions, HRT users, or during pregnancy, cumulative topical exposure is worth discussing with a prescriber.",
+    });
+  }
+
+  // Soy extracts / isoflavones
+  if (ingName.includes("soy") || ingName.includes("glycine soja") || ingName.includes("isoflavone") || ingName.includes("genistein") || ingName.includes("daidzein")) {
+    notes.push({
+      dimensions: [],
+      climate: ["hormone_sensitive", "on_hrt", "pregnant", "breastfeeding"],
+      sentiment: "caution",
+      text: "Soy-derived isoflavones (genistein, daidzein) are phytoestrogens that bind estrogen receptors. Topical absorption is low but cumulative with dietary soy. For hormone-sensitive conditions or during pregnancy and breastfeeding, minimize unnecessary exposure.",
+    });
+  }
+
   // Deduplicate identical notes that might arise from overlapping rules
   const seen = new Set<string>();
   return notes.filter((n) => {

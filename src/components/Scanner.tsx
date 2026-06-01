@@ -359,6 +359,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   "teratogen": "Teratogen",
   "iodine-heavy": "Iodine-heavy",
   "environmental persistent": "Environmentally persistent",
+  // Profile-specific concern categories
+  "vasodilator": "Vasodilator",
+  "fungal-feed": "Fungal feed",
 };
 
 const UNIVERSAL_FLAG_CATS = new Set([
@@ -604,7 +607,8 @@ function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateT
   if (climates.has("high_uv") || skinTypes.has("hyperpigmentation_prone")) cats.push("AHA exfoliants", "Retinoids");
   if (climates.has("hot") || climates.has("humid")) cats.push("Heavy occlusives", "Silicones");
   if (skinTypes.has("fungal_acne") || skinTypes.has("seborrheic")) cats.push("Plant oils", "Fatty acid esters", "Emulsifiers");
-  if (skinTypes.has("rosacea")) cats.push("Chemical sunscreens", "Warming agents", "Drying solvents");
+  if (skinTypes.has("rosacea")) cats.push("Chemical sunscreens", "Warming agents", "Drying solvents", "Vasodilators");
+  if (skinTypes.has("fungal_acne") || skinTypes.has("seborrheic")) cats.push("Fungal feeds");
   if (skinTypes.has("eczema")) cats.push("Sensitizing preservatives", "Fragrance allergens", "Sulfate surfactants");
   if (skinTypes.has("psoriasis")) cats.push("Fragrances", "Sulfate surfactants");
   if (skinTypes.has("lupus_rash")) cats.push("Chemical sunscreens", "Photosensitizers", "AHA exfoliants");
@@ -746,7 +750,9 @@ function isFcProfileMatch(fc: string, activeSkinTypes: Set<SkinType>, activeClim
     (fc === "endocrine disruptor" && (activeClimates.has("pregnant") || activeClimates.has("breastfeeding") || activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt"))) ||
     (fc === "phytoestrogen" && (activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt"))) ||
     (fc === "teratogen" && activeClimates.has("pregnant")) ||
-    (fc === "iodine-heavy" && activeClimates.has("thyroid_condition"))
+    (fc === "iodine-heavy" && activeClimates.has("thyroid_condition")) ||
+    (fc === "vasodilator" && (activeSkinTypes.has("rosacea") || activeSkinTypes.has("lupus_rash"))) ||
+    (fc === "fungal-feed" && (activeSkinTypes.has("fungal_acne") || activeSkinTypes.has("seborrheic")))
   );
 }
 
