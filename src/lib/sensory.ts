@@ -244,10 +244,15 @@ export const SENSORY_PROFILE_MAP: Record<string, string[]> = {
   "Astringent": ["reactive", "dry", "damaged_barrier", "eczema", "fast_shedding"],
 };
 
+const RINSE_OFF_SUPPRESS_SENSORY = new Set([
+  "Pilling", "Film-forming", "Occlusive", "occlusive-itch", "comedogenic-itch",
+]);
+
 export function countProfileSensoryMatches(
   ingredientList: string,
   skinTypes: string[],
-  climates: string[] = []
+  climates: string[] = [],
+  isRinseOff = false
 ): number {
   if (skinTypes.length === 0 && climates.length === 0) return 0;
   const skinTypeSet = new Set(skinTypes);
@@ -269,6 +274,7 @@ export function countProfileSensoryMatches(
         if (!seen.has(key)) {
           seen.add(key);
           const sc = rule.sensory_category;
+          if (isRinseOff && RINSE_OFF_SUPPRESS_SENSORY.has(sc)) break;
           const profileTypes = SENSORY_PROFILE_MAP[sc] ?? [];
           let isProfileMatch = profileTypes.some((st) => skinTypeSet.has(st));
           if (!isProfileMatch && sc === "Stripping") {

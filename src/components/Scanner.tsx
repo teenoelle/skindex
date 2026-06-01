@@ -2265,6 +2265,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     if (concerns.length) params.set("concerns", concerns.join(","));
     if (activeSkinTypes.size > 0) params.set("skinTypes", [...activeSkinTypes].join(","));
     if (activeClimates.size > 0) params.set("climates", [...activeClimates].join(","));
+    if (rinseOffDefaults.has(typeName)) params.set("isRinseOff", "1");
     const res = await fetch(`/api/browse?${params.toString()}`);
     const data = await res.json();
     setBrowseProducts(data.products ?? []);
@@ -3205,7 +3206,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   ✓ Neutral &amp; Beneficial
                 </button>
                 <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                  Photo-safe
+                  Sun-safe
                 </button>
               </div>
             </div>
@@ -3321,7 +3322,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         <button type="button" onClick={() => setBrowseProfileLinked(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseProfileLinked ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>✗ My Sensitivities</button>
                       )}
                       <button type="button" onClick={() => setBrowseCleanOnly(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseCleanOnly ? "bg-green-700 text-white border-green-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>✓ Neutral &amp; Beneficial</button>
-                      <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Photo-safe</button>
+                      <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Sun-safe</button>
                       {avoidLists.filter(l => l.type === "avoid").map(l => (
                         <span key={l.id} className="text-xs px-2 py-0.5 rounded-full border bg-rose-50 text-rose-700 border-rose-200">✗ {l.name}</span>
                       ))}

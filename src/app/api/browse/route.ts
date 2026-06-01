@@ -64,13 +64,18 @@ export async function GET(req: NextRequest) {
   // Profile-specific flagged count (optional — when concerns param is present)
   const concernsParam = req.nextUrl.searchParams.get("concerns");
   const concerns = concernsParam ? concernsParam.split(",").filter(Boolean) : [];
+  const isRinseOff = req.nextUrl.searchParams.get("isRinseOff") === "1";
+  const RINSE_OFF_SUPPRESS_DB_CATS = new Set(["pore-clogger", "occlusive", "bacteria-trap"]);
+  const effectiveConcerns = isRinseOff
+    ? concerns.filter((c) => !RINSE_OFF_SUPPRESS_DB_CATS.has(c))
+    : concerns;
   const profileCounts = new Map<string, number>();
 
-  if (concerns.length > 0) {
+  if (effectiveConcerns.length > 0) {
     const { data: concernIngredients } = await supabase
       .from("ingredients")
       .select("id")
-      .in("flagged_category", concerns);
+      .in("flagged_category", effectiveConcerns);
     const concernIds = (concernIngredients ?? []).map((i) => i.id);
 
     if (concernIds.length > 0) {
@@ -121,7 +126,7 @@ export async function GET(req: NextRequest) {
     universalConcernCount: universalCounts.get(p.id) ?? 0,
     profileFlaggedCount: concerns.length > 0 ? (profileCounts.get(p.id) ?? 0) : undefined,
     profileSensoryCount: skinTypes.length > 0 || climates.length > 0
-      ? (p.ingredient_list ? countProfileSensoryMatches(p.ingredient_list, skinTypes, climates) : 0)
+      ? (p.ingredient_list ? countProfileSensoryMatches(p.ingredient_list, skinTypes, climates, isRinseOff) : 0)
       : undefined,
   })).sort((a, b) => {
     if (a.flaggedCount !== b.flaggedCount) return a.flaggedCount - b.flaggedCount;
