@@ -5074,23 +5074,31 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             {/* Profile caution notes — separate amber stripe */}
                             {filteredProfileCautionNotes.length > 0 && (
                               <div className="pl-3 border-l-2 border-amber-500 space-y-1">
-                                {filteredProfileCautionNotes.map((note, i) => (
-                                  <p key={i} className="text-xs text-gray-600 leading-relaxed">
-                                    {noteLabel(note) && <span className="font-semibold text-amber-700">{noteLabel(note)} — </span>}
-                                    {note.text}
-                                  </p>
-                                ))}
+                                {filteredProfileCautionNotes.map((note, i) => {
+                                  const nl = noteLabel(note);
+                                  const fullLabel = [catLabel, nl].filter(Boolean).join(" · ");
+                                  return (
+                                    <p key={i} className="text-xs text-gray-600 leading-relaxed">
+                                      {fullLabel && <span className="font-semibold text-amber-700">{fullLabel} — </span>}
+                                      {note.text}
+                                    </p>
+                                  );
+                                })}
                               </div>
                             )}
                             {/* Other-profile caution notes — gray stripe */}
                             {otherCautionNotes.length > 0 && (
                               <div className="pl-3 border-l-2 border-gray-200 space-y-1">
-                                {otherCautionNotes.map((note, i) => (
-                                  <p key={i} className="text-xs text-gray-500 leading-relaxed">
-                                    {noteLabel(note) && <span className="font-semibold text-gray-500">{noteLabel(note)} — </span>}
-                                    {note.text}
-                                  </p>
-                                ))}
+                                {otherCautionNotes.map((note, i) => {
+                                  const nl = noteLabel(note);
+                                  const fullLabel = [catLabel, nl].filter(Boolean).join(" · ");
+                                  return (
+                                    <p key={i} className="text-xs text-gray-500 leading-relaxed">
+                                      {fullLabel && <span className="font-semibold text-gray-500">{fullLabel} — </span>}
+                                      {note.text}
+                                    </p>
+                                  );
+                                })}
                               </div>
                             )}
                             {/* Other-profile benefit notes — gray stripe */}
