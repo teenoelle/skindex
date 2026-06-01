@@ -2480,13 +2480,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <p className="text-xs font-medium text-gray-800 truncate">{displayName}</p>
-                    {(dupMap.get(p.routineId) ?? []).length > 0 && (() => {
+                    {(() => {
                       const dups = dupMap.get(p.routineId) ?? [];
                       const highConcernPat = /retinol|retinyl|retinaldehyde|tretinoin|glycolic|lactic|mandelic|salicylic|benzoyl/i;
                       const highConcern = dups.some(d => highConcernPat.test(d));
+                      if (!highConcern || dups.length === 0) return null;
                       const label = dups.length === 1 ? dups[0] : `${dups.slice(0, 2).join(", ")}${dups.length > 2 ? ` +${dups.length - 2}` : ""}`;
                       return (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${highConcern ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-amber-50 border-amber-200 text-amber-700">
                           {label} × {dups.length > 1 ? `${dups.length} shared` : "shared"}
                         </span>
                       );
@@ -2743,12 +2744,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   {sortedSlots.map(({ slot, priority, reasons }) => {
                     const isAvoid = priority === "avoid";
                     const chipColor = isAvoid
-                      ? "border-rose-200 text-rose-700 bg-rose-50"
+                      ? "border-rose-100 text-rose-800 bg-rose-50"
                       : priority === "essential"
-                      ? "border-gray-700 text-gray-800 bg-gray-100"
+                      ? "border-gray-200 text-gray-900 bg-gray-50"
                       : priority === "beneficial"
-                      ? "border-gray-300 text-gray-600 bg-white"
-                      : "border-gray-200 text-gray-400 bg-white";
+                      ? "border-gray-200 text-gray-700 bg-white"
+                      : "border-gray-100 text-gray-500 bg-white";
                     const tod = slot.timeOfDay ? ` (${slot.timeOfDay.toUpperCase()})` : "";
                     const hintOpen = whatNextHint === slot.key;
                     return (
@@ -2758,12 +2759,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             type="button"
                             disabled={isAvoid}
                             onClick={() => {
-                              setRoutinePanelOpen(false);
-                              setTab("browse");
                               setBrowseProfileLinked(true);
                               selectBrowseType(slot.browseType);
+                              setRoutinePanelOpen(false);
+                              resetTab("browse");
                             }}
-                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${chipColor} ${isAvoid ? "cursor-default opacity-60" : "hover:border-gray-500 hover:text-gray-700"}`}
+                            className={`text-[10px] px-2 py-0.5 rounded-md border transition-colors ${chipColor} ${isAvoid ? "cursor-not-allowed opacity-60" : "hover:border-gray-400 hover:text-gray-800"}`}
                           >
                             {slot.label}{tod}
                           </button>
@@ -2780,10 +2781,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 </div>
                 {sortedSlots.length > 0 && (
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 pt-1.5 border-t border-gray-100">
-                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-gray-100 border border-gray-700" /> essential</span>
-                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-white border border-gray-300" /> beneficial</span>
-                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-white border border-gray-200" /> optional</span>
-                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-rose-50 border border-rose-200" /> avoid</span>
+                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm bg-gray-50 border border-gray-200" /> essential</span>
+                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm bg-white border border-gray-200" /> beneficial</span>
+                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm bg-white border border-gray-100" /> optional</span>
+                    <span className="text-[9px] text-gray-400 flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm bg-rose-50 border border-rose-100" /> avoid</span>
                   </div>
                 )}
               </div>
