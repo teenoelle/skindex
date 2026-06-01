@@ -7,6 +7,7 @@ export type SkinNote = {
   climate: string[];
   sentiment: Sentiment;
   text: string;
+  concern?: string | null;
 };
 
 export type IngredientContext = {
@@ -50,12 +51,14 @@ export function generateNotes(ing: {
       climate: ["hot", "humid"],
       sentiment: "strong_caution",
       text: "Heavy occlusion traps excess sebum and heat against the skin — significantly worse in hot or humid weather when oil production is already elevated.",
+      concern: fc,
     });
     notes.push({
       dimensions: ["dry", "damaged_barrier"],
       climate: ["cold"],
       sentiment: "neutral",
       text: "For dry or barrier-compromised skin in cold conditions, occlusives offer some protection — but lighter barrier ingredients (ceramides, fatty acids) deliver similar defense without the congestion risk.",
+      concern: fc,
     });
   }
 
@@ -65,12 +68,14 @@ export function generateNotes(ing: {
       climate: [],
       sentiment: "strong_caution",
       text: "On reactive or compromised skin, contact sensitizers have a lower trigger threshold — reactions can occur faster and at lower concentrations when the barrier is disrupted.",
+      concern: fc,
     });
     notes.push({
       dimensions: [],
       climate: ["hot"],
       sentiment: "caution",
       text: "Warm weather increases skin permeability and absorption, which can amplify sensitizer-triggered reactions even on normally tolerant skin.",
+      concern: fc,
     });
   }
 
@@ -80,12 +85,14 @@ export function generateNotes(ing: {
       climate: ["high_uv"],
       sentiment: "strong_caution",
       text: "AHA exfoliants thin the outermost skin layer, significantly increasing UV sensitivity. Daily broad-spectrum SPF is essential when using these.",
+      concern: fc,
     });
     notes.push({
       dimensions: ["reactive", "damaged_barrier"],
       climate: [],
       sentiment: "caution",
       text: "On reactive or compromised skin, AHAs penetrate more deeply and intensify irritation — start at the lowest available percentage and limit frequency.",
+      concern: fc,
     });
   }
 
@@ -95,6 +102,7 @@ export function generateNotes(ing: {
       climate: ["cold", "dry_climate"],
       sentiment: "strong_caution",
       text: "Drying solvents strip skin lipids — particularly damaging in cold or dry air when the barrier is already under environmental stress and recovery is slowest.",
+      concern: fc,
     });
   }
 
@@ -104,12 +112,14 @@ export function generateNotes(ing: {
       climate: ["cold", "dry_climate"],
       sentiment: "strong_caution",
       text: "Sulfate surfactants remove the skin's protective lipid film — especially damaging in cold or dry conditions where the barrier needs that film most and takes longest to rebuild.",
+      concern: fc,
     });
     notes.push({
       dimensions: [],
       climate: [],
       sentiment: "neutral",
       text: "After rinsing, the skin's surface film is temporarily gone. Apply your next product promptly — the tight feeling is the post-wash window when barrier disruption is highest.",
+      concern: fc,
     });
   }
 
@@ -119,6 +129,7 @@ export function generateNotes(ing: {
       climate: ["hot", "high_uv"],
       sentiment: "caution",
       text: "Chemical UV filters absorb into skin and convert UV energy to heat — the resulting skin warmth can amplify reactivity in already-sensitized skin.",
+      concern: fc,
     });
   }
 
@@ -128,6 +139,7 @@ export function generateNotes(ing: {
       climate: ["cold", "dry_climate"],
       sentiment: "strong_caution",
       text: "Barrier-disrupting ingredients compound damage from cold or dry environments, where TEWL (water loss through skin) is already elevated.",
+      concern: fc,
     });
   }
 

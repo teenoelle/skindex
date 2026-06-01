@@ -4824,6 +4824,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               const isFlagged = match?.status === "flagged";
               const profileBenefitNotes = isNonMatching ? [] : filterNotes(rawNotes).filter((n) => n.sentiment === "benefit");
               const profileCautionNotes = isNonMatching ? [] : filterNotes(rawNotes).filter((n) => n.sentiment === "caution" || n.sentiment === "strong_caution");
+              const fcLower = fc?.toLowerCase() ?? "";
+              const fcProfileCautionNote = fcLower
+                ? (profileCautionNotes.find(n => n.concern != null && n.concern === fcLower && n.sentiment === "strong_caution")
+                  ?? profileCautionNotes.find(n => n.concern != null && n.concern === fcLower && n.sentiment === "caution"))
+                : null;
+              const fcProfileLabel = fcProfileCautionNote?.dimensions.length
+                ? ` · ${fcProfileCautionNote.dimensions.filter(d => activeSkinTypes.has(d as SkinType)).map(d => SKIN_TYPES.find(s => s.value === d)?.label ?? d).join(", ")}`
+                : "";
+              const filteredProfileCautionNotes = fcProfileCautionNote
+                ? profileCautionNotes.filter(n => n !== fcProfileCautionNote)
+                : profileCautionNotes;
               const otherCautionNotes = isNonMatching ? cautiousNotes : cautiousNotes.filter((n) => !isProfileNote(n));
               // Flagged ingredients already show all benefits in the teal stripe — don't duplicate in gray.
               const otherBenefitNotes = isFlagged ? [] : allBenefitNotes.filter((n) => !isProfileNote(n));
@@ -5033,9 +5044,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                 <p className="text-xs text-gray-600 leading-relaxed">
                                   {catLabel && (
                                     <span className={`font-semibold ${fc && isUniversalCat(fc) ? "text-rose-700" : "text-amber-700"}`}>
-                                      {sensoryMergedWith === fc && sensoryLabel ? `${catLabel}, ${sensoryLabel}${sensoryProfileLabel}` : catLabel} — </span>
+                                      {sensoryMergedWith === fc && sensoryLabel
+                                        ? `${catLabel}, ${sensoryLabel}${sensoryProfileLabel}`
+                                        : `${catLabel}${fcProfileLabel}`} — </span>
                                   )}
-                                  {dbConcernText}{sensoryMergedWith === fc && sensoryText ? ` ${sensoryText}` : ""}
+                                  {(fcProfileCautionNote?.text ?? dbConcernText)}{sensoryMergedWith === fc && sensoryText ? ` ${sensoryText}` : ""}
                                 </p>
                               )}
                               {/* Sensory shown separately only when it wasn't merged with a concern */}
@@ -5059,9 +5072,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               )}
                             </div>
                             {/* Profile caution notes — separate amber stripe */}
-                            {profileCautionNotes.length > 0 && (
+                            {filteredProfileCautionNotes.length > 0 && (
                               <div className="pl-3 border-l-2 border-amber-500 space-y-1">
-                                {profileCautionNotes.map((note, i) => (
+                                {filteredProfileCautionNotes.map((note, i) => (
                                   <p key={i} className="text-xs text-gray-600 leading-relaxed">
                                     {noteLabel(note) && <span className="font-semibold text-amber-700">{noteLabel(note)} — </span>}
                                     {note.text}

@@ -3,6 +3,7 @@ export type SkinClimateNote = {
   climate: string[];
   sentiment: "strong_caution" | "caution" | "benefit" | "neutral";
   text: string;
+  concern?: string | null;
 };
 
 export type ConcernItem = {
