@@ -105,6 +105,7 @@ export type RoutineProduct = {
   flaggedCategories: string[];
   timeOfDay?: "am" | "pm" | null;
   productType?: string | null;
+  image_url?: string | null;
 };
 
 export type Routine = {
