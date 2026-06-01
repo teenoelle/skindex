@@ -104,6 +104,7 @@ export type RoutineProduct = {
   ingredients: string[];
   flaggedCategories: string[];
   timeOfDay?: "am" | "pm" | null;
+  productType?: string | null;
 };
 
 export type Routine = {

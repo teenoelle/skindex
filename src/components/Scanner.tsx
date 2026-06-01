@@ -35,6 +35,60 @@ function getStepOrder(stepTags: string[]): number {
   return 4.5; // serum / moisturizer range
 }
 
+type SlotPriority = "essential" | "beneficial" | "optional" | "avoid";
+
+const ROUTINE_SLOTS: {
+  key: string; label: string; productTypes: string[]; browseType: string;
+  timeOfDay: "am" | "pm" | null; defaultPriority: SlotPriority;
+  profilePriority: Partial<Record<string, SlotPriority>>;
+  defaultReason: string; profileReasons: Partial<Record<string, string>>;
+}[] = [
+  { key: "cleanser", label: "Cleanser", productTypes: ["Face Wash", "Micellar Water", "Makeup Remover"], browseType: "Face Wash", timeOfDay: null, defaultPriority: "beneficial",
+    profilePriority: { oily: "essential", acne_prone: "essential", seborrheic: "essential", fungal_acne: "essential" },
+    defaultReason: "Removes surface buildup and preps skin for actives",
+    profileReasons: { oily: "Oily skin — excess sebum blocks actives and feeds bacteria; cleansing is essential", acne_prone: "Acne-prone skin — removes pore-clogging oils and debris that drive breakouts", damaged_barrier: "Use a gentle, non-stripping formula — harsh cleansers worsen barrier damage", reactive: "Use a fragrance-free, low-surfactant formula — reactive skin is easily over-cleansed" } },
+  { key: "moisturizer", label: "Moisturizer", productTypes: ["Cream", "Emulsion", "Gel", "Lotion"], browseType: "Cream", timeOfDay: null, defaultPriority: "beneficial",
+    profilePriority: { dry: "essential", reactive: "essential", damaged_barrier: "essential", eczema: "essential", psoriasis: "essential", rosacea: "essential", oily: "optional" },
+    defaultReason: "Seals in hydration and prior layers",
+    profileReasons: { dry: "Dry skin — seals in hydration and prevents TEWL; skipping causes progressive moisture loss", reactive: "Reactive skin — calms and reinforces the barrier after actives", damaged_barrier: "Damaged barrier — ceramide-rich formula fills lipid gaps and allows overnight repair", oily: "Optional for oily skin — a lightweight gel texture delivers hydration without adding occlusion" } },
+  { key: "serum", label: "Serum", productTypes: ["Serum", "Ampoule", "Extract"], browseType: "Serum", timeOfDay: null, defaultPriority: "beneficial",
+    profilePriority: { hyperpigmentation_prone: "essential", mature: "essential", acne_prone: "beneficial", damaged_barrier: "beneficial" },
+    defaultReason: "Delivers concentrated actives to target specific concerns",
+    profileReasons: { hyperpigmentation_prone: "Hyperpigmentation — targeted actives (niacinamide, vitamin C, AHA) are most potent in serum form", mature: "Mature skin — peptides and retinoids require high-concentration serum delivery to signal collagen", damaged_barrier: "Barrier-repair serums (ceramide, panthenol, centella) address the root cause rather than masking symptoms" } },
+  { key: "spf", label: "SPF", productTypes: ["Sunscreen Face", "Sunscreen"], browseType: "Sunscreen Face", timeOfDay: "am", defaultPriority: "beneficial",
+    profilePriority: { high_uv: "essential", hyperpigmentation_prone: "essential", rosacea: "essential", lupus_rash: "essential", mature: "essential" },
+    defaultReason: "Protects against UV damage",
+    profileReasons: { high_uv: "High UV climate — unprotected UV exposure is the single largest driver of all skin damage", hyperpigmentation_prone: "Hyperpigmentation — UV is the primary trigger for melanin overproduction; SPF is non-negotiable", rosacea: "Rosacea — UV is a primary rosacea trigger and worsens the inflammatory response", lupus_rash: "Lupus — UV triggers flares directly; broad-spectrum SPF is essential daily" } },
+  { key: "barrier", label: "Barrier Repair", productTypes: ["Ointment", "Balm"], browseType: "Ointment", timeOfDay: "pm", defaultPriority: "optional",
+    profilePriority: { damaged_barrier: "essential", reactive: "beneficial", eczema: "essential", psoriasis: "essential", rosacea: "beneficial" },
+    defaultReason: "Occlusive PM layer seals and repairs the skin barrier overnight",
+    profileReasons: { damaged_barrier: "Damaged barrier — occlusive PM step prevents TEWL and allows full overnight barrier recovery", eczema: "Eczema — occlusives reduce the TEWL that drives itching and flares overnight" } },
+  { key: "oil", label: "Face Oil", productTypes: ["Oil"], browseType: "Oil", timeOfDay: "pm", defaultPriority: "optional",
+    profilePriority: { dry: "beneficial", damaged_barrier: "beneficial", fungal_acne: "avoid" },
+    defaultReason: "Adds emollient lipids and supports moisture sealing",
+    profileReasons: { dry: "Dry skin — adds emollient lipids that reinforce moisture retention overnight", fungal_acne: "Most oils feed Malassezia — avoid for fungal acne unless using squalane or caprylic/capric triglycerides" } },
+  { key: "eye", label: "Eye Cream", productTypes: ["Eye Cream"], browseType: "Eye Cream", timeOfDay: null, defaultPriority: "optional",
+    profilePriority: { mature: "beneficial", hyperpigmentation_prone: "beneficial" },
+    defaultReason: "Addresses the delicate periorbital skin",
+    profileReasons: { mature: "Mature skin — periorbital skin is thinner and loses collagen faster; targeted peptides and emollients help", hyperpigmentation_prone: "Hyperpigmentation — dark circles often have a melanin component that targeted vitamin C or kojic acid can address" } },
+];
+
+const ACTIVE_LOAD_CATEGORIES: {
+  key: string; label: string; stepTags: string[]; ingredientPatterns: RegExp[];
+  defaultMax: number; profileThresholds: Partial<Record<string, { max: number; note: string }>>;
+}[] = [
+  { key: "aha", label: "AHA", stepTags: ["acid-step"], ingredientPatterns: [/glycolic/i, /lactic acid/i, /mandelic/i, /malic acid/i, /tartaric/i], defaultMax: 2,
+    profileThresholds: { reactive: { max: 1, note: "High for reactive skin" }, damaged_barrier: { max: 1, note: "High for damaged barrier" }, rosacea: { max: 1, note: "High for rosacea" } } },
+  { key: "bha", label: "BHA", stepTags: [], ingredientPatterns: [/salicylic/i, /willow bark/i, /beta hydroxy/i], defaultMax: 2,
+    profileThresholds: { reactive: { max: 1, note: "High for reactive skin" }, damaged_barrier: { max: 1, note: "High for damaged barrier" } } },
+  { key: "retinoid", label: "Retinoid", stepTags: ["retinoid"], ingredientPatterns: [/\bretinol\b/i, /\bretinal\b/i, /retinyl/i, /tretinoin/i, /adapalene/i], defaultMax: 1,
+    profileThresholds: { reactive: { max: 1, note: "Start slow — reactive skin sensitizes easily" }, damaged_barrier: { max: 1, note: "Use cautiously — retinoids increase TEWL on compromised barrier" } } },
+  { key: "vitc", label: "Vitamin C", stepTags: ["low-ph-step"], ingredientPatterns: [/ascorbic acid/i, /ascorbyl/i, /l-ascorbic/i], defaultMax: 2,
+    profileThresholds: { reactive: { max: 1, note: "High for reactive skin — can cause stinging" } } },
+  { key: "enhancer", label: "Penetration enhancer", stepTags: ["enhancer-caution"], ingredientPatterns: [], defaultMax: 2,
+    profileThresholds: { reactive: { max: 1, note: "Drives irritants deeper on reactive skin" }, damaged_barrier: { max: 1, note: "Disrupts compromised barrier further" } } },
+];
+
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Ampoule: Pipette,
   Balm: Sparkles,
@@ -588,13 +642,50 @@ const SENSORY_CATEGORY_LABEL: Record<string, string> = {
 };
 
 
-const STEP_TAG_CONFIG: Record<string, { label: string; desc: string; className: string }> = {
-  "acid-step":        { label: "Acid step",            desc: "Apply before serums; leave 15–20 min before higher-pH actives like niacinamide or peptides",                     className: "border-amber-200 bg-amber-50 text-amber-700" },
-  "low-ph-step":      { label: "Low pH",               desc: "Ascorbic acid works best at pH 3–3.5. Apply before niacinamide, peptides, or moisturizers and wait 20 min",      className: "border-orange-200 bg-orange-50 text-orange-700" },
-  "retinoid":         { label: "Retinoid",             desc: "Apply last in PM routine. Do not layer with AHAs or BHAs the same evening — alternate evenings instead",         className: "border-purple-200 bg-purple-50 text-purple-700" },
-  "spf-last":         { label: "Apply last (AM)",      desc: "Sunscreen is always the final AM step — after all serums, moisturizers, and eye creams",                        className: "border-yellow-200 bg-yellow-50 text-yellow-700" },
-  "seal-last":        { label: "Seal last (PM)",       desc: "Occlusive ingredients lock in all prior layers — apply as the absolute final PM step",                          className: "border-gray-200 bg-gray-100 text-gray-600" },
-  "enhancer-caution": { label: "Penetration enhancer", desc: "Contains drying alcohol that drives co-applied ingredients deeper — avoid applying immediately before fragrance-heavy or sensitizer-containing products", className: "border-rose-200 bg-rose-50 text-rose-700" },
+const STEP_TAG_CONFIG: Record<string, { label: string; desc: string; className: string; chemicalReason: string; neighborContext: string; movementImpact: string; synergy?: string }> = {
+  "acid-step": {
+    label: "Acid step", className: "border-amber-200 bg-amber-50 text-amber-700",
+    desc: "Apply before serums; leave 15–20 min before higher-pH actives like niacinamide or peptides",
+    chemicalReason: "AHAs require low pH (3.0–3.5) for optimal activity. Above pH 4, the ionized form dominates and cannot penetrate the stratum corneum — exfoliation efficiency drops by up to 80%.",
+    neighborContext: "Apply after cleansing while the skin surface is uncoated. The acid step loosens corneocyte bonds so serums that follow absorb into freshly cleared skin.",
+    movementImpact: "Applied after a serum or moisturizer, the formulation's pH is buffered upward and exfoliation is significantly reduced.",
+    synergy: "If your routine includes a vitamin C serum, the low-pH environment also briefly stabilizes ascorbic acid and may improve its absorption.",
+  },
+  "low-ph-step": {
+    label: "Low pH", className: "border-orange-200 bg-orange-50 text-orange-700",
+    desc: "Ascorbic acid works best at pH 3–3.5. Apply before niacinamide, peptides, or moisturizers and wait 20 min",
+    chemicalReason: "L-ascorbic acid is most stable and membrane-permeable at pH 3.0–3.5. Above pH 4, conversion to inactive dehydroascorbic acid accelerates and skin penetration drops sharply.",
+    neighborContext: "Apply before niacinamide — at low pH, niacinamide and ascorbic acid can form a yellow complex that reduces both actives' efficacy. A 20-minute gap prevents this.",
+    movementImpact: "Applied after a moisturizer, the buffering effect raises the pH and reduces vitamin C delivery by roughly 60%. Vitamin C must go on bare or lightly prepped skin.",
+  },
+  "retinoid": {
+    label: "Retinoid", className: "border-purple-200 bg-purple-50 text-purple-700",
+    desc: "Apply last in PM routine. Do not layer with AHAs or BHAs the same evening — alternate evenings instead",
+    chemicalReason: "Retinoids bind nuclear receptors to regulate keratinocyte differentiation. Applied as the last active step, nothing dilutes the contact time or competes for receptor binding.",
+    neighborContext: "For reactive or compromised skin, apply a light moisturizer before the retinoid (sandwich method) — this buffers absorption without blocking efficacy and significantly reduces peeling.",
+    movementImpact: "Applied before serums or moisturizer, subsequent layers dilute and spread the retinoid away from the skin surface, reducing effective dose.",
+  },
+  "spf-last": {
+    label: "Apply last (AM)", className: "border-yellow-200 bg-yellow-50 text-yellow-700",
+    desc: "Sunscreen is always the final AM step — after all serums, moisturizers, and eye creams",
+    chemicalReason: "UV filter molecules form a protective matrix at the skin surface. Skincare applied on top physically disrupts this matrix, reducing the measured SPF factor.",
+    neighborContext: "Everything goes under SPF. Antioxidants like vitamin C and niacinamide applied before enhance photoprotection by neutralizing free radicals that UV filters miss.",
+    movementImpact: "Anything applied on top of SPF breaks the UV filter matrix. SPF must always be the final AM step before makeup.",
+  },
+  "seal-last": {
+    label: "Seal last (PM)", className: "border-gray-200 bg-gray-100 text-gray-600",
+    desc: "Occlusive ingredients lock in all prior layers — apply as the absolute final PM step",
+    chemicalReason: "Petrolatum, silicones, and waxes form an occlusive film that physically blocks transepidermal water loss. Applied last, this film traps all humectants and actives applied before it.",
+    neighborContext: "Applied last, the occlusive layer prevents overnight moisture evaporation and keeps all prior actives in sustained contact with the skin surface.",
+    movementImpact: "Anything applied after an occlusive cannot penetrate — the film blocks absorption entirely. The sealing product must always go last.",
+  },
+  "enhancer-caution": {
+    label: "Penetration enhancer", className: "border-rose-200 bg-rose-50 text-rose-700",
+    desc: "Contains drying alcohol that drives co-applied ingredients deeper — avoid applying immediately before fragrance-heavy or sensitizer-containing products",
+    chemicalReason: "Drying alcohols (SD alcohol, denatured alcohol) temporarily disrupt the stratum corneum lipid bilayer, increasing penetration of co-applied ingredients by up to 3×.",
+    neighborContext: "Apply first before other toners or serums. The disruption window is short — anything applied immediately after benefits from enhanced penetration.",
+    movementImpact: "Applied after actives, the penetration-enhancing window is wasted. Applied before known sensitizers, it drives them deeper than intended.",
+  },
 };
 
 const RINSE_OFF_SUPPRESS_DB_CATS = new Set(["pore-clogger", "occlusive", "bacteria-trap"]);
@@ -906,6 +997,65 @@ function profileMatchedCategories(skinTypes: Set<SkinType>, climates: Set<Climat
   if (skinTypes.has("hyperpigmentation_prone") || climates.has("high_uv") || skinTypes.has("lupus_rash"))
     cats.push("photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical");
   return [...new Set(cats)];
+}
+
+function getSlotPriority(slot: typeof ROUTINE_SLOTS[0], skinTypes: Set<string>, climates: Set<string>): SlotPriority {
+  const all = [...skinTypes, ...climates];
+  const order: SlotPriority[] = ["avoid", "essential", "beneficial", "optional"];
+  let best = slot.defaultPriority;
+  for (const p of all) {
+    const ov = slot.profilePriority[p];
+    if (ov === "avoid") return "avoid";
+    if (ov && order.indexOf(ov) < order.indexOf(best)) best = ov;
+  }
+  return best;
+}
+
+function getSlotReasons(slot: typeof ROUTINE_SLOTS[0], skinTypes: Set<string>, climates: Set<string>): string[] {
+  const all = [...skinTypes, ...climates];
+  const reasons = all.flatMap(p => slot.profileReasons[p] ? [slot.profileReasons[p]!] : []);
+  return reasons.length > 0 ? reasons : [slot.defaultReason];
+}
+
+function getActiveLoads(products: RoutineProduct[], skinTypes: Set<string>, climates: Set<string>) {
+  const all = [...skinTypes, ...climates];
+  return ACTIVE_LOAD_CATEGORIES.map(cat => {
+    const count = products.filter(p =>
+      cat.stepTags.some(t => p.step_tags.includes(t)) ||
+      cat.ingredientPatterns.some(re => p.ingredients.some(ing => re.test(ing)))
+    ).length;
+    if (count === 0) return null;
+    const tensions = all
+      .map(p => cat.profileThresholds[p] ? { ...cat.profileThresholds[p]!, over: count > cat.profileThresholds[p]!.max } : null)
+      .filter(Boolean) as { max: number; note: string; over: boolean }[];
+    const unique = tensions.filter((t, i, a) => a.findIndex(x => x.note === t.note) === i);
+    return { key: cat.key, label: cat.label, count, defaultMax: cat.defaultMax, tensions: unique };
+  }).filter(Boolean) as { key: string; label: string; count: number; defaultMax: number; tensions: { max: number; note: string; over: boolean }[] }[];
+}
+
+function getOverlapBadge(product: RoutineProduct, all: RoutineProduct[], skinTypes: Set<string>, climates: Set<string>): { label: string; high: boolean } | null {
+  const profiles = [...skinTypes, ...climates];
+  for (const cat of ACTIVE_LOAD_CATEGORIES) {
+    const covers = (p: RoutineProduct) =>
+      cat.stepTags.some(t => p.step_tags.includes(t)) ||
+      cat.ingredientPatterns.some(re => p.ingredients.some(ing => re.test(ing)));
+    if (!covers(product)) continue;
+    const others = all.filter(p => p.routineId !== product.routineId && covers(p));
+    if (others.length === 0) continue;
+    const total = others.length + 1;
+    const isHigh = profiles.some(p => { const t = cat.profileThresholds[p]; return t && total > t.max; });
+    const names = others.slice(0, 2).map(p => p.name).join(", ") + (others.length > 2 ? ` +${others.length - 2}` : "");
+    return { label: `${cat.label} — also in ${names}`, high: isHigh };
+  }
+  return null;
+}
+
+function getWaitTimeAfter(p: RoutineProduct): string | null {
+  if (p.step_tags.includes("acid-step")) return "15–20 min";
+  if (p.step_tags.includes("low-ph-step")) return "20 min";
+  if (p.step_tags.includes("enhancer-caution")) return "1 min";
+  if (p.step_tags.includes("retinoid") || p.step_tags.includes("spf-last") || p.step_tags.includes("seal-last")) return null;
+  return "30 sec";
 }
 
 export default function Scanner({ initialProductId }: { initialProductId?: string | null }) {
@@ -1912,6 +2062,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       ingredients: result.originalItems,
       flaggedCategories: result.flagged.map((f) => f.ingredient.flagged_category ?? "").filter(Boolean),
       timeOfDay: timeOfDay ?? null,
+      productType: result.product.type ?? null,
     };
     updateActiveProducts(prev => [...prev, newEntry]);
     setAddedToRoutine(true);
@@ -1931,6 +2082,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       ingredients,
       flaggedCategories: [],
       timeOfDay: null,
+      productType: null,
     };
     updateActiveProducts(prev => [...prev, newEntry]);
     setRoutinePanelOpen(true);
@@ -2102,72 +2254,88 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     const bothProducts = routineProducts.filter(p => !p.timeOfDay);
     const totalConcerns = routineProducts.reduce((n, p) => n + p.flaggedCategories.length, 0);
 
-    const renderProduct = (p: RoutineProduct, sortedGroup: RoutineProduct[]) => {
+    const renderProduct = (p: RoutineProduct, sortedGroup: RoutineProduct[], waitTimeAfter?: string | null) => {
       const idx = sortedGroup.indexOf(p);
       const prev = idx > 0 ? sortedGroup[idx - 1] : null;
       const next = idx < sortedGroup.length - 1 ? sortedGroup[idx + 1] : null;
+      const overlap = getOverlapBadge(p, routineProducts, activeSkinTypes as Set<string>, activeClimates as Set<string>);
       return (
-        <div key={p.routineId} className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
-              {(dupMap.get(p.routineId) ?? []).length > 0 && (() => {
-                const dups = dupMap.get(p.routineId) ?? [];
-                const highConcernPat = /retinol|retinyl|retinaldehyde|tretinoin|glycolic|lactic|mandelic|salicylic|benzoyl/i;
-                const highConcern = dups.some(d => highConcernPat.test(d));
-                const label = dups.length === 1 ? dups[0] : `${dups.slice(0, 2).join(", ")}${dups.length > 2 ? ` +${dups.length - 2}` : ""}`;
-                return (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${highConcern ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
-                    {label} × {dups.length > 1 ? `${dups.length} shared` : "shared"}
-                  </span>
-                );
-              })()}
-            </div>
-            {p.brand && <p className="text-[10px] text-gray-400">{p.brand}</p>}
-            {/* Order context */}
-            {(prev || next) && (
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {prev && <span>After: {prev.name}{p.step_tags.includes("acid-step") ? " — wait 15–20 min" : ""}</span>}
-                {prev && next && <span className="mx-1">·</span>}
-                {next && <span>Before: {next.name}</span>}
-              </p>
-            )}
-            {p.step_tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {p.step_tags.map((tag) => {
-                  const cfg = STEP_TAG_CONFIG[tag];
-                  if (!cfg) return null;
-                  const hintKey = `${p.routineId}-${tag}`;
+        <div key={p.routineId}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
+                {(dupMap.get(p.routineId) ?? []).length > 0 && (() => {
+                  const dups = dupMap.get(p.routineId) ?? [];
+                  const highConcernPat = /retinol|retinyl|retinaldehyde|tretinoin|glycolic|lactic|mandelic|salicylic|benzoyl/i;
+                  const highConcern = dups.some(d => highConcernPat.test(d));
+                  const label = dups.length === 1 ? dups[0] : `${dups.slice(0, 2).join(", ")}${dups.length > 2 ? ` +${dups.length - 2}` : ""}`;
                   return (
-                    <span key={tag} className="inline-flex items-center gap-0.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${cfg.className}`}>{cfg.label}</span>
-                      <button type="button" onClick={() => setRoutineStepHint(h => h === hintKey ? null : hintKey)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none">ⓘ</button>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${highConcern ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                      {label} × {dups.length > 1 ? `${dups.length} shared` : "shared"}
                     </span>
                   );
-                })}
-                {p.step_tags.map(tag => {
-                  const hintKey = `${p.routineId}-${tag}`;
-                  if (routineStepHint !== hintKey) return null;
-                  const cfg = STEP_TAG_CONFIG[tag];
-                  if (!cfg) return null;
-                  return (
-                    <div key={`hint-${hintKey}`} className="w-full mt-0.5 text-[10px] text-gray-600 bg-gray-50 rounded-lg px-2 py-1.5 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{cfg.label} — </span>{cfg.desc}
-                    </div>
-                  );
-                })}
+                })()}
               </div>
-            )}
+              {p.brand && <p className="text-[10px] text-gray-400">{p.brand}</p>}
+              {(prev || next) && (
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {prev && <span>After: {prev.name}</span>}
+                  {prev && next && <span className="mx-1">·</span>}
+                  {next && <span>Before: {next.name}</span>}
+                </p>
+              )}
+              {p.step_tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {p.step_tags.map((tag) => {
+                    const cfg = STEP_TAG_CONFIG[tag];
+                    if (!cfg) return null;
+                    const hintKey = `${p.routineId}-${tag}`;
+                    return (
+                      <span key={tag} className="inline-flex items-center gap-0.5">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${cfg.className}`}>{cfg.label}</span>
+                        <button type="button" onClick={() => setRoutineStepHint(h => h === hintKey ? null : hintKey)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none">ⓘ</button>
+                      </span>
+                    );
+                  })}
+                  {p.step_tags.map(tag => {
+                    const hintKey = `${p.routineId}-${tag}`;
+                    if (routineStepHint !== hintKey) return null;
+                    const cfg = STEP_TAG_CONFIG[tag];
+                    if (!cfg) return null;
+                    return (
+                      <div key={`hint-${hintKey}`} className="w-full mt-1 text-[10px] text-gray-600 bg-gray-50 rounded-lg px-2 py-1.5 leading-relaxed border border-gray-100 space-y-1">
+                        <p><span className="font-semibold text-gray-700">Why here: </span>{cfg.chemicalReason}</p>
+                        <p><span className="font-semibold text-gray-700">For your routine: </span>{cfg.neighborContext}</p>
+                        <p><span className="font-semibold text-gray-700">If moved: </span>{cfg.movementImpact}</p>
+                        {cfg.synergy && <p><span className="font-semibold text-teal-700">Synergy: </span>{cfg.synergy}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {overlap && (
+                <p className={`text-[10px] mt-0.5 ${overlap.high ? "text-amber-800" : "text-gray-400"}`}>
+                  {overlap.high ? "⚠ " : "· "}{overlap.label}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0 mt-0.5">
+              <button type="button" onClick={() => {
+                const tod = p.timeOfDay === "am" ? "pm" : p.timeOfDay === "pm" ? null : "am";
+                updateActiveProducts(prev => prev.map(q => q.routineId === p.routineId ? { ...q, timeOfDay: tod } : q));
+              }} className="text-[10px] text-gray-400 hover:text-teal-600 border border-gray-200 rounded-full px-1.5 py-0.5 transition-colors">
+                {p.timeOfDay === "am" ? "AM" : p.timeOfDay === "pm" ? "PM" : "Both"}
+              </button>
+              <button type="button" onClick={() => removeFromRoutine(p.routineId)} className="text-[10px] text-gray-300 hover:text-rose-400">Remove</button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 mt-0.5">
-            <button type="button" onClick={() => {
-              const tod = p.timeOfDay === "am" ? "pm" : p.timeOfDay === "pm" ? null : "am";
-              updateActiveProducts(prev => prev.map(q => q.routineId === p.routineId ? { ...q, timeOfDay: tod } : q));
-            }} className="text-[10px] text-gray-400 hover:text-teal-600 border border-gray-200 rounded-full px-1.5 py-0.5 transition-colors">
-              {p.timeOfDay === "am" ? "AM" : p.timeOfDay === "pm" ? "PM" : "Both"}
-            </button>
-            <button type="button" onClick={() => removeFromRoutine(p.routineId)} className="text-[10px] text-gray-300 hover:text-rose-400">Remove</button>
-          </div>
+          {waitTimeAfter && (
+            <div className="flex items-center gap-1.5 py-1 pl-1">
+              <div className="w-px h-3 bg-gray-200" />
+              <span className="text-[9px] text-gray-300">{waitTimeAfter}</span>
+            </div>
+          )}
         </div>
       );
     };
@@ -2189,16 +2357,65 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       );
     };
 
+    const renderActiveLoadBar = (products: RoutineProduct[]) => {
+      const loads = getActiveLoads(products, activeSkinTypes as Set<string>, activeClimates as Set<string>);
+      if (loads.length === 0) return null;
+      return (
+        <div className="mb-2 space-y-1">
+          {loads.map(load => {
+            const overForAny = load.tensions.some(t => t.over);
+            const atForAny = load.tensions.some(t => !t.over && load.count >= t.max);
+            const dotColor = overForAny ? "bg-red-800" : atForAny ? "bg-amber-800" : "bg-green-800";
+            return (
+              <div key={load.key}>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                  <span className="text-[10px] text-gray-600">{load.label} ×{load.count}</span>
+                </div>
+                {load.tensions.length > 0 && (
+                  <div className="ml-3 mt-0.5 space-y-0.5">
+                    {load.tensions.map((t, i) => (
+                      <p key={i} className={`text-[9px] ${t.over ? "text-red-800" : "text-amber-800"}`}>
+                        {t.over ? "↑ " : "→ "}{t.note}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
     const renderGroup = (label: string, products: RoutineProduct[], tod?: "am" | "pm") => products.length === 0 ? null : (
       <div>
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
         {tod && renderStepRail(products, tod)}
-        <div className="space-y-2.5">{products.map(p => renderProduct(p, products))}</div>
+        {renderActiveLoadBar(products)}
+        <div className="space-y-0">
+          {products.map((p, i) => {
+            const isLast = i === products.length - 1;
+            return renderProduct(p, products, isLast ? null : getWaitTimeAfter(p));
+          })}
+        </div>
       </div>
     );
 
-    // Gap warnings
-    const amSpfMissing = amProducts.length > 0 && !amProducts.some(p => p.step_tags.includes("spf-last"));
+    // What's next strip
+    const coveredTypes = new Set(routineProducts.map(p => p.productType).filter(Boolean) as string[]);
+    const coveredStepTags = new Set(routineProducts.flatMap(p => p.step_tags));
+    const uncoveredSlots = ROUTINE_SLOTS.map(slot => {
+      const isCovered = slot.productTypes.some(t => coveredTypes.has(t)) ||
+        (slot.key === "spf" && coveredStepTags.has("spf-last")) ||
+        (slot.key === "barrier" && coveredStepTags.has("seal-last"));
+      if (isCovered) return null;
+      const priority = getSlotPriority(slot, activeSkinTypes as Set<string>, activeClimates as Set<string>);
+      const reasons = getSlotReasons(slot, activeSkinTypes as Set<string>, activeClimates as Set<string>);
+      return { slot, priority, reasons };
+    }).filter(Boolean) as { slot: typeof ROUTINE_SLOTS[0]; priority: SlotPriority; reasons: string[] }[];
+    const priorityOrder: SlotPriority[] = ["essential", "beneficial", "optional", "avoid"];
+    const sortedSlots = uncoveredSlots.sort((a, b) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority));
 
     return (
       <div className="space-y-3">
@@ -2259,10 +2476,42 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 <div className="space-y-2.5">{routineProducts.map(p => renderProduct(p, routineProducts))}</div>
               )}
             </div>
-            {amSpfMissing && (
-              <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2">
-                <p className="text-[10px] font-semibold text-yellow-800">⚠ No SPF in AM routine</p>
-                <p className="text-[10px] text-yellow-700">AHAs, retinoids, and brightening actives increase UV sensitivity — SPF is essential when using them.</p>
+            {sortedSlots.length > 0 && (
+              <div className="border-t border-gray-100 pt-2">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">What&apos;s next</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {sortedSlots.map(({ slot, priority, reasons }) => {
+                    const isAvoid = priority === "avoid";
+                    const chipColor = isAvoid
+                      ? "border-rose-200 text-rose-700 bg-rose-50"
+                      : priority === "essential"
+                      ? "border-gray-700 text-gray-800 bg-gray-100"
+                      : priority === "beneficial"
+                      ? "border-gray-300 text-gray-600 bg-white"
+                      : "border-gray-200 text-gray-400 bg-white";
+                    const tod = slot.timeOfDay ? ` (${slot.timeOfDay.toUpperCase()})` : "";
+                    return (
+                      <div key={slot.key} className="group relative">
+                        <button
+                          type="button"
+                          disabled={isAvoid}
+                          onClick={() => {
+                            setRoutinePanelOpen(false);
+                            setTab("browse");
+                            setBrowseProfileLinked(true);
+                            selectBrowseType(slot.browseType);
+                          }}
+                          className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${chipColor} ${isAvoid ? "cursor-default opacity-60" : "hover:border-gray-500 hover:text-gray-700"}`}
+                        >
+                          {slot.label}{tod}
+                        </button>
+                        <div className="absolute bottom-full left-0 mb-1 w-48 bg-gray-900 text-white text-[9px] rounded-lg px-2 py-1.5 leading-relaxed hidden group-hover:block z-50 pointer-events-none">
+                          {reasons.map((r, i) => <p key={i}>{r}</p>)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {routineWarns.length > 0 && (
