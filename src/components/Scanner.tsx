@@ -2223,15 +2223,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     });
   }
 
+  function isProfileNote(n: SkinClimateNote): boolean {
+    const skinMatch = n.dimensions.length === 0 || n.dimensions.some((d) => activeSkinTypes.has(d as SkinType));
+    const climateMatch = n.climate.length === 0 || n.climate.some((c) => activeClimates.has(c as ClimateType));
+    return skinMatch && climateMatch;
+  }
+
   function filterNotes(notes: SkinClimateNote[] | null | undefined): SkinClimateNote[] {
     if (!notes?.length) return [];
-    return notes.filter((n) => {
-      const skinMatch = n.dimensions.length === 0 || n.dimensions.some((d) => activeSkinTypes.has(d as SkinType));
-      const climateMatch = n.climate.length === 0 || n.climate.some((c) => activeClimates.has(c as ClimateType));
-      // Notes constrained on both axes: show if either matches
-      if (n.dimensions.length > 0 && n.climate.length > 0) return skinMatch || climateMatch;
-      return skinMatch && climateMatch;
-    });
+    return notes.filter((n) => isProfileNote(n));
   }
 
   function switchToPaste(prefill?: string) {
@@ -4817,10 +4817,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               const rawClimateNotes = match?.ingredient.skin_climate_notes;
               const rawNotes: SkinClimateNote[] = Array.isArray(rawClimateNotes) ? rawClimateNotes : [];
               const allBenefitNotes = rawNotes.filter((n) => n.sentiment === "benefit");
-              const profileBenefitNotes = filterNotes(rawNotes).filter((n) => n.sentiment === "benefit");
-              const profileCautionNotes = filterNotes(rawNotes).filter(
-                (n) => n.sentiment === "caution" || n.sentiment === "strong_caution"
-              );
+              const isNonMatching = level === "non-matching";
+              // Non-matching ingredients show all notes (unfiltered) so users see which profiles they apply to.
+              // Profile-matched ingredients split notes: profile notes (AND match) in amber, others in gray.
+              const cautiousNotes = rawNotes.filter((n) => n.sentiment === "caution" || n.sentiment === "strong_caution");
+              const isFlagged = match?.status === "flagged";
+              const profileBenefitNotes = isNonMatching ? [] : filterNotes(rawNotes).filter((n) => n.sentiment === "benefit");
+              const profileCautionNotes = isNonMatching ? [] : filterNotes(rawNotes).filter((n) => n.sentiment === "caution" || n.sentiment === "strong_caution");
+              const otherCautionNotes = isNonMatching ? cautiousNotes : cautiousNotes.filter((n) => !isProfileNote(n));
+              // Flagged ingredients already show all benefits in the teal stripe — don't duplicate in gray.
+              const otherBenefitNotes = isFlagged ? [] : allBenefitNotes.filter((n) => !isProfileNote(n));
 
               const itemKey = item.toLowerCase();
               const inList = addToListMenu === itemKey;
@@ -5048,6 +5054,28 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                 {profileCautionNotes.map((note, i) => (
                                   <p key={i} className="text-xs text-gray-600 leading-relaxed">
                                     {noteLabel(note) && <span className="font-semibold text-amber-700">{noteLabel(note)} — </span>}
+                                    {note.text}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                            {/* Other-profile caution notes — gray stripe */}
+                            {otherCautionNotes.length > 0 && (
+                              <div className="pl-3 border-l-2 border-gray-200 space-y-1">
+                                {otherCautionNotes.map((note, i) => (
+                                  <p key={i} className="text-xs text-gray-500 leading-relaxed">
+                                    {noteLabel(note) && <span className="font-semibold text-gray-500">{noteLabel(note)} — </span>}
+                                    {note.text}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                            {/* Other-profile benefit notes — gray stripe */}
+                            {otherBenefitNotes.length > 0 && (
+                              <div className="pl-3 border-l-2 border-gray-200 space-y-1">
+                                {otherBenefitNotes.map((note, i) => (
+                                  <p key={i} className="text-xs text-gray-500 leading-relaxed">
+                                    {noteLabel(note) && <span className="font-semibold text-gray-500">{noteLabel(note)} — </span>}
                                     {note.text}
                                   </p>
                                 ))}
