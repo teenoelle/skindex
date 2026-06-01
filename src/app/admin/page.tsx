@@ -507,7 +507,6 @@ export default function AdminPage() {
   const [savingQueueName, setSavingQueueName] = useState(false);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [upgradeStats, setUpgradeStats] = useState<{ weak: number; total: number } | null>(null);
-  const [upgradeRunning, setUpgradeRunning] = useState(false);
 
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannersLoading, setBannersLoading] = useState(false);
@@ -732,22 +731,6 @@ export default function AdminPage() {
     } catch { }
   }
 
-  async function runUpgradeBatch() {
-    setUpgradeRunning(true);
-    try {
-      const res = await fetch("/api/admin/upgrade-explanations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batchSize: 20 }),
-      });
-      const data = await res.json();
-      setUpgradeStats((prev) => prev
-        ? { ...prev, weak: data.remaining ?? prev.weak }
-        : null
-      );
-    } catch { }
-    setUpgradeRunning(false);
-  }
 
   async function removeFromQueue(item: QueueItem) {
     setRemovingFromQueue(item.id);
@@ -2503,14 +2486,7 @@ export default function AdminPage() {
                             : `All ${upgradeStats.total} explanations are curated`}
                         </span>
                         {upgradeStats.weak > 0 && (
-                          <button
-                            type="button"
-                            onClick={runUpgradeBatch}
-                            disabled={upgradeRunning}
-                            className="text-xs text-indigo-600 hover:text-indigo-800 disabled:opacity-40"
-                          >
-                            {upgradeRunning ? "Upgrading…" : "Upgrade batch (20)"}
-                          </button>
+                          <code className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded px-2 py-0.5 select-all">/upgrade-explanations</code>
                         )}
                       </>
                     )}

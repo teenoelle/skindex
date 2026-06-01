@@ -25,7 +25,7 @@ const limit = parseInt(process.argv.find((a) => /^\d+$/.test(a)) ?? "30");
 async function main() {
   const { data, error } = await supabase
     .from("ingredients")
-    .select("id, name, status, structural_category, category, flagged_category")
+    .select("id, name, status, structural_category, category, flagged_category, secondary_flagged_categories")
     .or("explanation_source.is.null,explanation_source.eq.template")
     .order("name")
     .limit(limit);

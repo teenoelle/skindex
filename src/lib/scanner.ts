@@ -23,7 +23,7 @@ function parseIngredientList(raw: string): string[] {
 
 export async function matchIngredients(raw: string) {
   const items = parseIngredientList(raw);
-  const { data } = await supabase.from("ingredients").select("*");
+  const { data } = await supabase.from("ingredients").select("*").limit(10000);
   const db = (data || []) as DbIngredient[];
 
   const safe: IngredientMatch[] = [];

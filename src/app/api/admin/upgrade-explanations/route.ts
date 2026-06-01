@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { generateCuratedExplanation } from "@/lib/ai-explanation";
+import { generateNotes } from "@/lib/curated-explanation";
 
 async function guard() {
   const { userId } = await auth();
@@ -29,6 +30,7 @@ export async function GET(req: NextRequest) {
 }
 
 // Upgrades a batch of template/null explanations to AI-curated.
+// Also saves explanation_structured and regenerates skin_climate_notes.
 // Call repeatedly until weak count reaches 0.
 export async function POST(req: NextRequest) {
   const err = await guard();
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const { data: ingredients } = await supabaseAdmin
     .from("ingredients")
-    .select("id, name, status, structural_category, category, flagged_category")
+    .select("id, name, status, structural_category, category, flagged_category, secondary_flagged_categories")
     .or("explanation_source.is.null,explanation_source.eq.template")
     .order("name")
     .limit(Math.min(batchSize, 50));
@@ -47,11 +49,17 @@ export async function POST(req: NextRequest) {
 
   let upgraded = 0;
   for (const ing of ingredients) {
-    const { explanation, source } = await generateCuratedExplanation(ing);
+    const { explanation, explanation_structured, source } = await generateCuratedExplanation(ing);
     if (source === "curated") {
+      const notes = generateNotes(ing);
       await supabaseAdmin
         .from("ingredients")
-        .update({ explanation, explanation_source: "curated" })
+        .update({
+          explanation,
+          explanation_structured,
+          explanation_source: "curated",
+          skin_climate_notes: notes.length > 0 ? notes : null,
+        })
         .eq("id", ing.id);
       upgraded++;
     }

@@ -40,8 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# claude code
-.claude/
+# claude code — ignore runtime files, track commands
+.claude/*.lock
+.claude/settings.local.json
 
 # temp / generated files
 iherb-report.html
