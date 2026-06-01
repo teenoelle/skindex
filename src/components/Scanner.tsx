@@ -366,7 +366,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const UNIVERSAL_FLAG_CATS = new Set([
   "fragrance-allergen", "preservative-allergen", "formaldehyde releaser",
-  "sensitizing preservative", "biocide", "Sulfate Surfactant", "Drying Solvent",
+  "sensitizing preservative", "biocide",
 ]);
 
 // Sensory categories that are redundant when the AI explanation already covers the same flagged concern
@@ -652,8 +652,6 @@ const CONCERN_UNIVERSAL_CATEGORIES = new Set([
   "formaldehyde releaser",
   "sensitizing preservative",
   "biocide",
-  "Sulfate Surfactant",
-  "Drying Solvent",
 ]);
 
 const ENVIRONMENTAL_CATEGORIES = new Set([
@@ -739,13 +737,18 @@ function isFcProfileMatch(fc: string, activeSkinTypes: Set<SkinType>, activeClim
       (activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") || activeSkinTypes.has("eczema"))) ||
     (fc.toLowerCase() === "chemical sunscreen" &&
       (activeSkinTypes.has("rosacea") || activeSkinTypes.has("lupus_rash"))) ||
-    (fc === "Drying Solvent" && (activeSkinTypes.has("rosacea") || activeClimates.has("heavy_metal_water"))) ||
+    (fc.toLowerCase() === "drying solvent" && (
+      activeSkinTypes.has("dry") || activeSkinTypes.has("damaged_barrier") ||
+      activeSkinTypes.has("rosacea") || activeSkinTypes.has("fast_shedding") ||
+      activeClimates.has("heavy_metal_water"))) ||
+    (fc.toLowerCase() === "sulfate surfactant" && (
+      activeSkinTypes.has("dry") || activeSkinTypes.has("damaged_barrier") ||
+      activeSkinTypes.has("eczema") || activeSkinTypes.has("psoriasis"))) ||
     (["photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical"].includes(fc) &&
       (activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv") || activeSkinTypes.has("lupus_rash"))) ||
     (["photo-retinoid", "photo-AHA", "photo-BHA"].includes(fc) && activeSkinTypes.has("fast_shedding")) ||
     (fc === "sensitizer" && activeSkinTypes.has("fast_shedding")) ||
     (fc === "fragrance-allergen" && activeSkinTypes.has("fast_shedding")) ||
-    (fc === "Drying Solvent" && activeSkinTypes.has("fast_shedding")) ||
     (fc.toLowerCase() === "chemical sunscreen" && (activeClimates.has("pregnant") || activeClimates.has("breastfeeding"))) ||
     (fc === "photo-retinoid" && activeClimates.has("pregnant")) ||
     (fc === "endocrine disruptor" && (activeClimates.has("pregnant") || activeClimates.has("breastfeeding") || activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt"))) ||
