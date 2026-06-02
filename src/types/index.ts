@@ -22,6 +22,13 @@ export type ExplanationStructured = {
   concern_items?: ConcernItem[] | null;
 };
 
+export type BioactiveProfile = {
+  primary_action: "antioxidant" | "soothing" | "brightening" | "firming" | "barrier-repairing" | "antimicrobial" | "anti-malassezia" | "wound-healing" | "anti-inflammatory";
+  secondary_actions: string[];
+  key_compounds: string[];
+  sensitization_risk: "low" | "moderate" | "high";
+};
+
 export type FattyAcidProfile = {
   linoleic?: number;
   oleic?: number;
@@ -49,6 +56,7 @@ export type DbIngredient = {
   secondary_flagged_categories: string[];
   structural_category: string | null;
   fatty_acid_profile: FattyAcidProfile | null;
+  bioactive_profile: BioactiveProfile | null;
   profile_status: "needs_profile" | "ai_generated" | "curated" | null;
 };
 

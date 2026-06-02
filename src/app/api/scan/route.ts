@@ -712,6 +712,7 @@ export async function POST(req: NextRequest) {
             structural_category: null,
             skin_climate_notes: null,
             fatty_acid_profile: null,
+            bioactive_profile: null,
             profile_status: null,
           },
           comedogenicRating: rule.rating,

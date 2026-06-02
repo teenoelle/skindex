@@ -77,8 +77,8 @@ async function classifyOne(
     // template_unclassified signals the AI upgrade path to also reclassify, not just rewrite text
     explanation_source: withAI ? explanation_source : (cl.structural_category ? "template" : "template_unclassified"),
     skin_climate_notes,
-    // Emollient ingredients need fatty acid profiling before concern notes can be generated
-    profile_status: cl.structural_category === "Emollient" ? "needs_profile" : null,
+    // Emollient and Plant Extract ingredients need profile enrichment before concern notes
+    profile_status: (cl.structural_category === "Emollient" || cl.structural_category === "Plant Extract") ? "needs_profile" : null,
   });
   await supabaseAdmin.from("ingredient_queue").delete().eq("id", queueId);
   return { classified: true, alreadyExists: false };

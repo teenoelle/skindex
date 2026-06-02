@@ -6,6 +6,8 @@ import { generateCuratedExplanation, generateWithReclassification } from "@/lib/
 import { generateNotes } from "@/lib/curated-explanation";
 import { getFattyAcidProfile } from "@/lib/fatty-acid-ai";
 import { getOilCategories, generateFattyAcidNotes } from "@/lib/fatty-acid-concerns";
+import { getBioactiveProfile } from "@/lib/bioactive-ai";
+import { getBioactiveCategories, generateBioactiveNotes } from "@/lib/bioactive-concerns";
 
 async function guard() {
   const { userId } = await auth();
@@ -36,8 +38,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ weak: weak ?? 0, needsProfile: needsProfile ?? 0, total: total ?? 0 });
 }
 
-// Upgrades a batch of template/null explanations to AI-curated, and enriches fatty acid
-// profiles for Emollient ingredients with profile_status = 'needs_profile'.
+// Upgrades a batch of template/null explanations to AI-curated, and enriches:
+//   - Fatty acid profiles for Emollient ingredients (profile_status = needs_profile)
+//   - Bioactive profiles for Plant Extract ingredients (profile_status = needs_profile)
 // Call repeatedly until both weak and needsProfile counts reach 0.
 export async function POST(req: NextRequest) {
   const err = await guard();
@@ -125,7 +128,47 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    const combinedUpdate = { ...explanationUpdate, ...profileUpdate };
+    // ── Bioactive profile enrichment (Plant Extract only) ─────────────────────
+    // Runs when profile_status = 'needs_profile', or when reclassification just
+    // produced structural_category = 'Plant Extract' (profile_status still null).
+    const shouldBioactive =
+      finalStructuralCategory === "Plant Extract" &&
+      (ing.profile_status === "needs_profile" || ing.profile_status === null);
+
+    let bioactiveUpdate: Record<string, unknown> = {};
+    if (shouldBioactive) {
+      const bioProfile = await getBioactiveProfile(ing.name);
+      const classification = getBioactiveCategories(bioProfile);
+      const bioNotes = generateBioactiveNotes(bioProfile);
+
+      // Build context with any explanation-pass classification changes applied
+      const updatedContext = {
+        name: ing.name,
+        status: classification.status ?? (explanationUpdate.status as string ?? ing.status),
+        structural_category: finalStructuralCategory,
+        category: classification.category,
+        flagged_category: classification.flagged_category ?? (explanationUpdate.flagged_category as string | null ?? ing.flagged_category),
+      };
+      const ruleNotes = (explanationUpdate.skin_climate_notes as unknown[] | null) ?? generateNotes(updatedContext as typeof ing);
+      const allNotes = [...(ruleNotes as object[]), ...bioNotes];
+
+      bioactiveUpdate = {
+        bioactive_profile: bioProfile,
+        profile_status: "ai_generated",
+        category: classification.category,
+        secondary_benefit_categories: classification.secondary_benefit_categories,
+        skin_climate_notes: allNotes.length > 0 ? allNotes : null,
+        // Reclassify to flagged/sensitizer when sensitization risk is high
+        ...(classification.status === "flagged" && {
+          status: "flagged",
+          flagged_category: "sensitizer",
+          category: null,
+          secondary_benefit_categories: [],
+        }),
+      };
+    }
+
+    const combinedUpdate = { ...explanationUpdate, ...profileUpdate, ...bioactiveUpdate };
     if (Object.keys(combinedUpdate).length > 0) {
       await supabaseAdmin.from("ingredients").update(combinedUpdate).eq("id", ing.id);
       upgraded++;
