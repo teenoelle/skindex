@@ -516,7 +516,11 @@ export default function AdminPage() {
   const [editingQueueName, setEditingQueueName] = useState("");
   const [savingQueueName, setSavingQueueName] = useState(false);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
-  const [upgradeStats, setUpgradeStats] = useState<{ weak: number; total: number } | null>(null);
+  const [upgradeStats, setUpgradeStats] = useState<{ weak: number; needsProfile: number; total: number } | null>(null);
+  const [flagsOpen, setFlagsOpen] = useState(false);
+  const [flagsLoading, setFlagsLoading] = useState(false);
+  const [flags, setFlags] = useState<{ ingredient_id: string; ingredient_name: string; explanation_source: string | null; flag_count: number; reasons: string[]; latest_flag: string }[]>([]);
+  const [actioning, setActioning] = useState<string | null>(null);
 
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannersLoading, setBannersLoading] = useState(false);
@@ -742,8 +746,31 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/admin/upgrade-explanations");
       const data = await res.json();
-      setUpgradeStats({ weak: data.weak ?? 0, total: data.total ?? 0 });
+      setUpgradeStats({ weak: data.weak ?? 0, needsProfile: data.needsProfile ?? 0, total: data.total ?? 0 });
     } catch { }
+  }
+
+  async function loadFlags() {
+    setFlagsLoading(true);
+    try {
+      const res = await fetch("/api/admin/ingredient-flags");
+      const data = await res.json();
+      setFlags(data.flags ?? []);
+    } catch { }
+    setFlagsLoading(false);
+  }
+
+  async function actOnFlag(ingredientId: string, action: "reclassify" | "regenerate" | "dismiss") {
+    setActioning(ingredientId);
+    try {
+      await fetch("/api/admin/ingredient-flags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ingredientId, action }),
+      });
+      setFlags((prev) => prev.filter((f) => f.ingredient_id !== ingredientId));
+    } catch { }
+    setActioning(null);
   }
 
 
@@ -2702,7 +2729,10 @@ export default function AdminPage() {
                             ? `${upgradeStats.weak} of ${upgradeStats.total} need curated explanation`
                             : `All ${upgradeStats.total} explanations are curated`}
                         </span>
-                        {upgradeStats.weak > 0 && (
+                        {upgradeStats.needsProfile > 0 && (
+                          <span className="text-xs text-amber-600">{upgradeStats.needsProfile} need fatty acid profile</span>
+                        )}
+                        {(upgradeStats.weak > 0 || upgradeStats.needsProfile > 0) && (
                           <code className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded px-2 py-0.5 select-all">/upgrade-explanations</code>
                         )}
                       </>
@@ -2711,6 +2741,85 @@ export default function AdminPage() {
                 </div>
               )}
             </>
+          )}
+        </section>
+
+        {/* Flagged Explanations */}
+        <section>
+          <button
+            type="button"
+            onClick={() => {
+              const opening = !flagsOpen;
+              setFlagsOpen(opening);
+              if (opening && flags.length === 0) loadFlags();
+            }}
+            className="flex items-center gap-3 mb-4 group"
+          >
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">Flagged Explanations</h2>
+            {flags.length > 0 && (
+              <span className="text-xs font-medium bg-rose-100 text-rose-700 rounded-full px-2.5 py-0.5">
+                {flags.length}
+              </span>
+            )}
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${flagsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {flagsOpen && (
+            <div className="space-y-3">
+              {flagsLoading ? (
+                <p className="text-sm text-gray-400">Loading…</p>
+              ) : flags.length === 0 ? (
+                <p className="text-sm text-gray-400">No flagged explanations.</p>
+              ) : flags.map((f) => (
+                <div key={f.ingredient_id} className="border border-gray-200 rounded-xl px-4 py-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{f.ingredient_name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {f.flag_count === 1 ? "1 report" : `${f.flag_count} reports`}
+                        {f.explanation_source ? ` · src: ${f.explanation_source}` : ""}
+                        {" · "}{new Date(f.latest_flag).toLocaleDateString()}
+                      </p>
+                      {f.reasons.length > 0 && (
+                        <div className="mt-1 space-y-0.5">
+                          {f.reasons.map((r, i) => (
+                            <p key={i} className="text-xs text-gray-500 italic">"{r}"</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={actioning === f.ingredient_id}
+                        onClick={() => actOnFlag(f.ingredient_id, "reclassify")}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-40 transition-colors"
+                      >
+                        Re-classify
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actioning === f.ingredient_id}
+                        onClick={() => actOnFlag(f.ingredient_id, "regenerate")}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-40 transition-colors"
+                      >
+                        Regenerate
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actioning === f.ingredient_id}
+                        onClick={() => actOnFlag(f.ingredient_id, "dismiss")}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </section>
 

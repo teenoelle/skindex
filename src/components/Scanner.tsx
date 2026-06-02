@@ -1288,6 +1288,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [dietHint, setDietHint] = useState<ClimateType | null>(null);
   const [hormoneHint, setHormoneHint] = useState<ClimateType | null>(null);
   const [lifestyleHint, setLifestyleHint] = useState<ClimateType | null>(null);
+  const [flaggedIngredients, setFlaggedIngredients] = useState<Set<string>>(new Set());
+  const [flagging, setFlagging] = useState<string | null>(null);
   const [stepTagHint, setStepTagHint] = useState<string | null>(null);
   const [routineStepHint, setRoutineStepHint] = useState<string | null>(null);
   const [whatNextHint, setWhatNextHint] = useState<string | null>(null);
@@ -1657,6 +1659,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         block: "nearest",
       });
     });
+  }
+
+  async function flagIngredient(ingId: string) {
+    if (flagging || flaggedIngredients.has(ingId)) return;
+    setFlagging(ingId);
+    try {
+      await fetch("/api/ingredient-flags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ingredientId: ingId }),
+      });
+      setFlaggedIngredients((prev) => new Set([...prev, ingId]));
+    } catch { }
+    setFlagging(null);
   }
 
   function handleIngredientClick(
@@ -5277,6 +5293,23 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           </div>
                         );
                       })()}
+                      {/* Flag explanation — signed-in users only, only when ingredient is in DB */}
+                      {ingId && isSignedIn && (
+                        <div className="flex justify-end pt-0.5">
+                          {flaggedIngredients.has(ingId) ? (
+                            <span className="text-xs text-gray-400">Flagged for review</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => flagIngredient(ingId)}
+                              disabled={flagging === ingId}
+                              className="text-xs text-gray-300 hover:text-gray-500 transition-colors disabled:opacity-50"
+                            >
+                              {flagging === ingId ? "Flagging…" : "Flag explanation"}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
