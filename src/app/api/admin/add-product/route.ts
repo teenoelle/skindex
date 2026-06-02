@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       brand: brand?.trim() || null,
       type: type?.trim() || null,
       ingredient_list: ingredient_list.trim(),
-      source: "admin",
+      source: "community",
       is_pending: false,
       ...(image_url?.trim() ? { image_url: image_url.trim() } : {}),
       ...(iherb_url?.trim() ? { iherb_url: iherb_url.trim() } : {}),
