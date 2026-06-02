@@ -55,7 +55,8 @@ type Entry = {
   fatty_acid_profile: FattyAcidProfile | null;
 };
 
-const entries: Entry[] = JSON.parse(fs.readFileSync(path.resolve(filePath), "utf8"));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const entries: any[] = JSON.parse(fs.readFileSync(path.resolve(filePath), "utf8"));
 
 async function main() {
   let ok = 0, failed = 0, skipped = 0;
