@@ -5005,7 +5005,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                     {[benefitLabel, ...secondaryBenefitLabels].filter(Boolean).join(", ")} — </span>
                                 ) : (structured?.benefit_category || (structured?.benefit_profiles?.length ?? 0) > 0) ? (
                                   <span className="font-semibold text-teal-700">
-                                    {[structured.benefit_category, structured.benefit_profiles?.join(", ")].filter(Boolean).join(" · ")} — </span>
+                                    {[structured?.benefit_category, structured?.benefit_profiles?.join(", ")].filter(Boolean).join(" · ")} — </span>
                                 ) : null}
                                 {benefitSentence}
                               </p>
