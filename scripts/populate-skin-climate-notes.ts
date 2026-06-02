@@ -1,10 +1,16 @@
 /**
  * Populates skin_climate_notes for all ingredients using rule-based logic.
- * Derives notes from flagged_category, category, and structural_category — no API cost.
+ * Derives notes from flagged_category, category, structural_category, and
+ * ingredient name — no API cost.
  *
- * Safe to re-run: skips ingredients that already have notes.
- * Pass --force to overwrite all existing notes.
- * Pass --dry-run to preview without writing.
+ * Default (no flags): skips ingredients that already have notes.
+ *
+ * --force  Regenerates rule-based notes for ALL ingredients and merges with
+ *          any existing profile-enrichment notes (fatty acid / bioactive) that
+ *          generateNotes() does not produce. Safe to run after adding new note
+ *          rules (e.g. smoking profile) without losing profile-enrichment data.
+ *
+ * --dry-run  Preview without writing. Shows up to 20 ingredients.
  *
  * Usage:
  *   npx tsx scripts/populate-skin-climate-notes.ts [--force] [--dry-run]
@@ -25,6 +31,8 @@ const supabase = createClient(
 
 const FORCE = process.argv.includes("--force");
 const DRY_RUN = process.argv.includes("--dry-run");
+
+type ExistingNote = { text: string; [key: string]: unknown };
 
 async function main() {
   const { data: ingredients, error } = await supabase
@@ -51,14 +59,18 @@ async function main() {
   console.log(`${ingredients.length} total ingredients.`);
   console.log(`${toUpdate.length} will receive notes.`);
   console.log(`${noNotes.length} have no applicable rules (will stay null).`);
+  if (FORCE) console.log("--force: profile-enrichment notes (fatty acid / bioactive) will be preserved.");
   if (DRY_RUN) console.log("\n-- DRY RUN — no writes --\n");
   console.log("");
 
   if (DRY_RUN) {
     for (const ing of toUpdate.slice(0, 20)) {
-      const notes = generateNotes(ing);
-      console.log(`${ing.name} [${ing.flagged_category ?? ing.category ?? ing.structural_category ?? "—"}]`);
-      for (const n of notes) {
+      const freshNotes = generateNotes(ing);
+      const existingNotes: ExistingNote[] = ing.skin_climate_notes ?? [];
+      const freshTextSet = new Set(freshNotes.map(n => n.text));
+      const profileNotes = existingNotes.filter(n => !freshTextSet.has(n.text));
+      console.log(`${ing.name} [${ing.flagged_category ?? ing.category ?? ing.structural_category ?? "—"}]${profileNotes.length > 0 ? ` (+${profileNotes.length} profile note(s) preserved)` : ""}`);
+      for (const n of freshNotes) {
         console.log(`  ${n.sentiment} | dims: [${n.dimensions.join(",")}] | climate: [${n.climate.join(",")}]`);
         console.log(`  "${n.text}"`);
       }
@@ -68,9 +80,19 @@ async function main() {
     return;
   }
 
-  let ok = 0, failed = 0;
+  let ok = 0, failed = 0, preserved = 0;
   for (const ing of toUpdate) {
-    const skin_climate_notes = generateNotes(ing);
+    const freshNotes = generateNotes(ing);
+    const existingNotes: ExistingNote[] = ing.skin_climate_notes ?? [];
+
+    // Preserve profile-enrichment notes (fatty acid / bioactive) whose text
+    // doesn't appear in the freshly generated rule-based set. These notes
+    // contain specific percentages and compound names that generateNotes()
+    // never produces, so text-based identity is unambiguous.
+    const freshTextSet = new Set(freshNotes.map(n => n.text));
+    const profileNotes = existingNotes.filter(n => !freshTextSet.has(n.text));
+    const skin_climate_notes = [...freshNotes, ...profileNotes];
+
     const { error: updateError } = await supabase
       .from("ingredients")
       .update({ skin_climate_notes })
@@ -80,12 +102,14 @@ async function main() {
       console.error(`✗ ${ing.name}: ${updateError.message}`);
       failed++;
     } else {
-      console.log(`✓ ${ing.name} (${skin_climate_notes.length} note${skin_climate_notes.length !== 1 ? "s" : ""})`);
+      if (profileNotes.length > 0) preserved++;
+      const suffix = profileNotes.length > 0 ? ` (+${profileNotes.length} preserved)` : "";
+      console.log(`✓ ${ing.name} (${freshNotes.length} note${freshNotes.length !== 1 ? "s" : ""}${suffix})`);
       ok++;
     }
   }
 
-  console.log(`\nDone. ${ok} updated, ${failed} failed.`);
+  console.log(`\nDone. ${ok} updated (${preserved} with preserved profile notes), ${failed} failed.`);
   if (failed > 0) console.log("Re-run to retry failed ingredients.");
 }
 
