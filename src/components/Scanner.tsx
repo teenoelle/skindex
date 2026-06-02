@@ -5000,10 +5000,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           <div className="pl-3 border-l-2 border-teal-500 space-y-0.5">
                             {benefitSentence && (
                               <p className="text-xs text-gray-600 leading-relaxed">
-                                {(benefitLabel || secondaryBenefitLabels.length > 0) && (
+                                {(benefitLabel || secondaryBenefitLabels.length > 0) ? (
                                   <span className="font-semibold text-teal-700">
                                     {[benefitLabel, ...secondaryBenefitLabels].filter(Boolean).join(", ")} — </span>
-                                )}
+                                ) : (structured?.benefit_category || (structured?.benefit_profiles?.length ?? 0) > 0) ? (
+                                  <span className="font-semibold text-teal-700">
+                                    {[structured.benefit_category, structured.benefit_profiles?.join(", ")].filter(Boolean).join(" · ")} — </span>
+                                ) : null}
                                 {benefitSentence}
                               </p>
                             )}

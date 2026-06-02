@@ -14,6 +14,8 @@ export type ConcernItem = {
 export type ExplanationStructured = {
   formula_role: string | null;
   benefit: string | null;
+  benefit_category?: string | null;
+  benefit_profiles?: string[] | null;
   concern: string | null;
   concern_items?: ConcernItem[] | null;
 };
