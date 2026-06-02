@@ -17,6 +17,13 @@ type ExplanationOutput = {
   source: "curated" | "template";
 };
 
+export type ReclassifyOutput = ExplanationOutput & {
+  status?: "safe" | "flagged";
+  structural_category?: string | null;
+  category?: string | null;
+  flagged_category?: string | null;
+};
+
 function buildPrompt(ingredient: IngredientInfo): string {
   const { name, status, structural_category, category, flagged_category, secondary_flagged_categories } = ingredient;
   const structNote = structural_category ? ` Its structural role in the formula is: ${structural_category}.` : "";
@@ -121,4 +128,92 @@ export async function generateCuratedExplanation(ingredient: IngredientInfo): Pr
   }
 
   return templateFallback(ingredient);
+}
+
+// ── Reclassification prompt (for template_unclassified entries) ──────────────
+
+const SAFE_STRUCTURAL = [
+  "Humectant","Emollient","Fatty Acid","Fatty Alcohol","Ceramide","Peptide",
+  "Silicone","Surfactant","Emulsifier","Thickener","Preservative","UV Filter",
+  "Plant Extract","Chelating Agent","pH Adjuster","Solvent","Conditioning Agent",
+  "Protein","Amino Acid","Active","Colorant","Clay","Exfoliant","Fragrance",
+].join(", ");
+
+const FLAGGED_CATEGORIES = [
+  "sensitizer","fragrance-allergen","Synthetic Musk","Chemical Sunscreen",
+  "AHA Exfoliant","BHA Exfoliant","Barrier-disrupting","pore-clogger","occlusive",
+  "Sulfate Surfactant","Drying Solvent","Irritant","vasodilator","phytoestrogen",
+].join(", ");
+
+const SAFE_CATEGORIES = [
+  "soothing","brightening","antioxidant","firming","barrier-repairing","moisturizing",
+  "smoothing","Softening","antimicrobial","anti-malassezia","wound-healing","cleansing",
+  "Pore-cleansing","Strengthening","Conditioning","chelating","PHA Exfoliant",
+  "Anti-inflammatory",
+].join(", ");
+
+function buildReclassifyPrompt(name: string): string {
+  return `You are a cosmetic chemist and skincare ingredient expert.
+
+Ingredient name: "${name}"
+
+Step 1 — classify this ingredient:
+- status: "safe" or "flagged" (flagged = a documented skin concern for some users)
+- structural_category: one of [${SAFE_STRUCTURAL}] — what it IS chemically in the formula. null if none fits.
+- If safe: category — one of [${SAFE_CATEGORIES}]. null if none fits.
+- If flagged: flagged_category — one of [${FLAGGED_CATEGORIES}]. null if none fits.
+
+Step 2 — write three short explanations:
+- formula_role: 1 sentence starting "${name} is..." describing its technical function.
+- benefit: 1 sentence starting "${name}..." describing its skin benefit (or null if flagged with no benefit).
+- concern: 1 sentence starting "${name} is..." or "${name} can..." describing the concern (or null if safe with no concern).
+
+Return ONLY valid JSON — no other text:
+{
+  "status": "safe" | "flagged",
+  "structural_category": string | null,
+  "category": string | null,
+  "flagged_category": string | null,
+  "formula_role": string,
+  "benefit": string | null,
+  "concern": string | null
+}`;
+}
+
+export async function generateWithReclassification(name: string): Promise<ReclassifyOutput> {
+  try {
+    const msg = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      messages: [{ role: "user", content: buildReclassifyPrompt(name) }],
+    });
+    const raw = msg.content[0].type === "text" ? msg.content[0].text.trim() : null;
+    if (raw) {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed && typeof parsed === "object") {
+          const structured: ExplanationStructured = {
+            formula_role: parsed.formula_role ?? null,
+            benefit: parsed.benefit ?? null,
+            concern: parsed.concern ?? null,
+          };
+          return {
+            status: parsed.status === "flagged" ? "flagged" : "safe",
+            structural_category: parsed.structural_category ?? null,
+            category: parsed.category ?? null,
+            flagged_category: parsed.flagged_category ?? null,
+            explanation_structured: structured,
+            explanation: flattenStructured(structured),
+            source: "curated",
+          };
+        }
+      }
+    }
+  } catch {
+    // fall through
+  }
+  // Fallback: return empty reclassification so caller can keep existing values
+  const fallback = templateFallback({ name, status: "safe", structural_category: null, category: null, flagged_category: null });
+  return { ...fallback };
 }

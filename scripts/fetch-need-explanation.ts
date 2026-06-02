@@ -91,11 +91,12 @@ async function main() {
     return;
   }
 
-  // Default: ingredients with no curated explanation yet
+  // Default: ingredients with no curated explanation yet (includes template_unclassified
+  // so the AI can classify + explain unknown ingredients in one pass)
   const { data, error } = await supabase
     .from("ingredients")
     .select("id, name, status, structural_category, category, flagged_category, secondary_flagged_categories")
-    .or("explanation_source.is.null,explanation_source.eq.template")
+    .or("explanation_source.is.null,explanation_source.eq.template,explanation_source.eq.template_unclassified")
     .order("name")
     .limit(limit);
 

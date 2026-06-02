@@ -9,6 +9,7 @@ import { SENSORY_PATTERNS, countSensoryPatternMatches } from "@/lib/sensory";
 import { countPhotoPatternMatches } from "@/lib/photo";
 import { computeProductConcerns } from "@/lib/compute-concerns";
 import { extractIngredientsFromUrl, mapCategoryToType, guessProductType } from "@/lib/extract-ingredients";
+import { isLikelyJunk } from "@/lib/junk-detector";
 
 function obfFullImage(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -803,6 +804,7 @@ export async function POST(req: NextRequest) {
     const productName = product?.name ?? null;
     await Promise.all(
       unreviewed.map(async (name) => {
+        if (isLikelyJunk(name)) return;
         const { data: existing } = await supabase
           .from("ingredient_queue")
           .select("id, times_seen")

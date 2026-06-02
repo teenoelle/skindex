@@ -42,7 +42,8 @@ async function processQueue(): Promise<NextResponse> {
       category: classification.category,
       flagged_category: classification.flagged_category,
       explanation,
-      explanation_source: "template",
+      // template_unclassified signals the AI upgrade path to also reclassify, not just rewrite text
+      explanation_source: classification.structural_category ? "template" : "template_unclassified",
       skin_climate_notes: notes.length > 0 ? notes : null,
     });
     return true;

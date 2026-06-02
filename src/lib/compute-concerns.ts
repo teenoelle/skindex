@@ -86,10 +86,12 @@ export function computeProductConcerns(
       const n = ing.name.toLowerCase();
       const i = ing.inci_name?.toLowerCase();
       const tokenLong = lower.length >= 6;
+      const dbNameLong = n.length >= 6;
       return (
-        lower.includes(n) ||
+        lower === n ||
+        (dbNameLong && lower.includes(n)) ||
         (tokenLong && n.includes(lower)) ||
-        (i && (lower.includes(i) || (tokenLong && i.includes(lower))))
+        (i && (lower === i || (i.length >= 6 && lower.includes(i)) || (tokenLong && i.includes(lower))))
       );
     });
     if (match && match.status === "flagged") {

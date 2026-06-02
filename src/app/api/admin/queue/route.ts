@@ -6,6 +6,7 @@ import { classifyIngredient } from "@/lib/ingredient-classifier";
 import { generateExplanation } from "@/lib/generate-explanation";
 import { generateCuratedExplanation } from "@/lib/ai-explanation";
 import { getSensoryCategories, generateNotes } from "@/lib/curated-explanation";
+import { isLikelyJunk } from "@/lib/junk-detector";
 
 async function guard() {
   const { userId } = await auth();
@@ -36,6 +37,11 @@ async function classifyOne(
   const { data: item } = await supabaseAdmin
     .from("ingredient_queue").select("id, name").eq("id", queueId).maybeSingle();
   if (!item) return { classified: false, alreadyExists: false };
+
+  if (isLikelyJunk(item.name)) {
+    await supabaseAdmin.from("ingredient_queue").delete().eq("id", queueId);
+    return { classified: false, alreadyExists: false };
+  }
 
   const { data: existing } = await supabaseAdmin
     .from("ingredients").select("id").ilike("name", item.name).maybeSingle();
@@ -68,7 +74,8 @@ async function classifyOne(
     category: cl.category,
     flagged_category: cl.flagged_category,
     explanation,
-    explanation_source,
+    // template_unclassified signals the AI upgrade path to also reclassify, not just rewrite text
+    explanation_source: withAI ? explanation_source : (cl.structural_category ? "template" : "template_unclassified"),
     skin_climate_notes,
   });
   await supabaseAdmin.from("ingredient_queue").delete().eq("id", queueId);

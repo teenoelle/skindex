@@ -55,7 +55,16 @@ const SENSITIZING_PRESERVATIVES = new Set([
 
 // ── Classify ────────────────────────────────────────────────────────────────
 
+// Strip leading marketing/certification adjectives so "organic aloe vera" classifies as "aloe vera".
+// Processing descriptors (cold-pressed, unrefined, steam distilled) are intentionally excluded:
+// they affect chemistry and should be preserved for classification and AI explanation context.
+const NON_INCI_PREFIX = /^(organic|natural|vegan|certified|wildcrafted)\s+/i;
+
 export function classifyIngredient(rawName: string): Classification {
+  const stripped = rawName.replace(NON_INCI_PREFIX, "").trim();
+  if (stripped.length > 0 && stripped.toLowerCase() !== rawName.toLowerCase().trim()) {
+    return classifyIngredient(stripped);
+  }
   const name = n(rawName);
 
   // Parabens
@@ -75,7 +84,7 @@ export function classifyIngredient(rawName: string): Classification {
     return { status: "flagged", structural_category: "UV Filter", category: null, flagged_category: "Chemical Sunscreen" };
 
   // Generic fragrance — structural tells you what it IS; "sensitizer" tells you why it's flagged
-  if (["parfum","fragrance","aroma","fragrance (parfum)","parfum/fragrance"].includes(name))
+  if (["parfum","fragrance","aroma","perfume","fragrance (parfum)","parfum/fragrance"].includes(name))
     return { status: "flagged", structural_category: "Fragrance", category: null, flagged_category: "sensitizer" };
 
   // Fragrance allergens
@@ -111,7 +120,7 @@ export function classifyIngredient(rawName: string): Classification {
     return { status: "flagged", structural_category: "Plant Extract", category: null, flagged_category: "sensitizer" };
 
   // Sulfate surfactants
-  if (SULFATE_SURFACTANTS.has(name) || (name.includes("lauryl sulfate") || name.includes("laureth sulfate")))
+  if (SULFATE_SURFACTANTS.has(name) || name.includes("lauryl sulfate") || name.includes("laureth sulfate") || name.includes("coco-sulfate") || name.includes("cetearyl sulfate"))
     return { status: "flagged", structural_category: "Surfactant", category: null, flagged_category: "Sulfate Surfactant" };
 
   // Cyclic silicones
@@ -205,7 +214,8 @@ function detectStructural(name: string): string | null {
     return "Silicone";
   if (["kaolin","bentonite","montmorillonite","zeolite","fullers earth"].includes(name) || name.endsWith(" clay"))
     return "Clay";
-  if (name.includes("glucoside") || name.includes("betaine") || name.includes("sulfosuccinate") || name.includes("amphoacetate") || ["cocamidopropyl betaine","sodium cocoyl isethionate","sodium lauroyl sarcosinate","sodium lauroyl isethionate","cocamide dea","cocamide mea","betaine salicylate"].includes(name) || name.includes("cocamide"))
+  // ascorbyl glucoside is a vitamin C derivative, not a surfactant — exclude before glucoside check
+  if ((name.includes("glucoside") && !name.includes("ascorbyl")) || name.includes("betaine") || name.includes("sulfosuccinate") || name.includes("amphoacetate") || ["cocamidopropyl betaine","sodium cocoyl isethionate","sodium lauroyl sarcosinate","sodium lauroyl isethionate","cocamide dea","cocamide mea","betaine salicylate"].includes(name) || name.includes("cocamide"))
     return "Surfactant";
   if (name.includes("glyceryl stearate") || name.includes("polyglyceryl") || name.includes("sorbitan") || name.includes("polysorbate") || name.includes("lecithin") || name.includes("ceteareth") || name.includes("steareth") || name.includes("oleth"))
     return "Emulsifier";

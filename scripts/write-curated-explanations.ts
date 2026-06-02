@@ -92,14 +92,23 @@ async function main() {
       structural_category: entry.structural_category ?? null,
     });
 
+    // Build update payload — always write explanation fields.
+    // Write classification fields only when the JSON provides them (reclassification path
+    // for template_unclassified entries where the AI corrects status/categories).
+    const updatePayload: Record<string, unknown> = {
+      explanation,
+      explanation_structured: entry.explanation_structured,
+      explanation_source: "curated",
+      skin_climate_notes: notes.length > 0 ? notes : null,
+    };
+    if (entry.status !== undefined) updatePayload.status = entry.status;
+    if (entry.structural_category !== undefined) updatePayload.structural_category = entry.structural_category;
+    if (entry.category !== undefined) updatePayload.category = entry.category;
+    if (entry.flagged_category !== undefined) updatePayload.flagged_category = entry.flagged_category;
+
     const { error } = await supabase
       .from("ingredients")
-      .update({
-        explanation,
-        explanation_structured: entry.explanation_structured,
-        explanation_source: "curated",
-        skin_climate_notes: notes.length > 0 ? notes : null,
-      })
+      .update(updatePayload)
       .eq("id", entry.id);
 
     if (error) {

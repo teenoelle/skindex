@@ -80,13 +80,132 @@ const JUNK_PATTERNS = [
   /replenisher for skin/i,
   /rejuvenate and restore/i,
   /\bfl\.?\s*oz\b/i,
+  /<[a-z]/i,                            // HTML tag remnant (e.g. "Acid<span...")
+  /\bflavor\b|\bflavour\b/i,            // food flavoring terms
+  /\bfragrance note\b/i,                // perfumery descriptor, not an ingredient
 ];
+
+const JUNK_SINGLE_WORDS = new Set([
+  "silicon", "retinoid", "organic", "natural", "pure", "vegan",
+  "purifying", "hydrating", "moisturizing", "nourishing", "soothing",
+]);
+
+const JUNK_TWO_WORD_PHRASES = new Set([
+  "steam distilled",
+]);
 
 function isJunk(name: string): boolean {
   if (JUNK_PATTERNS.some((p) => p.test(name))) return true;
-  if (name.trim().split(/\s+/).length > 8) return true;
-  if (name.length > 100) return true;
+  const words = name.trim().split(/\s+/);
+  if (words.length > 6) return true;
+  if (name.length > 120) return true;
+  if (words.length === 1 && JUNK_SINGLE_WORDS.has(words[0].toLowerCase())) return true;
+  if (words.length === 2 && JUNK_TWO_WORD_PHRASES.has(name.trim().toLowerCase())) return true;
   return false;
+}
+
+// ── edit-distance duplicate detection ────────────────────────────────────────
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const prev = Array.from({ length: n + 1 }, (_, j) => j);
+  const curr = new Array(n + 1).fill(0);
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      curr[j] = a[i - 1] === b[j - 1]
+        ? prev[j - 1]
+        : 1 + Math.min(prev[j - 1], prev[j], curr[j - 1]);
+    }
+    prev.splice(0, n + 1, ...curr);
+  }
+  return prev[n];
+}
+
+/**
+ * Returns true when two names that are 1 edit apart are almost certainly
+ * different compounds rather than the same ingredient with a typo.
+ */
+function isFalseEditPositive(a: string, b: string): boolean {
+  const aL = a.toLowerCase(), bL = b.toLowerCase();
+
+  // Any numbers in both names differ → different grades/series members
+  // Catches: PEG-10 vs PEG-12, Polysorbate 20 vs 60, CI 77491 vs 77492, Red 6 vs Red 7
+  const numRe = /\d+/g;
+  const aNums = [...aL.matchAll(numRe)].map(m => m[0]);
+  const bNums = [...bL.matchAll(numRe)].map(m => m[0]);
+  if (aNums.length > 0 && bNums.length > 0 && aNums.join(",") !== bNums.join(",")) return true;
+  // One has numbers and the other doesn't
+  if ((aNums.length > 0) !== (bNums.length > 0)) return true;
+
+  // Very short names (≤5 chars) that differ → likely distinct compounds (BHA/BHT)
+  if (a.length <= 5) return true;
+
+  // Names ending with a short uppercase abbreviation that differs (Ceramide AP/NP, Cocamide DEA/MEA)
+  const abbrevEnd = /\s+([A-Z]{2,4})$/;
+  const aAbbrev = a.match(abbrevEnd)?.[1];
+  const bAbbrev = b.match(abbrevEnd)?.[1];
+  if (aAbbrev && bAbbrev && aAbbrev !== bAbbrev) return true;
+
+  // Names ending with a single uppercase/lowercase letter after a space (Vitamin C/E)
+  const singleLetterEnd = /\s+([A-Za-z])$/;
+  const aLetter = a.match(singleLetterEnd)?.[1];
+  const bLetter = b.match(singleLetterEnd)?.[1];
+  if (aLetter && bLetter && aLetter.toLowerCase() !== bLetter.toLowerCase()) return true;
+
+  // Different chemical-type prefix (methyl/ethyl/propyl → different homologues)
+  const chemPrefix = /^(methyl|ethyl|propyl|butyl|hydroxy|dehydro|iso|neo|di|tri|mono)/;
+  if (chemPrefix.exec(aL)?.[1] !== chemPrefix.exec(bL)?.[1]) return true;
+
+  return false;
+}
+
+/**
+ * Finds pairs that differ by at most 1 edit (insert/delete/substitute) after
+ * lowercasing. Only compares names within 2 chars of each other to avoid O(n²)
+ * cost and false positives across very different-length names.
+ */
+function findEditDistanceDupes(
+  all: Ingredient[],
+  exclude: Set<string>,
+): Array<Ingredient[]> {
+  const candidates = all.filter(i => !exclude.has(i.id) && !isJunk(i.name));
+  // bucket by length so we only compare names within ±2 chars
+  const byLen = new Map<number, Ingredient[]>();
+  for (const ing of candidates) {
+    const len = ing.name.length;
+    for (const l of [len - 2, len - 1, len, len + 1, len + 2]) {
+      if (!byLen.has(l)) byLen.set(l, []);
+    }
+    byLen.get(len)!.push(ing);
+  }
+
+  const seen = new Set<string>();
+  const groups: Array<Ingredient[]> = [];
+
+  for (const ing of candidates) {
+    if (seen.has(ing.id)) continue;
+    const aLow = ing.name.toLowerCase();
+    const group: Ingredient[] = [ing];
+
+    for (const l of [ing.name.length - 2, ing.name.length - 1, ing.name.length, ing.name.length + 1, ing.name.length + 2]) {
+      for (const other of byLen.get(l) ?? []) {
+        if (other.id === ing.id || seen.has(other.id)) continue;
+        const bLow = other.name.toLowerCase();
+        if (levenshtein(aLow, bLow) <= 1 && !isFalseEditPositive(ing.name, other.name)) {
+          group.push(other);
+          seen.add(other.id);
+        }
+      }
+    }
+
+    if (group.length > 1) {
+      seen.add(ing.id);
+      groups.push(group);
+    }
+  }
+
+  return groups;
 }
 
 // ── winner selection ─────────────────────────────────────────────────────────
@@ -234,7 +353,7 @@ async function main() {
   const exactGroups = [...exactMap.values()].filter((g) => g.length > 1);
   const inExact = new Set(exactGroups.flat().map((i) => i.id));
 
-  // Fuzzy duplicates
+  // Fuzzy duplicates (character-strip normalization)
   const fuzzyMap = new Map<string, Ingredient[]>();
   for (const ing of all) {
     if (junkIds.has(ing.id) || inExact.has(ing.id)) continue;
@@ -244,10 +363,15 @@ async function main() {
     fuzzyMap.get(key)!.push(ing);
   }
   const fuzzyGroups = [...fuzzyMap.values()].filter((g) => g.length > 1);
+  const inFuzzy = new Set(fuzzyGroups.flat().map((i) => i.id));
+
+  // Edit-distance duplicates (letter-swap typos like "salicyclic" ↔ "salicylic")
+  const excludeFromEdit = new Set([...junkIds, ...inExact, ...inFuzzy]);
+  const editGroups = findEditDistanceDupes(all, excludeFromEdit);
 
   // Build final list of (keep, drop) pairs from all dupe groups
   const pairs: Array<{ keep: Ingredient; drop: Ingredient }> = [];
-  for (const group of [...exactGroups, ...fuzzyGroups]) {
+  for (const group of [...exactGroups, ...fuzzyGroups, ...editGroups]) {
     // Sort by score descending; the first is the keeper
     const sorted = [...group].sort((a, b) => score(b) - score(a));
     const keep = sorted[0];
@@ -275,6 +399,7 @@ async function main() {
   const totalDeletes = junk.length + pairs.length;
   console.log(`${"─".repeat(70)}`);
   console.log(`TOTAL: ${totalDeletes} rows to delete (${junk.length} junk + ${pairs.length} duplicates)`);
+  if (editGroups.length > 0) console.log(`  (${editGroups.length} of those duplicate groups found via edit-distance — verify carefully)`);
 
   if (!EXECUTE) {
     console.log(`\nDry run — no changes made. Re-run with --execute to commit.\n`);

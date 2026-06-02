@@ -35,14 +35,16 @@ export async function matchIngredients(raw: string) {
     const match = db.find((ing) => {
       const n = ing.name.toLowerCase();
       const i = ing.inci_name?.toLowerCase();
-      // lower.includes(n): "ceramide np" contains DB name "ceramide" ✓
-      // n.includes(lower): only when the scanned token is substantial (>=6 chars)
-      //   to prevent short words like "water" falsely matching "aloe barbadensis leaf water"
+      // Both direction guards prevent generic short words from false-matching complex botanical names.
+      // "ceramide np" includes "ceramide" (8 chars) ✓; "rose flower water" must NOT match "water" (5 chars).
+      // Short DB names (< 6 chars) are exact-match only; longer names allow substring in both directions.
       const tokenLong = lower.length >= 6;
+      const dbNameLong = n.length >= 6;
       return (
-        lower.includes(n) ||
+        lower === n ||
+        (dbNameLong && lower.includes(n)) ||
         (tokenLong && n.includes(lower)) ||
-        (i && (lower.includes(i) || (tokenLong && i.includes(lower))))
+        (i && (lower === i || (i.length >= 6 && lower.includes(i)) || (tokenLong && i.includes(lower))))
       );
     });
 
