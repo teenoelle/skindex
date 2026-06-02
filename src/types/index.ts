@@ -22,6 +22,19 @@ export type ExplanationStructured = {
   concern_items?: ConcernItem[] | null;
 };
 
+export type FattyAcidProfile = {
+  linoleic?: number;
+  oleic?: number;
+  alpha_linolenic?: number;
+  gamma_linolenic?: number;
+  palmitoleic?: number;
+  lauric?: number;
+  palmitic?: number;
+  stearic?: number;
+  ricinoleic?: number;
+  punicic?: number;
+};
+
 export type DbIngredient = {
   id: string;
   name: string;
@@ -35,6 +48,8 @@ export type DbIngredient = {
   flagged_category: string | null;
   secondary_flagged_categories: string[];
   structural_category: string | null;
+  fatty_acid_profile: FattyAcidProfile | null;
+  profile_status: "needs_profile" | "ai_generated" | "curated" | null;
 };
 
 export type IngredientMatch = {
