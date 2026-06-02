@@ -1,10 +1,14 @@
 # Generate Ingredient Explanations
 
-Generate curated explanations for Skindex ingredients that currently have only template (auto-generated) text. Uses your Claude Pro session — no extra API cost.
+Generate curated explanations for Skindex ingredients. Uses your Claude Pro session — no extra API cost.
 
 ## Arguments
 
-`$ARGUMENTS` — optional batch size (default 30). Pass a number, e.g. `/generate-explanations 20`.
+`$ARGUMENTS` — optional flags and batch size (default 30).
+
+- `/generate-explanations 20` — generate up to 20 new explanations for ingredients that have none yet
+- `/generate-explanations --missing-labels` — add missing label fields (`benefit_category`, `benefit_profiles`, `concern_category`, `concern_profiles`) to ingredients that already have explanation text but were generated before the two-tier label system existed
+- `/generate-explanations --missing-labels 20` — same, limited to 20 at a time
 
 ---
 
@@ -12,19 +16,29 @@ Generate curated explanations for Skindex ingredients that currently have only t
 
 ### 1. Check how many need generating
 
+**Default mode** (no explanation yet):
 ```bash
 npx tsx scripts/fetch-need-explanation.ts 1
 ```
 
-Count the total by running:
-
+Count the total:
 ```bash
 npx tsx scripts/fetch-need-explanation.ts 9999 2>/dev/null | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8');console.log(JSON.parse(d).length+' ingredients need curated explanations');"
 ```
 
+**Missing-labels mode**:
+```bash
+npx tsx scripts/fetch-need-explanation.ts --missing-labels 1
+```
+
+Count the total:
+```bash
+npx tsx scripts/fetch-need-explanation.ts --missing-labels 9999 2>/dev/null | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8');console.log(JSON.parse(d).length+' ingredients need label fields');"
+```
+
 ### 2. Fetch a batch
 
-Run the fetch script to get the next batch. Use the batch size from `$ARGUMENTS`, defaulting to 30:
+Pass through `$ARGUMENTS` (which may include `--missing-labels` and/or a number):
 
 ```bash
 npx tsx scripts/fetch-need-explanation.ts $ARGUMENTS
@@ -104,6 +118,9 @@ Valid skin type labels for `benefit_profiles` and `concern_profiles`:
 - `concern_category` is set when the mechanism label adds clarity beyond the `flagged_category` badge already shown in the UI — omit if redundant
 - `concern_profiles` lists skin types most affected by this concern; omit skin types for which the concern is unremarkable
 - Keep each sentence to one sentence — no run-ons
+
+**Additional rule for `--missing-labels` mode:**
+The fetched data includes the ingredient's existing `explanation_structured`. **Preserve the `formula_role`, `benefit`, and `concern` sentences verbatim** — do not rewrite them. Only generate the missing label fields (`benefit_category`, `benefit_profiles`, `concern_category`, `concern_profiles`). Copy all other fields through unchanged.
 
 ### 4. Assemble the output JSON
 
