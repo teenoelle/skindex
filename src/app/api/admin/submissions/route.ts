@@ -17,9 +17,10 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("products")
-    .select("id, name, brand, type, submitted_at, ingredient_list")
+    .select("id, name, brand, type, submitted_at, ingredient_list, image_url, iherb_url, source_url")
     .not("submitted_at", "is", null)
     .is("reviewed_at", null)
+    .eq("is_pending", true)
     .order("submitted_at", { ascending: false })
     .limit(100);
 
@@ -32,6 +33,9 @@ export async function GET() {
     type: p.type ?? null,
     submitted_at: p.submitted_at,
     ingredient_list: p.ingredient_list ?? null,
+    image_url: p.image_url ?? null,
+    iherb_url: p.iherb_url ?? null,
+    source_url: p.source_url ?? null,
     ingredient_count: p.ingredient_list
       ? p.ingredient_list.split(",").filter((s: string) => s.trim().length > 0).length
       : 0,

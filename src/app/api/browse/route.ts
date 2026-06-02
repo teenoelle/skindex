@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
         .from("products")
         .select("type")
         .not("ingredient_list", "is", null)
-        .eq("is_archived", false),
+        .eq("is_archived", false)
+        .eq("is_pending", false),
     ]);
 
     const counts: Record<string, number> = {};
@@ -37,7 +38,8 @@ export async function GET(req: NextRequest) {
     .select("id, name, brand, image_url, ingredient_list")
     .eq("type", type)
     .not("ingredient_list", "is", null)
-    .eq("is_archived", false);
+    .eq("is_archived", false)
+    .eq("is_pending", false);
 
   if (!products?.length) return NextResponse.json({ products: [] });
 

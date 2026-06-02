@@ -292,6 +292,7 @@ export async function POST(req: NextRequest) {
         .ilike("name", `%${query}%`)
         .not("ingredient_list", "is", null)
         .eq("is_archived", false)
+        .eq("is_pending", false)
         .limit(10);
       if (data?.length) {
         // Check for close scores — if top match is exact, take it; otherwise collect ambiguous ones
@@ -323,6 +324,7 @@ export async function POST(req: NextRequest) {
           .or(orFilter)
           .not("ingredient_list", "is", null)
           .eq("is_archived", false)
+          .eq("is_pending", false)
           .limit(20);
         if (candidates?.length) {
           const scored = candidates
@@ -499,6 +501,7 @@ export async function POST(req: NextRequest) {
         .select("id, name, brand, type")
         .ilike("name", `%${query}%`)
         .not("ingredient_list", "is", null)
+        .eq("is_pending", false)
         .neq("id", dbProduct.id)
         .limit(10);
       if (alts?.length) {
@@ -552,6 +555,7 @@ export async function POST(req: NextRequest) {
         .eq("source_url", url)
         .not("ingredient_list", "is", null)
         .eq("is_archived", false)
+        .eq("is_pending", false)
         .maybeSingle();
 
       if (cached?.ingredient_list) {

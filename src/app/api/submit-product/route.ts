@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Sign in to add products" }, { status: 401 });
   }
 
-  const { name, brand, type, ingredient_list, url } = await req.json();
+  const { name, brand, type, ingredient_list, url, image_url, iherb_url, source_url } = await req.json();
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Product name is required" }, { status: 400 });
@@ -62,8 +62,10 @@ export async function POST(req: NextRequest) {
       submitted_by: userId,
       submitted_at: new Date().toISOString(),
       source: "community",
-      ...(extractedImageUrl ? { image_url: extractedImageUrl } : {}),
-      ...(hasUrl ? { source_url: url.trim() } : {}),
+      is_pending: true,
+      ...(image_url?.trim() ? { image_url: image_url.trim() } : extractedImageUrl ? { image_url: extractedImageUrl } : {}),
+      ...(iherb_url?.trim() ? { iherb_url: iherb_url.trim() } : {}),
+      ...(source_url?.trim() ? { source_url: source_url.trim() } : hasUrl ? { source_url: url.trim() } : {}),
     })
     .select("id")
     .single();

@@ -1211,9 +1211,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [submitType, setSubmitType] = useState("");
   const [submitIngredients, setSubmitIngredients] = useState("");
   const [submitUrl, setSubmitUrl] = useState("");
+  const [submitImageUrl, setSubmitImageUrl] = useState("");
+  const [submitIherbUrl, setSubmitIherbUrl] = useState("");
+  const [submitSourceUrl, setSubmitSourceUrl] = useState("");
   const [submitMode, setSubmitMode] = useState<"paste" | "url">("paste");
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitDone, setSubmitDone] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportNote, setReportNote] = useState("");
   const [reportLoading, setReportLoading] = useState(false);
@@ -1927,6 +1931,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     if (submitType) body.type = submitType;
     if (submitMode === "paste") body.ingredient_list = submitIngredients.trim();
     else body.url = submitUrl.trim();
+    if (submitImageUrl.trim()) body.image_url = submitImageUrl.trim();
+    if (submitIherbUrl.trim()) body.iherb_url = submitIherbUrl.trim();
+    if (submitSourceUrl.trim()) body.source_url = submitSourceUrl.trim();
 
     let submitRes: Response | null = null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1957,7 +1964,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       return;
     }
     setSubmitOpen(false);
-    scanVariant({ productId: submitData.productId });
+    setSubmitDone(true);
+    setSubmitName("");
+    setSubmitBrand("");
+    setSubmitType("");
+    setSubmitIngredients("");
+    setSubmitUrl("");
+    setSubmitImageUrl("");
+    setSubmitIherbUrl("");
+    setSubmitSourceUrl("");
   }
 
   async function handleReport() {
@@ -3489,6 +3504,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       )}
 
       {/* Community submission form */}
+      {submitDone && (
+        <div className="mt-4 p-4 bg-teal-50 border border-teal-200 rounded-xl text-sm text-teal-800 flex items-start gap-2">
+          <span className="text-base leading-none mt-0.5">✓</span>
+          <div>
+            <p className="font-medium">Product submitted for review</p>
+            <p className="text-teal-700 mt-0.5">It will appear in search results once approved.</p>
+          </div>
+          <button type="button" onClick={() => setSubmitDone(false)} className="ml-auto text-teal-500 hover:text-teal-800 text-xs shrink-0">Dismiss</button>
+        </div>
+      )}
       {submitOpen && (
         <div className="mt-4 border border-gray-200 rounded-xl p-4 space-y-3">
           <p className="text-sm font-semibold text-gray-800">Add this product</p>
@@ -3531,7 +3556,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               onClick={() => setSubmitMode("url")}
               className={`flex-1 py-1 text-xs font-medium rounded-md transition-all ${submitMode === "url" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}
             >
-              From URL
+              From URL (INCIDecoder)
             </button>
           </div>
           {submitMode === "paste" ? (
@@ -3547,10 +3572,34 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               type="url"
               value={submitUrl}
               onChange={(e) => setSubmitUrl(e.target.value)}
-              placeholder="https://sephora.com/product/..."
+              placeholder="https://incidecoder.com/products/..."
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
             />
           )}
+          <div className="space-y-2 pt-1 border-t border-gray-100">
+            <p className="text-xs text-gray-400">Optional links</p>
+            <input
+              type="url"
+              value={submitIherbUrl}
+              onChange={(e) => setSubmitIherbUrl(e.target.value)}
+              placeholder="iHerb URL (optional)"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+            />
+            <input
+              type="url"
+              value={submitSourceUrl}
+              onChange={(e) => setSubmitSourceUrl(e.target.value)}
+              placeholder="Product page URL — Sephora, brand site, etc. (optional)"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+            />
+            <input
+              type="url"
+              value={submitImageUrl}
+              onChange={(e) => setSubmitImageUrl(e.target.value)}
+              placeholder="Product image URL (optional)"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+            />
+          </div>
           {submitError && <p className="text-xs text-rose-600">{submitError}</p>}
           <div className="flex gap-2">
             <button
@@ -3559,7 +3608,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               disabled={submitLoading || !submitName.trim() || (submitMode === "paste" ? !submitIngredients.trim() : !submitUrl.trim())}
               className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {submitLoading ? "Submitting…" : "Submit product"}
+              {submitLoading ? "Submitting…" : "Submit for review"}
             </button>
             <button
               type="button"

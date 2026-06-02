@@ -20,11 +20,12 @@ export async function POST(req: NextRequest) {
 
   const { error } = await supabaseAdmin
     .from("products")
-    .update({ reviewed_at: new Date().toISOString(), is_archived: true })
+    .update({ is_pending: false, reviewed_at: new Date().toISOString() })
     .eq("id", productId);
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await writeAuditLog(userId, "reject_submission", "submission", productId, {
+  await writeAuditLog(userId, "approve_submission", "submission", productId, {
     name: existing?.name ?? productId,
   });
 

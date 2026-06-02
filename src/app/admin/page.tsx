@@ -26,6 +26,9 @@ type Submission = {
   submitted_at: string;
   ingredient_list: string | null;
   ingredient_count: number;
+  image_url: string | null;
+  iherb_url: string | null;
+  source_url: string | null;
 };
 
 type AllProduct = {
@@ -237,10 +240,15 @@ function describeAction(entry: AuditEntry): string {
         .join(", ");
       return `Updated "${d.name}"${changes ? ` — ${changes}` : ""}`;
     }
+    case "add_product":
+      return `Added product "${d.name}"`;
     case "delete_product":
       return `Deleted product "${d.name}"`;
     case "archive_submission":
-      return `Archived submission "${d.name}"`;
+    case "reject_submission":
+      return `Rejected submission "${d.name}"`;
+    case "approve_submission":
+      return `Approved submission "${d.name}"`;
     case "archive_product":
       return `Archived product "${d.name}"`;
     case "restore_product":
@@ -260,9 +268,10 @@ function actionColor(action: string): string {
 }
 
 const ACTION_GROUPS: Record<string, string[]> = {
-  Products: ["update_product", "delete_product", "restore_product"],
+  Products: ["add_product", "update_product", "delete_product", "restore_product"],
   Types: ["add_type", "edit_type", "delete_type", "merge_types"],
-  Archive: ["archive_product", "archive_submission"],
+  Archive: ["archive_product", "archive_submission", "reject_submission"],
+  Approve: ["approve_submission"],
 };
 
 const JUNK_KEYWORDS = /\b(directions?|warnings?|contains|apply|rinse|massage|avoid|consult|keep out|active ingredient|inactive ingredient|drug facts|other information|flush|store at|tamper|expir|for external use|do not|if swallowed|see package|serving|amount per|calories|sodium|total fat)\b/i;
@@ -449,8 +458,9 @@ export default function AdminPage() {
   const [forbidden, setForbidden] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<string | null>(null);
+  const [approving, setApproving] = useState<string | null>(null);
   const [editingSubmission, setEditingSubmission] = useState<string | null>(null);
-  const [submissionEdits, setSubmissionEdits] = useState<Record<string, { name: string; brand: string; type: string; ingredient_list: string }>>({});
+  const [submissionEdits, setSubmissionEdits] = useState<Record<string, { name: string; brand: string; type: string; ingredient_list: string; image_url: string; iherb_url: string; source_url: string }>>({});
   const [submissionSaving, setSubmissionSaving] = useState<string | null>(null);
   const [submissionSaved, setSubmissionSaved] = useState<Set<string>>(new Set());
 
@@ -572,6 +582,11 @@ export default function AdminPage() {
   const [revertingEntryId, setRevertingEntryId] = useState<string | null>(null);
   const [submissionsOpen, setSubmissionsOpen] = useState(true);
   const [allProductsOpen, setAllProductsOpen] = useState(false);
+  const [addProductOpen, setAddProductOpen] = useState(false);
+  const [addProductFields, setAddProductFields] = useState({ name: "", brand: "", type: "", ingredient_list: "", image_url: "", iherb_url: "", source_url: "" });
+  const [addProductSaving, setAddProductSaving] = useState(false);
+  const [addProductError, setAddProductError] = useState<string | null>(null);
+  const [addProductSaved, setAddProductSaved] = useState(false);
   const [typesOpen, setTypesOpen] = useState(false);
   const [typeFormOpen, setTypeFormOpen] = useState(false);
 
@@ -1159,6 +1174,48 @@ export default function AdminPage() {
     setArchiving(null);
   }
 
+  async function handleApprove(id: string) {
+    setApproving(id);
+    const res = await fetch("/api/admin/approve-submission", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId: id }),
+    });
+    if (res.ok) setSubmissions((prev) => prev.filter((s) => s.id !== id));
+    setApproving(null);
+  }
+
+  async function handleAddProduct() {
+    setAddProductSaving(true);
+    setAddProductError(null);
+    const res = await fetch("/api/admin/add-product", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(addProductFields),
+    });
+    const data = await res.json();
+    setAddProductSaving(false);
+    if (res.status === 409) {
+      setAddProductError("A product with this name already exists.");
+      return;
+    }
+    if (!res.ok) {
+      setAddProductError(data.error ?? "Failed to add product");
+      return;
+    }
+    const newProduct: AllProduct = {
+      ...data.product,
+      ingredient_list: data.product.ingredient_list ?? null,
+      is_archived: false,
+    };
+    setAllProducts((prev) => [newProduct, ...prev]);
+    setAllEdits((prev) => ({ ...prev, [newProduct.id]: initEdit(newProduct, activeTypesSet) }));
+    setAddProductFields({ name: "", brand: "", type: "", ingredient_list: "", image_url: "", iherb_url: "", source_url: "" });
+    setAddProductOpen(false);
+    setAddProductSaved(true);
+    setTimeout(() => setAddProductSaved(false), 3000);
+  }
+
   async function handleSaveSubmission(id: string) {
     const edits = submissionEdits[id];
     if (!edits) return;
@@ -1172,6 +1229,9 @@ export default function AdminPage() {
         brand: edits.brand,
         type: edits.type,
         ingredient_list: edits.ingredient_list,
+        image_url: edits.image_url,
+        iherb_url: edits.iherb_url,
+        source_url: edits.source_url,
       }),
     });
     if (res.ok) {
@@ -1180,6 +1240,9 @@ export default function AdminPage() {
         name: edits.name || s.name,
         brand: edits.brand || null,
         type: edits.type || null,
+        image_url: edits.image_url || s.image_url,
+        iherb_url: edits.iherb_url || s.iherb_url,
+        source_url: edits.source_url || s.source_url,
         ingredient_count: edits.ingredient_list ? splitIngredientList(edits.ingredient_list).length : s.ingredient_count,
       } : s));
       setSubmissionSaved((prev) => new Set([...prev, id]));
@@ -1766,21 +1829,41 @@ export default function AdminPage() {
                         )}
                         {submissionSaved.has(s.id) && <span className="text-xs text-teal-600 shrink-0">Saved</span>}
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-xs text-gray-400">
                           {s.ingredient_count > 0 ? `${s.ingredient_count} ingredients` : "No ingredients"}
                         </span>
                         <span className="text-gray-200 text-xs">·</span>
                         <span className="text-xs text-gray-400">{relativeTime(s.submitted_at)}</span>
+                        {s.iherb_url && (
+                          <>
+                            <span className="text-gray-200 text-xs">·</span>
+                            <a href={s.iherb_url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-500 hover:underline">iHerb</a>
+                          </>
+                        )}
+                        {s.source_url && (
+                          <>
+                            <span className="text-gray-200 text-xs">·</span>
+                            <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-500 hover:underline">Product page</a>
+                          </>
+                        )}
+                        {s.image_url && (
+                          <>
+                            <span className="text-gray-200 text-xs">·</span>
+                            <a href={s.image_url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-500 hover:underline">Image</a>
+                          </>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <Link
-                        href={`/?scan=${s.id}`}
-                        className="text-xs text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
+                      <button
+                        type="button"
+                        onClick={() => handleApprove(s.id)}
+                        disabled={approving === s.id}
+                        className="text-xs font-medium bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 rounded-md px-2.5 py-1 disabled:opacity-40"
                       >
-                        Scan
-                      </Link>
+                        {approving === s.id ? "Approving…" : "Approve"}
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -1790,7 +1873,7 @@ export default function AdminPage() {
                             setEditingSubmission(s.id);
                             setSubmissionEdits((prev) => ({
                               ...prev,
-                              [s.id]: { name: s.name, brand: s.brand ?? "", type: s.type ?? "", ingredient_list: "" },
+                              [s.id]: { name: s.name, brand: s.brand ?? "", type: s.type ?? "", ingredient_list: "", image_url: s.image_url ?? "", iherb_url: s.iherb_url ?? "", source_url: s.source_url ?? "" },
                             }));
                           }
                         }}
@@ -1804,7 +1887,7 @@ export default function AdminPage() {
                         disabled={archiving === s.id}
                         className="text-xs text-gray-400 hover:text-gray-700 disabled:opacity-40"
                       >
-                        {archiving === s.id ? "Archiving…" : "Archive"}
+                        {archiving === s.id ? "Rejecting…" : "Reject"}
                       </button>
                       <button
                         type="button"
@@ -1861,6 +1944,38 @@ export default function AdminPage() {
                           className="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm resize-y"
                         />
                       </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-0.5">Image URL</label>
+                        <input
+                          type="url"
+                          value={submissionEdits[s.id].image_url}
+                          onChange={(e) => setSubmissionEdits((prev) => ({ ...prev, [s.id]: { ...prev[s.id], image_url: e.target.value } }))}
+                          placeholder="https://…"
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-0.5">iHerb URL</label>
+                          <input
+                            type="url"
+                            value={submissionEdits[s.id].iherb_url}
+                            onChange={(e) => setSubmissionEdits((prev) => ({ ...prev, [s.id]: { ...prev[s.id], iherb_url: e.target.value } }))}
+                            placeholder="https://www.iherb.com/…"
+                            className="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-0.5">Product page URL</label>
+                          <input
+                            type="url"
+                            value={submissionEdits[s.id].source_url}
+                            onChange={(e) => setSubmissionEdits((prev) => ({ ...prev, [s.id]: { ...prev[s.id], source_url: e.target.value } }))}
+                            placeholder="https://…"
+                            className="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm"
+                          />
+                        </div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleSaveSubmission(s.id)}
@@ -1879,21 +1994,123 @@ export default function AdminPage() {
 
         {/* All Products */}
         <section>
-          <button
-            type="button"
-            onClick={() => setAllProductsOpen((v) => !v)}
-            className="flex items-center gap-3 mb-2 group"
-          >
-            <h2 className="text-xl font-semibold tracking-tight text-gray-900">All Products</h2>
-            {!allProductsLoading && (
-              <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
-                {allStats.total}
-              </span>
-            )}
-            <svg className={`w-4 h-4 text-gray-400 transition-transform ${allProductsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-3 mb-2">
+            <button
+              type="button"
+              onClick={() => setAllProductsOpen((v) => !v)}
+              className="flex items-center gap-3 group"
+            >
+              <h2 className="text-xl font-semibold tracking-tight text-gray-900">All Products</h2>
+              {!allProductsLoading && (
+                <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
+                  {allStats.total}
+                </span>
+              )}
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${allProductsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAddProductOpen((v) => !v); setAddProductError(null); }}
+              className="ml-auto text-xs font-medium border border-gray-300 rounded-lg px-3 py-1.5 text-gray-600 hover:border-gray-500 hover:text-gray-900 transition-colors"
+            >
+              {addProductOpen ? "Cancel" : "+ Add product"}
+            </button>
+            {addProductSaved && <span className="text-xs text-teal-600">Product added.</span>}
+          </div>
+
+          {addProductOpen && (
+            <div className="border border-gray-300 rounded-xl p-4 space-y-3 mb-4">
+              <p className="text-sm font-semibold text-gray-800">New product</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-14 shrink-0">Name</span>
+                  <input
+                    type="text"
+                    value={addProductFields.name}
+                    onChange={(e) => setAddProductFields((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Product name"
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-14 shrink-0">Brand</span>
+                  <input
+                    type="text"
+                    value={addProductFields.brand}
+                    onChange={(e) => setAddProductFields((f) => ({ ...f, brand: e.target.value }))}
+                    placeholder="Brand"
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-14 shrink-0">Type</span>
+                  <select
+                    value={addProductFields.type}
+                    onChange={(e) => setAddProductFields((f) => ({ ...f, type: e.target.value }))}
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-white min-w-0"
+                  >
+                    <option value="">Type…</option>
+                    {dropdownGroups.map(({ label, types }) => (
+                      <optgroup key={label} label={label}>
+                        {types.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-xs text-gray-400 w-14 shrink-0 pt-1.5">Source</span>
+                  <input
+                    type="url"
+                    value={addProductFields.source_url}
+                    onChange={(e) => setAddProductFields((f) => ({ ...f, source_url: e.target.value }))}
+                    placeholder="Source URL (INCIDecoder, Sephora, etc.)"
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-xs text-gray-400 w-14 shrink-0 pt-1.5">Image</span>
+                  <input
+                    type="url"
+                    value={addProductFields.image_url}
+                    onChange={(e) => setAddProductFields((f) => ({ ...f, image_url: e.target.value }))}
+                    placeholder="Image URL"
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-xs text-gray-400 w-14 shrink-0 pt-1.5">iHerb</span>
+                  <input
+                    type="url"
+                    value={addProductFields.iherb_url}
+                    onChange={(e) => setAddProductFields((f) => ({ ...f, iherb_url: e.target.value }))}
+                    placeholder="iHerb URL"
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0"
+                  />
+                </div>
+                <div>
+                  <span className="text-xs text-gray-400 block mb-1">Ingredients</span>
+                  <IngredientChipEditor
+                    value={addProductFields.ingredient_list}
+                    onChange={(v) => setAddProductFields((f) => ({ ...f, ingredient_list: v }))}
+                  />
+                </div>
+              </div>
+              {addProductError && <p className="text-xs text-rose-600">{addProductError}</p>}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleAddProduct}
+                  disabled={addProductSaving || !addProductFields.name.trim() || !addProductFields.ingredient_list.trim()}
+                  className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
+                >
+                  {addProductSaving ? "Adding…" : "Add product"}
+                </button>
+                <span className="text-xs text-gray-400">Goes live immediately</span>
+              </div>
+            </div>
+          )}
 
           {allProductsOpen && (<>
           {/* Filter bar */}
