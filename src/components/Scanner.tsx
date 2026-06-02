@@ -5089,11 +5089,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                 );
                               }) : dbConcernText && (
                                 <p className="text-xs text-gray-600 leading-relaxed">
-                                  {catLabel && (
+                                  {(catLabel || structured?.concern_category || (structured?.concern_profiles?.length ?? 0) > 0) && (
                                     <span className={`font-semibold ${fc && isUniversalCat(fc) ? "text-rose-700" : "text-amber-700"}`}>
-                                      {sensoryMergedWith === fc && sensoryLabel
-                                        ? (sensoryLabelRedundant ? `${catLabel}${sensoryProfileLabel}` : `${catLabel}, ${sensoryLabel}${sensoryProfileLabel}`)
-                                        : `${catLabel}${fcProfileLabel}`} —</span>
+                                      {catLabel
+                                        ? (sensoryMergedWith === fc && sensoryLabel
+                                            ? (sensoryLabelRedundant ? `${catLabel}${sensoryProfileLabel}` : `${catLabel}, ${sensoryLabel}${sensoryProfileLabel}`)
+                                            : `${catLabel}${fcProfileLabel}`)
+                                        : [structured?.concern_category, structured?.concern_profiles?.join(", ")].filter(Boolean).join(" · ")
+                                      } —</span>
                                   )}
                                   {(fcProfileCautionNote?.text ?? dbConcernText)}{sensoryMergedWith === fc && sensoryText ? ` ${sensoryText}` : ""}
                                 </p>

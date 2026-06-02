@@ -1,16 +1,16 @@
-# Upgrade Ingredient Explanations
+# Generate Ingredient Explanations
 
-Generate curated AI explanations for Skindex ingredients that currently have only template (auto-generated) text. Uses your Claude Pro session — no extra API cost.
+Generate curated explanations for Skindex ingredients that currently have only template (auto-generated) text. Uses your Claude Pro session — no extra API cost.
 
 ## Arguments
 
-`$ARGUMENTS` — optional batch size (default 30). Pass a number, e.g. `/upgrade-explanations 20`.
+`$ARGUMENTS` — optional batch size (default 30). Pass a number, e.g. `/generate-explanations 20`.
 
 ---
 
 ## Steps
 
-### 1. Check how many need upgrading
+### 1. Check how many need generating
 
 ```bash
 npx tsx scripts/fetch-need-explanation.ts 1
@@ -36,34 +36,55 @@ This outputs a JSON array of ingredients with these fields:
 
 ### 3. Generate explanation_structured for each ingredient
 
-For **every** ingredient in the batch, produce an `explanation_structured` object following these rules:
+For **every** ingredient in the batch, produce an `explanation_structured` object.
+
+Valid skin type labels for `benefit_profiles` and `concern_profiles`:
+> Reactive, Dry, Oily, Acne-prone, Mature, Eczema, Rosacea, Hyperpigmentation-prone, Damaged Barrier, Seborrheic, Fungal Acne
+
+---
 
 **For safe ingredients** (`status === "safe"`):
 ```json
 {
   "formula_role": "1 sentence: what [name] does technically in the formula. Start with '[name] is...'",
   "benefit": "1 sentence: its skin benefit and why it is well-tolerated. Start with '[name]...'",
+  "benefit_category": "1–3 word label for the type of benefit (e.g. Humectant, Antioxidant, Barrier-repairing, Soothing). Set null if the ingredient's category field already provides this label.",
+  "benefit_profiles": ["skin type", "skin type"] or null,
   "concern": null,
+  "concern_category": null,
+  "concern_profiles": null,
   "concern_items": null
 }
 ```
+
+---
 
 **For flagged ingredients** (`status === "flagged"`) with a single concern category:
 ```json
 {
   "formula_role": "1 sentence: what [name] does technically in the formula. Start with '[name] is...'",
   "benefit": "1 sentence: any meaningful benefit or why some use it despite the concern — or null if none. Start with '[name]...'",
+  "benefit_category": "1–3 word label for the type of benefit (e.g. Humectant, Exfoliant, Antioxidant) — or null if benefit is null or if flagged_category already describes it.",
+  "benefit_profiles": ["skin type", "skin type"] or null,
   "concern": "1 sentence: why [name] is a concern for reactive or sensitive skin. Start with '[name] is...' or '[name] can...'",
+  "concern_category": "1–3 word label naming the mechanism of harm (e.g. Photosensitizer, Barrier Disruptor, Sensitizer, Irritant). Set null if it would just repeat the flagged_category badge label.",
+  "concern_profiles": ["skin type", "skin type"] or null,
   "concern_items": null
 }
 ```
+
+---
 
 **For flagged ingredients with multiple concern categories** (when `secondary_flagged_categories` is non-empty):
 ```json
 {
   "formula_role": "...",
-  "benefit": "...",
+  "benefit": "... or null",
+  "benefit_category": "... or null",
+  "benefit_profiles": [...] or null,
   "concern": "1 sentence covering the primary concern",
+  "concern_category": "... or null",
+  "concern_profiles": [...] or null,
   "concern_items": [
     { "category": "<flagged_category>", "text": "1 sentence specific to this concern" },
     { "category": "<secondary category>", "text": "1 sentence specific to this concern" }
@@ -71,11 +92,17 @@ For **every** ingredient in the batch, produce an `explanation_structured` objec
 }
 ```
 
+---
+
 **Quality rules:**
 - Be specific to the ingredient — no generic filler like "this ingredient may cause issues"
 - `formula_role` should name the ingredient's technical function (emollient, preservative, humectant, surfactant, etc.)
-- `benefit` for safe ingredients should mention the actual skin benefit (hydration, barrier support, anti-inflammatory, etc.)
-- `concern` should name the specific mechanism (e.g., "can disrupt the skin barrier" not just "is harmful")
+- `benefit` must add information that `formula_role` did not already state — lead with the skin outcome, a comparison, or a profile-specific advantage
+- `benefit_category` is set when the benefit sentence describes a specific functional role (Humectant, Antioxidant, etc.) that isn't already captured by the ingredient's `category` classification field
+- `benefit_profiles` lists skin types that benefit most; omit skin types for which the ingredient is unremarkable
+- `concern` should name the specific mechanism (e.g., "disrupts the skin barrier" not just "is harmful")
+- `concern_category` is set when the mechanism label adds clarity beyond the `flagged_category` badge already shown in the UI — omit if redundant
+- `concern_profiles` lists skin types most affected by this concern; omit skin types for which the concern is unremarkable
 - Keep each sentence to one sentence — no run-ons
 
 ### 4. Assemble the output JSON

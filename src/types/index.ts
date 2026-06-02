@@ -17,6 +17,8 @@ export type ExplanationStructured = {
   benefit_category?: string | null;
   benefit_profiles?: string[] | null;
   concern: string | null;
+  concern_category?: string | null;
+  concern_profiles?: string[] | null;
   concern_items?: ConcernItem[] | null;
 };
 
