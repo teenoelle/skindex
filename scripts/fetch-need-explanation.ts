@@ -78,12 +78,12 @@ async function main() {
     }
 
     const needing = all.filter((row) => {
-      const s = row.explanation_structured;
+      const s = row.explanation_structured as Record<string, unknown>;
       if (!s) return false;
-      // Flagged: has concern text but no concern_category
-      const needsConcernLabel = row.status === "flagged" && !!s.concern && !s.concern_category && !s.concern_items;
-      // Any: has benefit text, no ingredient-level category, and no benefit_category
-      const needsBenefitLabel = !!s.benefit && !row.category && !s.benefit_category;
+      // Flagged: has concern text but concern_category key has never been written
+      const needsConcernLabel = row.status === "flagged" && !!s["concern"] && !s["concern_items"] && !("concern_category" in s);
+      // Any: has benefit text, no ingredient-level category, and benefit_category key has never been written
+      const needsBenefitLabel = !!s["benefit"] && !row.category && !("benefit_category" in s);
       return needsConcernLabel || needsBenefitLabel;
     }).slice(0, limit);
 
