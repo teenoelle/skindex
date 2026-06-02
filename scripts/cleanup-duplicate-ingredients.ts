@@ -7,6 +7,17 @@
  *
  * For junk entries, removes their product_ingredients rows then deletes them.
  *
+ * Duplicate detection strategies (applied in order, each excludes already-found):
+ *   1. Exact         — case/whitespace/trailing-punct normalisation
+ *   2. Fuzzy         — strip all non-alphanumeric, exact match
+ *   3. INCI          — two entries share the same non-null inci_name
+ *   4. Stripped      — strip parenthetical INCI notation, certification marks,
+ *                      and marketing prefixes, then exact match
+ *   5. Sorted tokens — tokenise, drop stop words, sort; match on ≥3 tokens
+ *                      (catches word-order variants like "Rosa Canina Seed Oil"
+ *                      vs "Seed Oil, Rosa Canina")
+ *   6. Edit-distance — Levenshtein ≤ 1 (letter-swap typos)
+ *
  * Usage:
  *   npx tsx scripts/cleanup-duplicate-ingredients.ts           # dry run
  *   npx tsx scripts/cleanup-duplicate-ingredients.ts --execute # commit
@@ -31,6 +42,7 @@ const EXECUTE = process.argv.includes("--execute");
 type Ingredient = {
   id: string;
   name: string;
+  inci_name: string | null;
   status: string;
   structural_category: string | null;
   category: string | null;
@@ -39,17 +51,62 @@ type Ingredient = {
   explanation_source: string | null;
 };
 
-// ── normalisation (same as find-duplicate-ingredients.ts) ────────────────────
+// ── normalisation ─────────────────────────────────────────────────────────────
 
 const SOFT_HYPHEN = "­";
 
+/** Case + whitespace + trailing-punct normalisation */
 function normExact(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ").replace(/[.,;:!?]+$/, "");
 }
 
+/** Strip all non-alphanumeric characters (catches hyphen/slash/space variants) */
 function normFuzzy(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
+
+/**
+ * Strip parenthetical INCI notation, bracketed content, certification marks,
+ * and marketing prefixes — then apply exact normalisation.
+ *
+ * Catches: "Aloe Vera (Aloe Barbadensis Leaf Juice)" → "aloe vera"
+ *          "Retinol (Vitamin A)*" → "retinol"
+ *          "Organic Jojoba Oil" → "jojoba oil"
+ */
+function normStripped(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/\*/g, " ")
+    .replace(/^(organic|natural|pure|vegan|certified|wildcrafted|raw)\s+/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.,;:]+$/, "");
+}
+
+/**
+ * Tokenise, drop stop words, sort, join.
+ * Returns "" for names with fewer than 3 meaningful tokens (too short to
+ * word-order match safely).
+ *
+ * Catches: "Rosa Canina Seed Oil" ↔ "Seed Oil, Rosa Canina"
+ *          "Centella Asiatica Extract" ↔ "Extract of Centella Asiatica"
+ */
+const STOP_WORDS = new Set(["of", "the", "and", "from", "with", "in", "an", "a"]);
+
+function normSorted(name: string): string {
+  const tokens = name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(t => t.length > 1 && !STOP_WORDS.has(t))
+    .sort();
+  if (tokens.length < 3) return "";
+  return tokens.join(" ");
+}
+
+// ── helper predicates ────────────────────────────────────────────────────────
 
 function hasSoftHyphen(name: string): boolean {
   return name.includes(SOFT_HYPHEN);
@@ -80,9 +137,9 @@ const JUNK_PATTERNS = [
   /replenisher for skin/i,
   /rejuvenate and restore/i,
   /\bfl\.?\s*oz\b/i,
-  /<[a-z]/i,                            // HTML tag remnant (e.g. "Acid<span...")
-  /\bflavor\b|\bflavour\b/i,            // food flavoring terms
-  /\bfragrance note\b/i,                // perfumery descriptor, not an ingredient
+  /<[a-z]/i,
+  /\bflavor\b|\bflavour\b/i,
+  /\bfragrance note\b/i,
 ];
 
 const JUNK_SINGLE_WORDS = new Set([
@@ -129,48 +186,35 @@ function levenshtein(a: string, b: string): number {
 function isFalseEditPositive(a: string, b: string): boolean {
   const aL = a.toLowerCase(), bL = b.toLowerCase();
 
-  // Any numbers in both names differ → different grades/series members
-  // Catches: PEG-10 vs PEG-12, Polysorbate 20 vs 60, CI 77491 vs 77492, Red 6 vs Red 7
   const numRe = /\d+/g;
   const aNums = [...aL.matchAll(numRe)].map(m => m[0]);
   const bNums = [...bL.matchAll(numRe)].map(m => m[0]);
   if (aNums.length > 0 && bNums.length > 0 && aNums.join(",") !== bNums.join(",")) return true;
-  // One has numbers and the other doesn't
   if ((aNums.length > 0) !== (bNums.length > 0)) return true;
 
-  // Very short names (≤5 chars) that differ → likely distinct compounds (BHA/BHT)
   if (a.length <= 5) return true;
 
-  // Names ending with a short uppercase abbreviation that differs (Ceramide AP/NP, Cocamide DEA/MEA)
   const abbrevEnd = /\s+([A-Z]{2,4})$/;
   const aAbbrev = a.match(abbrevEnd)?.[1];
   const bAbbrev = b.match(abbrevEnd)?.[1];
   if (aAbbrev && bAbbrev && aAbbrev !== bAbbrev) return true;
 
-  // Names ending with a single uppercase/lowercase letter after a space (Vitamin C/E)
   const singleLetterEnd = /\s+([A-Za-z])$/;
   const aLetter = a.match(singleLetterEnd)?.[1];
   const bLetter = b.match(singleLetterEnd)?.[1];
   if (aLetter && bLetter && aLetter.toLowerCase() !== bLetter.toLowerCase()) return true;
 
-  // Different chemical-type prefix (methyl/ethyl/propyl → different homologues)
   const chemPrefix = /^(methyl|ethyl|propyl|butyl|hydroxy|dehydro|iso|neo|di|tri|mono)/;
   if (chemPrefix.exec(aL)?.[1] !== chemPrefix.exec(bL)?.[1]) return true;
 
   return false;
 }
 
-/**
- * Finds pairs that differ by at most 1 edit (insert/delete/substitute) after
- * lowercasing. Only compares names within 2 chars of each other to avoid O(n²)
- * cost and false positives across very different-length names.
- */
 function findEditDistanceDupes(
   all: Ingredient[],
   exclude: Set<string>,
 ): Array<Ingredient[]> {
   const candidates = all.filter(i => !exclude.has(i.id) && !isJunk(i.name));
-  // bucket by length so we only compare names within ±2 chars
   const byLen = new Map<number, Ingredient[]>();
   for (const ing of candidates) {
     const len = ing.name.length;
@@ -210,36 +254,33 @@ function findEditDistanceDupes(
 
 // ── winner selection ─────────────────────────────────────────────────────────
 
-/**
- * Score an ingredient for "how good is this as the canonical row".
- * Higher = better to keep.
- */
 function score(ing: Ingredient): number {
   let s = 0;
-  if (!hasSoftHyphen(ing.name))    s += 100; // soft hyphen is the #1 bad signal
-  if (!hasTrailingPunct(ing.name)) s +=  50;
-  if (!hasAsterisk(ing.name))      s +=  20;
-  if (!hasLeadingLowercase(ing.name)) s += 10;
-  // More classification data = better
-  if (ing.structural_category)     s +=   5;
-  if (ing.category)                s +=   3;
-  if (ing.flagged_category)        s +=   2;
-  // Better explanation source
+  if (!hasSoftHyphen(ing.name))       s += 100;
+  if (!hasTrailingPunct(ing.name))    s +=  50;
+  if (!hasAsterisk(ing.name))         s +=  20;
+  if (!hasLeadingLowercase(ing.name)) s +=  10;
+  if (ing.structural_category)        s +=   5;
+  if (ing.category)                   s +=   3;
+  if (ing.flagged_category)           s +=   2;
   if (ing.explanation_source === "curated")  s += 4;
   if (ing.explanation_source === "template") s += 1;
+  // Small length bonus — helps truncated entries lose to their complete counterparts.
+  // Capped at 5 so it only breaks near-ties and never overrides quality signals.
+  s += Math.min(Math.floor(ing.name.length / 5), 5);
+  // Shade/variant prefix penalty: "Red 7 Ruby: Diisostearyl Malate" style names
+  if (ing.name.includes(":")) s -= 20;
+  // All-caps product-code penalty: "POLYGLYCERYL-3 DIISOSTEARATE 7743" style names
+  if (ing.name.length > 10 && /^[A-Z0-9\s\-\/,.]+$/.test(ing.name)) s -= 10;
   return s;
 }
 
-function pickWinner(
-  a: Ingredient,
-  b: Ingredient,
-): { keep: Ingredient; drop: Ingredient } {
+function pickWinner(a: Ingredient, b: Ingredient): { keep: Ingredient; drop: Ingredient } {
   return score(a) >= score(b) ? { keep: a, drop: b } : { keep: b, drop: a };
 }
 
 // ── DB operations ─────────────────────────────────────────────────────────────
 
-/** Returns how many product_ingredients rows reference ingredient_id */
 async function countRefs(ingredientId: string): Promise<number> {
   const { count, error } = await supabase
     .from("product_ingredients")
@@ -249,16 +290,10 @@ async function countRefs(ingredientId: string): Promise<number> {
   return count ?? 0;
 }
 
-/**
- * Re-points product_ingredients rows from dropId → keepId.
- * Rows that would conflict (product already has keepId) are deleted instead.
- * Returns { repointed, conflictsDropped }.
- */
 async function repointRefs(
   dropId: string,
   keepId: string,
 ): Promise<{ repointed: number; conflictsDropped: number }> {
-  // Fetch all product_ids that reference the drop ingredient
   const { data: dropRows, error: fetchErr } = await supabase
     .from("product_ingredients")
     .select("product_id")
@@ -268,7 +303,6 @@ async function repointRefs(
 
   const dropProductIds = dropRows.map((r) => r.product_id as string);
 
-  // Find which of those products already reference the keep ingredient
   const { data: keepRows, error: keepErr } = await supabase
     .from("product_ingredients")
     .select("product_id")
@@ -278,7 +312,6 @@ async function repointRefs(
 
   const alreadyHaveKeep = new Set((keepRows ?? []).map((r) => r.product_id as string));
 
-  // Products with conflicts: just delete the drop row
   const conflictIds = dropProductIds.filter((id) => alreadyHaveKeep.has(id));
   if (conflictIds.length > 0) {
     const { error: delErr } = await supabase
@@ -289,7 +322,6 @@ async function repointRefs(
     if (delErr) throw new Error(`repointRefs delete conflicts: ${delErr.message}`);
   }
 
-  // Products without conflicts: update ingredient_id
   const updateIds = dropProductIds.filter((id) => !alreadyHaveKeep.has(id));
   if (updateIds.length > 0) {
     const { error: updErr } = await supabase
@@ -303,7 +335,6 @@ async function repointRefs(
   return { repointed: updateIds.length, conflictsDropped: conflictIds.length };
 }
 
-/** Deletes all product_ingredients rows for an ingredient then deletes the ingredient. */
 async function deleteIngredient(id: string): Promise<void> {
   const { error: piErr } = await supabase
     .from("product_ingredients")
@@ -321,13 +352,12 @@ async function deleteIngredient(id: string): Promise<void> {
 // ── main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  // Load all ingredients
   const all: Ingredient[] = [];
   let from = 0;
   while (true) {
     const { data, error } = await supabase
       .from("ingredients")
-      .select("id, name, status, structural_category, category, flagged_category, secondary_flagged_categories, explanation_source")
+      .select("id, name, inci_name, status, structural_category, category, flagged_category, secondary_flagged_categories, explanation_source")
       .order("name")
       .range(from, from + 999);
     if (error) { console.error(error.message); process.exit(1); }
@@ -338,11 +368,10 @@ async function main() {
   }
   console.log(`\nLoaded ${all.length} ingredients.\n`);
 
-  // ── identify groups ────────────────────────────────────────────────────────
+  // ── strategy 1: exact ──────────────────────────────────────────────────────
   const junk = all.filter((i) => isJunk(i.name));
   const junkIds = new Set(junk.map((i) => i.id));
 
-  // Exact duplicates
   const exactMap = new Map<string, Ingredient[]>();
   for (const ing of all) {
     if (junkIds.has(ing.id)) continue;
@@ -353,7 +382,7 @@ async function main() {
   const exactGroups = [...exactMap.values()].filter((g) => g.length > 1);
   const inExact = new Set(exactGroups.flat().map((i) => i.id));
 
-  // Fuzzy duplicates (character-strip normalization)
+  // ── strategy 2: fuzzy (char-strip) ────────────────────────────────────────
   const fuzzyMap = new Map<string, Ingredient[]>();
   for (const ing of all) {
     if (junkIds.has(ing.id) || inExact.has(ing.id)) continue;
@@ -365,41 +394,98 @@ async function main() {
   const fuzzyGroups = [...fuzzyMap.values()].filter((g) => g.length > 1);
   const inFuzzy = new Set(fuzzyGroups.flat().map((i) => i.id));
 
-  // Edit-distance duplicates (letter-swap typos like "salicyclic" ↔ "salicylic")
-  const excludeFromEdit = new Set([...junkIds, ...inExact, ...inFuzzy]);
+  // ── strategy 3: INCI dedup ────────────────────────────────────────────────
+  // Two DB rows sharing the same non-null inci_name are the same ingredient.
+  const inciMap = new Map<string, Ingredient[]>();
+  for (const ing of all) {
+    if (junkIds.has(ing.id) || inExact.has(ing.id) || inFuzzy.has(ing.id)) continue;
+    if (!ing.inci_name) continue;
+    const key = ing.inci_name.toLowerCase().trim();
+    if (key.length < 3) continue;
+    if (!inciMap.has(key)) inciMap.set(key, []);
+    inciMap.get(key)!.push(ing);
+  }
+  const inciGroups = [...inciMap.values()].filter((g) => g.length > 1);
+  const inInci = new Set(inciGroups.flat().map((i) => i.id));
+
+  // ── strategy 4: stripped (parenthetical INCI / marketing prefix) ──────────
+  const strippedMap = new Map<string, Ingredient[]>();
+  for (const ing of all) {
+    if (junkIds.has(ing.id) || inExact.has(ing.id) || inFuzzy.has(ing.id) || inInci.has(ing.id)) continue;
+    const key = normStripped(ing.name);
+    if (key.length < 4) continue;
+    if (!strippedMap.has(key)) strippedMap.set(key, []);
+    strippedMap.get(key)!.push(ing);
+  }
+  const strippedGroups = [...strippedMap.values()].filter((g) => g.length > 1);
+  const inStripped = new Set(strippedGroups.flat().map((i) => i.id));
+
+  // ── strategy 5: sorted tokens (word-order variants) ───────────────────────
+  const sortedMap = new Map<string, Ingredient[]>();
+  for (const ing of all) {
+    if (junkIds.has(ing.id) || inExact.has(ing.id) || inFuzzy.has(ing.id) || inInci.has(ing.id) || inStripped.has(ing.id)) continue;
+    const key = normSorted(ing.name);
+    if (!key) continue; // empty = fewer than 3 tokens, skip
+    if (!sortedMap.has(key)) sortedMap.set(key, []);
+    sortedMap.get(key)!.push(ing);
+  }
+  const sortedGroups = [...sortedMap.values()].filter((g) => g.length > 1);
+  const inSorted = new Set(sortedGroups.flat().map((i) => i.id));
+
+  // ── strategy 6: edit-distance (letter-swap typos) ─────────────────────────
+  const excludeFromEdit = new Set([...junkIds, ...inExact, ...inFuzzy, ...inInci, ...inStripped, ...inSorted]);
   const editGroups = findEditDistanceDupes(all, excludeFromEdit);
 
-  // Build final list of (keep, drop) pairs from all dupe groups
-  const pairs: Array<{ keep: Ingredient; drop: Ingredient }> = [];
-  for (const group of [...exactGroups, ...fuzzyGroups, ...editGroups]) {
-    // Sort by score descending; the first is the keeper
-    const sorted = [...group].sort((a, b) => score(b) - score(a));
-    const keep = sorted[0];
-    for (const drop of sorted.slice(1)) {
-      pairs.push({ keep, drop });
+  // ── build pairs with strategy labels ──────────────────────────────────────
+  const pairs: Array<{ keep: Ingredient; drop: Ingredient; strategy: string }> = [];
+
+  function addPairs(groups: Array<Ingredient[]>, strategy: string) {
+    for (const group of groups) {
+      const sorted = [...group].sort((a, b) => score(b) - score(a));
+      const keep = sorted[0];
+      for (const drop of sorted.slice(1)) {
+        pairs.push({ keep, drop, strategy });
+      }
     }
   }
 
-  // ── dry-run report ─────────────────────────────────────────────────────────
+  addPairs(exactGroups, "exact");
+  addPairs(fuzzyGroups, "fuzzy");
+  addPairs(inciGroups, "inci");
+  addPairs(strippedGroups, "stripped");
+  addPairs(sortedGroups, "sorted");
+  addPairs(editGroups, "edit-distance");
+
+  // ── report ─────────────────────────────────────────────────────────────────
   console.log(`${"─".repeat(70)}`);
   console.log(`JUNK ENTRIES TO DELETE (${junk.length}):`);
   for (const ing of junk) {
-    console.log(`  DELETE  ${ing.id}  "${ing.name.slice(0, 70)}…"`);
+    console.log(`  DELETE  ${ing.id}  "${ing.name.slice(0, 70)}"`);
   }
 
-  console.log(`\nDUPLICATE PAIRS TO MERGE (${pairs.length}):`);
-  for (const { keep, drop } of pairs) {
-    const statusWarning =
-      keep.status !== drop.status ? `  ⚠ status mismatch: keeping ${keep.status}` : "";
-    console.log(`  KEEP    ${keep.id}  "${keep.name}"  [${keep.status}]  src=${keep.explanation_source ?? "none"}`);
-    console.log(`  DROP    ${drop.id}  "${drop.name}"  [${drop.status}]  src=${drop.explanation_source ?? "none"}${statusWarning}`);
-    console.log();
+  // Group pairs by strategy for readability
+  const byStrategy = new Map<string, typeof pairs>();
+  for (const p of pairs) {
+    if (!byStrategy.has(p.strategy)) byStrategy.set(p.strategy, []);
+    byStrategy.get(p.strategy)!.push(p);
+  }
+
+  console.log(`\nDUPLICATE PAIRS TO MERGE (${pairs.length} total):`);
+  for (const [strategy, stratPairs] of byStrategy) {
+    console.log(`\n  ── ${strategy.toUpperCase()} (${stratPairs.length}) ──`);
+    for (const { keep, drop } of stratPairs) {
+      const warn = keep.status !== drop.status ? `  ⚠ status mismatch: keeping ${keep.status}` : "";
+      console.log(`    KEEP  "${keep.name}"  [${keep.status}]  src=${keep.explanation_source ?? "none"}`);
+      console.log(`    DROP  "${drop.name}"  [${drop.status}]  src=${drop.explanation_source ?? "none"}${warn}`);
+      console.log();
+    }
   }
 
   const totalDeletes = junk.length + pairs.length;
   console.log(`${"─".repeat(70)}`);
   console.log(`TOTAL: ${totalDeletes} rows to delete (${junk.length} junk + ${pairs.length} duplicates)`);
-  if (editGroups.length > 0) console.log(`  (${editGroups.length} of those duplicate groups found via edit-distance — verify carefully)`);
+  const highRisk = pairs.filter(p => p.strategy === "sorted" || p.strategy === "inci");
+  if (highRisk.length > 0) console.log(`  ⚠  ${highRisk.length} pair(s) via INCI/sorted — verify carefully before --execute`);
 
   if (!EXECUTE) {
     console.log(`\nDry run — no changes made. Re-run with --execute to commit.\n`);
@@ -411,7 +497,6 @@ async function main() {
   let ok = 0;
   let failed = 0;
 
-  // Merge duplicate pairs
   for (const { keep, drop } of pairs) {
     const refs = await countRefs(drop.id);
     try {
@@ -430,11 +515,10 @@ async function main() {
     }
   }
 
-  // Delete junk
   for (const ing of junk) {
     try {
       await deleteIngredient(ing.id);
-      console.log(`  ✓ deleted junk: "${ing.name.slice(0, 60)}…"`);
+      console.log(`  ✓ deleted junk: "${ing.name.slice(0, 60)}"`);
       ok++;
     } catch (e) {
       console.error(`  ✗ junk "${ing.id}": ${e}`);
