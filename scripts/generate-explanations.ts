@@ -26,11 +26,15 @@ import { getBioactiveProfile } from "../src/lib/bioactive-ai.js";
 import { getBioactiveCategories, generateBioactiveNotes } from "../src/lib/bioactive-concerns.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Load env before any client is created — dotenv.config must run before
+// createClient or Anthropic() are called, so clients are initialised lazily.
 dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
 
+// Supabase client created after dotenv — module-level createClient would
+// run before dotenv.config() resolves in the ES module initialisation graph.
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? (() => { throw new Error("NEXT_PUBLIC_SUPABASE_URL not set — did vercel env pull run?"); })(),
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? (() => { throw new Error("SUPABASE_SERVICE_ROLE_KEY not set"); })(),
 );
 
 const DRY_RUN = process.argv.includes("--dry-run");

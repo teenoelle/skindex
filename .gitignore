@@ -49,3 +49,5 @@ iherb-report.html
 supabase/.temp/
 
 .vercel
+
+.env*
