@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater } from "lucide-react";
+import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater, Cigarette } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, Routine, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 import { SENSORY_PROFILE_MAP, CONCERN_PROFILE_TYPES } from "@/lib/sensory";
@@ -434,7 +434,7 @@ const RINSE_OFF_TYPES = new Set([
 ]);
 
 type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash" | "keratosis_pilaris" | "body_acne" | "fast_shedding";
-type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water" | "red_nir" | "blue_light" | "amber_light" | "vibration_sonic" | "heat_steam" | "microcurrent" | "iodine_load" | "phytoestrogen_load" | "anti_androgenic" | "vasodilating_supps" | "immune_stimulating" | "insulin_sensitizing" | "anabolic_dht" | "high_dose_b12" | "collagen_support" | "high_glycemic" | "dairy_regular" | "gluten_sensitive" | "histamine_foods" | "alcohol_regular" | "spicy_foods" | "high_iodine_diet" | "sulfites_diet" | "benzoates_diet" | "nitrites_diet" | "bha_bht_diet" | "propionates_diet" | "carmine_diet" | "pregnant" | "breastfeeding" | "hormone_sensitive" | "thyroid_condition" | "on_hrt";
+type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water" | "red_nir" | "blue_light" | "amber_light" | "vibration_sonic" | "heat_steam" | "microcurrent" | "iodine_load" | "phytoestrogen_load" | "anti_androgenic" | "vasodilating_supps" | "immune_stimulating" | "insulin_sensitizing" | "anabolic_dht" | "high_dose_b12" | "collagen_support" | "high_glycemic" | "dairy_regular" | "gluten_sensitive" | "histamine_foods" | "alcohol_regular" | "spicy_foods" | "high_iodine_diet" | "sulfites_diet" | "benzoates_diet" | "nitrites_diet" | "bha_bht_diet" | "propionates_diet" | "carmine_diet" | "pregnant" | "breastfeeding" | "hormone_sensitive" | "thyroid_condition" | "on_hrt" | "smoking";
 
 const SKIN_TYPES: { value: SkinType; label: string }[] = [
   { value: "oily", label: "Oily" },
@@ -515,7 +515,11 @@ const HORMONE_TYPES: { value: ClimateType; label: string }[] = [
   { value: "on_hrt", label: "On HRT" },
 ];
 
-const ALL_MODIFIER_TYPES = [...CLIMATE_TYPES, ...WATER_TYPES, ...DEVICE_TYPES, ...SUPPLEMENT_TYPES, ...DIET_TYPES, ...HORMONE_TYPES];
+const LIFESTYLE_TYPES: { value: ClimateType; label: string }[] = [
+  { value: "smoking", label: "Smoking / tobacco" },
+];
+
+const ALL_MODIFIER_TYPES = [...CLIMATE_TYPES, ...WATER_TYPES, ...DEVICE_TYPES, ...SUPPLEMENT_TYPES, ...DIET_TYPES, ...HORMONE_TYPES, ...LIFESTYLE_TYPES];
 
 const SKIN_TYPE_NOTES: Record<SkinType, string> = {
   oily: "Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.",
@@ -579,6 +583,7 @@ const CLIMATE_NOTES: Record<ClimateType, string> = {
   hormone_sensitive: "For hormone-sensitive conditions (estrogen receptor-positive cancer, endometriosis, PCOS, fibroids), phytoestrogens and estrogen-mimicking topical ingredients are a relevant concern. Key ingredients: parabens (methylparaben, propylparaben, butylparaben) — weak estrogen mimics; lavender oil and tea tree oil — associated with hormonal effects in studies; soy isoflavones and fermented extracts — phytoestrogenic botanicals. Oxybenzone also has documented endocrine-disrupting activity.",
   thyroid_condition: "For thyroid conditions (hypothyroidism, Hashimoto's, Graves'), iodine-containing topical ingredients are worth noting — povidone-iodine, kelp extract, sea algae, and certain marine extracts deliver iodine that is partially absorbed through skin and may affect thyroid function or interact with thyroid medication. Most relevant for leave-on products applied to large surface areas over time.",
   on_hrt: "For those on hormone replacement therapy or hormonal medications (oral contraceptives, bioidentical hormones), phytoestrogens and estrogen-mimicking topical ingredients can theoretically interact with hormone levels. Parabens, soy isoflavones, lavender oil, and licorice root (glycyrrhizic acid is mildly estrogenic) are the main topical ingredients with documented estrogenic activity. Clinical significance of topical exposure is lower than oral, but is most relevant at high-absorption sites (inner arms, chest, neck).",
+  smoking: "Tobacco smoke generates reactive oxygen species that deplete skin vitamins C and E, activate metalloproteinases that break down collagen and elastin, impair microcirculation, and increase transepidermal water loss by disrupting the lipid barrier. The clinical result is accelerated photoaging, impaired wound healing, dull complexion, and a lower threshold for contact sensitizer reactions. Key topical priorities: vitamin C and antioxidants (replenish what smoke depletes), peptides and retinoids (counter collagen breakdown), and ceramides with fatty acids (restore barrier function).",
 };
 
 function noteLabel(n: SkinClimateNote): string {
@@ -591,7 +596,7 @@ function noteLabel(n: SkinClimateNote): string {
 }
 
 function climateNoteStyle(c: ClimateType): string {
-  const amberSet = new Set<ClimateType>(["heavy_metal_water", "heat_steam", "iodine_load", "immune_stimulating", "anabolic_dht", "high_dose_b12"]);
+  const amberSet = new Set<ClimateType>(["heavy_metal_water", "heat_steam", "iodine_load", "immune_stimulating", "anabolic_dht", "high_dose_b12", "smoking"]);
   if (amberSet.has(c)) return "text-amber-800 bg-amber-50 border-amber-200";
   if (DEVICE_TYPES.some(d => d.value === c)) return "text-blue-800 bg-blue-50 border-blue-200";
   if (DIET_TYPES.some(d => d.value === c)) return "text-emerald-800 bg-emerald-50 border-emerald-200";
@@ -637,6 +642,7 @@ function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateT
   if (climates.has("hormone_sensitive")) cats.push("Phytoestrogens", "Endocrine disruptors", "Parabens");
   if (climates.has("thyroid_condition")) cats.push("Iodine-heavy ingredients");
   if (climates.has("on_hrt")) cats.push("Phytoestrogens", "Endocrine disruptors");
+  if (climates.has("smoking")) cats.push("Sensitizers", "Fragrance allergens");
   return [...new Set(cats)];
 }
 
@@ -755,6 +761,7 @@ function isFcProfileMatch(fc: string, activeSkinTypes: Set<SkinType>, activeClim
     (fc === "phytoestrogen" && (activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt"))) ||
     (fc === "teratogen" && activeClimates.has("pregnant")) ||
     (fc === "iodine-heavy" && activeClimates.has("thyroid_condition")) ||
+    ((fc === "sensitizer" || fc === "fragrance-allergen") && activeClimates.has("smoking")) ||
     (fc === "vasodilator" && (activeSkinTypes.has("rosacea") || activeSkinTypes.has("lupus_rash"))) ||
     (fc === "fungal-feed" && (activeSkinTypes.has("fungal_acne") || activeSkinTypes.has("seborrheic")))
   );
@@ -1280,6 +1287,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [supplementHint, setSupplementHint] = useState<ClimateType | null>(null);
   const [dietHint, setDietHint] = useState<ClimateType | null>(null);
   const [hormoneHint, setHormoneHint] = useState<ClimateType | null>(null);
+  const [lifestyleHint, setLifestyleHint] = useState<ClimateType | null>(null);
   const [stepTagHint, setStepTagHint] = useState<string | null>(null);
   const [routineStepHint, setRoutineStepHint] = useState<string | null>(null);
   const [whatNextHint, setWhatNextHint] = useState<string | null>(null);
@@ -3180,6 +3188,23 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     </div>
                   )}
                 </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Cigarette size={12} /> Lifestyle</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {LIFESTYLE_TYPES.map(({ value, label }) => (
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-800 text-white border-amber-800" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setLifestyleHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
+                    ))}
+                  </div>
+                  {lifestyleHint && CLIMATE_NOTES[lifestyleHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{LIFESTYLE_TYPES.find(t => t.value === lifestyleHint)?.label} — </span>
+                      {CLIMATE_NOTES[lifestyleHint]}
+                    </div>
+                  )}
+                </div>
                 {(activeSkinTypes.size + activeClimates.size) > 0 && (
                   <div className="space-y-1.5 pt-1">
                     {(() => {
@@ -4620,6 +4645,23 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
                       <span className="font-medium text-gray-700">{HORMONE_TYPES.find(t => t.value === hormoneHint)?.label} — </span>
                       {CLIMATE_NOTES[hormoneHint]}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Cigarette size={12} /> Lifestyle</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {LIFESTYLE_TYPES.map(({ value, label }) => (
+                      <span key={value} className="inline-flex items-center gap-0.5">
+                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-800 text-white border-amber-800" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
+                        <button type="button" onClick={() => setLifestyleHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
+                      </span>
+                    ))}
+                  </div>
+                  {lifestyleHint && CLIMATE_NOTES[lifestyleHint] && (
+                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                      <span className="font-medium text-gray-700">{LIFESTYLE_TYPES.find(t => t.value === lifestyleHint)?.label} — </span>
+                      {CLIMATE_NOTES[lifestyleHint]}
                     </div>
                   )}
                 </div>

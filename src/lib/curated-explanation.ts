@@ -1023,6 +1023,61 @@ export function generateNotes(ing: {
     });
   }
 
+  // ── SMOKING NOTES ─────────────────────────────────────────────────────────
+
+  // Antioxidants — replenish smoke-depleted vitamins C and E
+  if (cat === "antioxidant") {
+    const isVitC = ingName.includes("ascorb") || (ingName.includes("vitamin") && ingName.includes("c"));
+    notes.push({
+      dimensions: [],
+      climate: ["smoking"],
+      sentiment: "benefit",
+      text: isVitC
+        ? "Vitamin C is the first antioxidant exhausted by cigarette smoke-generated free radicals. Topical vitamin C partially restores the antioxidant deficit directly at the skin surface while also stimulating collagen synthesis — one of the most evidence-backed actives for smoke-exposed skin."
+        : "Tobacco smoke depletes skin vitamins C and E through sustained oxidative stress. Topical antioxidants directly replenish this deficit at the skin surface and are among the highest-value ingredients for smoke-exposed skin.",
+    });
+  }
+
+  // Peptides — counter metalloproteinase-driven collagen breakdown
+  if (sc === "Peptide") {
+    notes.push({
+      dimensions: [],
+      climate: ["smoking"],
+      sentiment: "benefit",
+      text: "Smoking upregulates matrix metalloproteinases (MMPs) that actively degrade collagen and elastin. Signal peptides and collagen-stimulating peptides work directly against this degradation pathway.",
+    });
+  }
+
+  // Ceramides — restore smoke-impaired barrier lipids
+  if (sc === "Ceramide") {
+    notes.push({
+      dimensions: [],
+      climate: ["smoking"],
+      sentiment: "benefit",
+      text: "Tobacco smoke reduces ceramide synthesis and increases transepidermal water loss. Topical ceramides directly restore the lipid barrier layers that smoking depletes.",
+    });
+  }
+
+  // Retinoids — high benefit for smoke-induced aging, but barrier caution
+  if (sc === "Retinoid") {
+    notes.push({
+      dimensions: [],
+      climate: ["smoking"],
+      sentiment: "caution",
+      text: "Retinoids are among the most effective actives for the collagen loss and premature aging driven by smoking — they directly stimulate collagen synthesis and accelerate cell turnover. However, smoking impairs the barrier, making skin more reactive to retinoid-induced irritation. Start at a low concentration and build slowly.",
+    });
+  }
+
+  // Sensitizers — smoking lowers the barrier trigger threshold
+  if (fc === "sensitizer" || fc === "fragrance-allergen") {
+    notes.push({
+      dimensions: [],
+      climate: ["smoking"],
+      sentiment: "caution",
+      text: "Smoking impairs the skin barrier and sustains low-grade inflammation, lowering the concentration at which sensitizing ingredients trigger reactions. Sensitizers carry meaningfully higher risk on smoke-exposed skin.",
+    });
+  }
+
   // Deduplicate identical notes that might arise from overlapping rules
   const seen = new Set<string>();
   return notes.filter((n) => {
