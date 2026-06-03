@@ -2052,22 +2052,22 @@ export default function AdminPage() {
               <p className="text-sm font-semibold text-gray-800">New product</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 w-14 shrink-0">Name</span>
-                  <input
-                    type="text"
-                    value={addProductFields.name}
-                    onChange={(e) => setAddProductFields((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="Product name"
-                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-400 w-14 shrink-0">Brand</span>
                   <input
                     type="text"
                     value={addProductFields.brand}
                     onChange={(e) => setAddProductFields((f) => ({ ...f, brand: e.target.value }))}
                     placeholder="Brand"
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-14 shrink-0">Name</span>
+                  <input
+                    type="text"
+                    value={addProductFields.name}
+                    onChange={(e) => setAddProductFields((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Product name"
                     className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 min-w-0"
                   />
                 </div>
