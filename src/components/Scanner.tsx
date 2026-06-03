@@ -3498,7 +3498,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             Paste the ingredient list
           </button>
           {" "}instead.
-          {isSignedIn && !submitOpen && (
+          {!submitOpen && (
             <>
               {" "}Or{" "}
               <button
@@ -3611,14 +3611,23 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           </div>
           {submitError && <p className="text-xs text-rose-600">{submitError}</p>}
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleSubmitProduct}
-              disabled={submitLoading || !submitName.trim() || (submitMode === "paste" ? !submitIngredients.trim() : !submitUrl.trim())}
-              className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {submitLoading ? "Submitting…" : "Submit for review"}
-            </button>
+            {isSignedIn ? (
+              <button
+                type="button"
+                onClick={handleSubmitProduct}
+                disabled={submitLoading || !submitName.trim() || (submitMode === "paste" ? !submitIngredients.trim() : !submitUrl.trim())}
+                className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {submitLoading ? "Submitting…" : "Submit for review"}
+              </button>
+            ) : (
+              <Link
+                href="/sign-in"
+                className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium text-center"
+              >
+                Sign in to submit
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => setSubmitOpen(false)}
@@ -4218,6 +4227,19 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 )}
               </div>
             </div>
+          )}
+
+          {tab === "search" && query && !submitOpen && (
+            <p className="text-xs text-gray-400 text-center">
+              Not {query}?{" "}
+              <button
+                type="button"
+                className="underline underline-offset-2 hover:text-gray-700"
+                onClick={() => { setSubmitOpen(true); setSubmitName(query); }}
+              >
+                Add it to the database
+              </button>
+            </p>
           )}
 
           </div>
