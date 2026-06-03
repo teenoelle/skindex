@@ -3901,8 +3901,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </div>
                 )}
 
-                {/* Add to routine */}
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {/* Add to routine + Save to a list */}
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
                   {(() => {
                     const inRoutine = routineProducts.some((p) => p.name === result.product?.name);
                     if (inRoutine) {
@@ -3932,6 +3932,26 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       </button>
                     );
                   })()}
+                  {result.product.id && (
+                    savedTo ? (
+                      <p className="text-xs text-teal-700">✓ Saved to {savedTo}</p>
+                    ) : !saveListOpen ? (
+                      <button
+                        type="button"
+                        onClick={openSaveList}
+                        className="text-xs text-gray-500 underline underline-offset-2 hover:text-gray-800"
+                      >
+                        + Save to a list
+                      </button>
+                    ) : !isSignedIn ? (
+                      <p className="text-xs text-gray-500">
+                        <SignInButton mode="modal">
+                          <button type="button" className="underline underline-offset-2 hover:text-gray-800">Sign in</button>
+                        </SignInButton>
+                        {" "}to save products to lists.
+                      </p>
+                    ) : null
+                  )}
                 </div>
 
                 {/* Image upload / change — signed-in users only */}
@@ -4154,27 +4174,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </div>
                 )}
 
-                {result.product.id && (
+                {result.product.id && saveListOpen && isSignedIn && (
                   <div className="mt-2">
-                    {savedTo ? (
-                      <p className="text-xs text-teal-700">✓ Saved to {savedTo}</p>
-                    ) : !saveListOpen ? (
-                      <button
-                        type="button"
-                        onClick={openSaveList}
-                        className="text-xs text-gray-500 underline underline-offset-2 hover:text-gray-800"
-                      >
-                        + Save to a list
-                      </button>
-                    ) : !isSignedIn ? (
-                      <p className="text-xs text-gray-500">
-                        <SignInButton mode="modal">
-                          <button type="button" className="underline underline-offset-2 hover:text-gray-800">Sign in</button>
-                        </SignInButton>
-                        {" "}to save products to lists.
-                      </p>
-                    ) : (
-                      <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
                         <div className="divide-y divide-gray-100">
                           {!userListsLoaded && (
                             <p className="px-4 py-3 text-xs text-gray-400">Loading…</p>
@@ -4245,7 +4247,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           </button>
                         </div>
                       </div>
-                    )}
                   </div>
                 )}
               </div>
