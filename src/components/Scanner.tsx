@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { useUser, UserButton } from "@clerk/nextjs";
+import { useUser, UserButton, SignInButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater, Cigarette } from "lucide-react";
@@ -1987,12 +1987,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   async function openSaveList() {
     setSaveListOpen(true);
-    if (!userListsLoaded) {
-      const res = await fetch("/api/lists");
-      const data = await res.json();
-      setUserLists(data.lists ?? []);
-      setUserListsLoaded(true);
-    }
+    if (!isSignedIn || userListsLoaded) return;
+    const res = await fetch("/api/lists");
+    const data = await res.json();
+    setUserLists(data.lists ?? []);
+    setUserListsLoaded(true);
   }
 
   async function quickCreateListAndAdd(name: string, productId: string) {
@@ -4155,7 +4154,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </div>
                 )}
 
-                {result.product.id && isSignedIn && (
+                {result.product.id && (
                   <div className="mt-2">
                     {savedTo ? (
                       <p className="text-xs text-teal-700">✓ Saved to {savedTo}</p>
@@ -4167,6 +4166,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       >
                         + Save to a list
                       </button>
+                    ) : !isSignedIn ? (
+                      <p className="text-xs text-gray-500">
+                        <SignInButton mode="modal">
+                          <button type="button" className="underline underline-offset-2 hover:text-gray-800">Sign in</button>
+                        </SignInButton>
+                        {" "}to save products to lists.
+                      </p>
                     ) : (
                       <div className="border border-gray-200 rounded-xl overflow-hidden">
                         <div className="divide-y divide-gray-100">
@@ -5033,7 +5039,17 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     </button>
                   </div>
                   </div>
-                  {inList && (
+                  {inList && !isSignedIn && (
+                    <div className="border-t border-gray-100 px-3 py-2">
+                      <p className="text-xs text-gray-500">
+                        <SignInButton mode="modal">
+                          <button type="button" className="underline underline-offset-2 hover:text-gray-800">Sign in</button>
+                        </SignInButton>
+                        {" "}to use ingredient lists.
+                      </p>
+                    </div>
+                  )}
+                  {inList && isSignedIn && (
                     <div className="border-t border-gray-100 px-2 py-1.5 space-y-0.5">
                       {ingredientLists.map((lst) => {
                         const already = lst.items.includes(itemKey);
