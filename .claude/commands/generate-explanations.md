@@ -381,6 +381,18 @@ rm scripts/tmp-bioactive-profiles.json
 
 ---
 
+## Post-processing — Re-link Product Ingredients
+
+Always run this after any queue was non-empty. It finds products whose
+`product_ingredients` join table is missing links to ingredients that
+were unreviewed at add/import time but have since been classified.
+
+```bash
+npx tsx scripts/relink-product-ingredients.ts
+```
+
+---
+
 ## Wrap-up
 
 After all queues are processed, check remaining counts:
