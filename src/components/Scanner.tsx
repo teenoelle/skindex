@@ -3752,6 +3752,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
               {/* Details panel */}
               <div className="flex-1 p-2 sm:p-3 flex flex-col justify-center gap-1 min-w-0">
+                {result.product.brand && (
+                  <button
+                    type="button"
+                    onClick={() => { setTab("search"); setQuery(result.product!.brand!); handleScan({ tab: "search", query: result.product!.brand! }); }}
+                    className="text-xs text-gray-400 hover:underline underline-offset-2 text-left"
+                  >
+                    {result.product.brand}
+                  </button>
+                )}
                 <h2 className="text-lg font-semibold text-gray-900 leading-snug">
                   {result.product.source === "url-extract"
                     ? (() => { try { return new URL(result.product.name).hostname.replace("www.", ""); } catch { return result.product.name; } })()
@@ -3762,33 +3771,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     {[typeBodyAreaMap.get(result.product.type), result.product.type].filter(Boolean).join(" · ")}
                   </p>
                 )}
-                {(result.product.brand || result.product.iherb_url || result.product.name) && (
+                {(result.product.iherb_url || result.product.name) && (
                   <div className="flex flex-col gap-0.5">
                     <p className="text-sm text-gray-400 flex items-center gap-2 flex-wrap">
-                      {result.product.brand && (
-                        <button
-                          type="button"
-                          onClick={() => { setTab("search"); setQuery(result.product!.brand!); handleScan({ tab: "search", query: result.product!.brand! }); }}
-                          className="hover:underline underline-offset-2"
-                        >
-                          {result.product.brand}
-                        </button>
-                      )}
                       {result.product.iherb_url ? (
-                        <>
-                          {result.product.brand && <span className="text-gray-300">·</span>}
-                          <a
-                            href={withRcode(result.product.iherb_url)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs hover:underline underline-offset-2"
-                          >
-                            iHerb ↗
-                          </a>
-                        </>
+                        <a
+                          href={withRcode(result.product.iherb_url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs hover:underline underline-offset-2"
+                        >
+                          iHerb ↗
+                        </a>
                       ) : !suggestLinkOpen ? (
                         <>
-                          {result.product.brand && <span className="text-gray-300">·</span>}
                           <a
                             href={`https://www.iherb.com/search?kw=${encodeURIComponent([result.product.brand, result.product.name].filter(Boolean).join(" "))}&rcode=DYT4743`}
                             target="_blank"
