@@ -285,7 +285,8 @@ export async function POST(req: NextRequest) {
       dbProduct = data;
     }
 
-    // Strategy 1: exact substring match on name
+    // Strategy 1: exact substring match on name, re-ranked so results whose brand
+    // is mentioned in the query float to the top
     if (!dbProduct) {
       const { data } = await supabase
         .from("products")
@@ -296,11 +297,15 @@ export async function POST(req: NextRequest) {
         .eq("is_pending", false)
         .limit(10);
       if (data?.length) {
-        // Check for close scores — if top match is exact, take it; otherwise collect ambiguous ones
-        dbProduct = data[0];
-        if (data.length > 1) {
-          // All are substring matches, offer alternatives
-          communityVariants = data.slice(1).map((p) => ({
+        const queryLower = query.toLowerCase();
+        const ranked = [...data].sort((a, b) => {
+          const aMatch = queryLower.includes((a.brand ?? "").toLowerCase()) && (a.brand ?? "").length > 0 ? 1 : 0;
+          const bMatch = queryLower.includes((b.brand ?? "").toLowerCase()) && (b.brand ?? "").length > 0 ? 1 : 0;
+          return bMatch - aMatch;
+        });
+        dbProduct = ranked[0];
+        if (ranked.length > 1) {
+          communityVariants = ranked.slice(1).map((p) => ({
             id: p.id,
             name: p.name,
             brand: p.brand ?? null,
@@ -314,11 +319,52 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Strategy 2: token match — score candidates by how many query words appear in name/brand
+    // Strategy 1b: brand + name/type split — for "Brand ProductType" queries where the
+    // brand and product type/name are stored in separate fields
+    if (!dbProduct) {
+      const words = query.trim().split(/\s+/);
+      if (words.length >= 2) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let splitData: any[] | null = null;
+        for (let brandWords = 1; brandWords < words.length && !splitData; brandWords++) {
+          const brandPart = words.slice(0, brandWords).join(" ");
+          const namePart = words.slice(brandWords).join(" ");
+          if (namePart.length < 2) continue;
+          const { data } = await supabase
+            .from("products")
+            .select("*")
+            .ilike("brand", `%${brandPart}%`)
+            .or(`name.ilike.%${namePart}%,type.ilike.%${namePart}%`)
+            .not("ingredient_list", "is", null)
+            .eq("is_archived", false)
+            .eq("is_pending", false)
+            .limit(10);
+          if (data?.length) splitData = data;
+        }
+        if (splitData?.length) {
+          dbProduct = splitData[0];
+          if (splitData.length > 1) {
+            communityVariants = splitData.slice(1).map((p) => ({
+              id: p.id,
+              name: p.name,
+              brand: p.brand ?? null,
+              type: p.type ?? null,
+              image_url: null,
+              flaggedCount: 0,
+              sensoryCount: 0,
+              photoCount: 0,
+            }));
+          }
+        }
+      }
+    }
+
+    // Strategy 2: token match — score candidates by how many query words appear in
+    // name/brand/type; brand matches are weighted 1.5× as a stronger signal
     if (!dbProduct) {
       const tokens = query.trim().split(/\s+/).filter((w: string) => w.length >= 3);
       if (tokens.length > 1) {
-        const orFilter = tokens.map((t: string) => `name.ilike.%${t}%,brand.ilike.%${t}%`).join(",");
+        const orFilter = tokens.map((t: string) => `name.ilike.%${t}%,brand.ilike.%${t}%,type.ilike.%${t}%`).join(",");
         const { data: candidates } = await supabase
           .from("products")
           .select("*")
@@ -329,19 +375,24 @@ export async function POST(req: NextRequest) {
           .limit(20);
         if (candidates?.length) {
           const scored = candidates
-            .map((p) => ({
-              p,
-              score:
-                tokens.filter(
-                  (t: string) =>
-                    p.name.toLowerCase().includes(t.toLowerCase()) ||
-                    (p.brand ?? "").toLowerCase().includes(t.toLowerCase())
-                ).length / tokens.length,
-            }))
+            .map((p) => {
+              const brandLower = (p.brand ?? "").toLowerCase();
+              const nameLower = p.name.toLowerCase();
+              const typeLower = (p.type ?? "").toLowerCase();
+              let matchCount = 0;
+              for (const t of tokens) {
+                const tl = t.toLowerCase();
+                if (nameLower.includes(tl) || typeLower.includes(tl)) {
+                  matchCount += 1;
+                } else if (brandLower.includes(tl)) {
+                  matchCount += 1.5;
+                }
+              }
+              return { p, score: matchCount / tokens.length };
+            })
             .sort((a, b) => b.score - a.score);
           if (scored[0].score >= 0.5) {
             dbProduct = scored[0].p;
-            // Collect alternatives within 0.15 of top score
             const alts = scored.slice(1).filter((s) => s.score >= 0.5 && scored[0].score - s.score <= 0.15);
             if (alts.length) {
               communityVariants = alts.map((s) => ({
