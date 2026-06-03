@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
   // Universal concern count — ingredients that are concerns for all skin types
   const UNIVERSAL_CATS = [
     "fragrance-allergen", "preservative-allergen", "formaldehyde releaser",
-    "sensitizing preservative", "biocide", "Sulfate Surfactant", "Drying Solvent",
+    "sensitizing preservative", "biocide",
   ];
   const { data: universalIngredients } = await supabase
     .from("ingredients").select("id").in("flagged_category", UNIVERSAL_CATS);

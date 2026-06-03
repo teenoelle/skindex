@@ -779,7 +779,7 @@ export default function ListsPage() {
                             const isFetching = ingredientFetching.has(item);
                             const structured = detail?.explanation_structured ?? null;
                             const isFlagged = detail?.status === "flagged";
-                            const isUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide","Sulfate Surfactant","Drying Solvent"].includes(detail?.category ?? "");
+                            const isUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide"].includes(detail?.category ?? "");
                             const concernBorder = isUniversal ? "border-rose-500" : "border-amber-500";
                             return (
                               <div key={item}>
@@ -825,7 +825,7 @@ export default function ListsPage() {
                                         {isFlagged && (structured?.concern_items?.length || structured?.concern || (!structured && detail.explanation)) && (
                                           <div className={`pl-3 border-l-2 ${concernBorder} space-y-1`}>
                                             {structured?.concern_items ? structured.concern_items.map(ci => {
-                                              const ciUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide","Sulfate Surfactant","Drying Solvent"].includes(ci.category);
+                                              const ciUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide"].includes(ci.category);
                                               return (
                                                 <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
                                                   <span className={`font-semibold ${ciUniversal ? "text-rose-700" : "text-amber-700"}`}>{ci.category} — </span>

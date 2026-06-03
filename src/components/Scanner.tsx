@@ -1092,14 +1092,32 @@ function profileMatchedCategories(skinTypes: Set<SkinType>, climates: Set<Climat
   const cats: string[] = [];
   if (skinTypes.has("acne_prone") || skinTypes.has("oily") || skinTypes.has("fungal_acne") || skinTypes.has("body_acne") || skinTypes.has("keratosis_pilaris"))
     cats.push("pore-clogger", "occlusive", "bacteria-trap");
-  if (skinTypes.has("reactive") || skinTypes.has("damaged_barrier") || skinTypes.has("eczema") || skinTypes.has("rosacea") || skinTypes.has("psoriasis"))
+  if (skinTypes.has("reactive") || skinTypes.has("damaged_barrier") || skinTypes.has("eczema") || skinTypes.has("rosacea") || skinTypes.has("psoriasis") || skinTypes.has("fast_shedding") || climates.has("smoking"))
     cats.push("sensitizer");
-  if (skinTypes.has("reactive") || skinTypes.has("damaged_barrier") || skinTypes.has("eczema"))
+  if (skinTypes.has("reactive") || skinTypes.has("damaged_barrier") || skinTypes.has("eczema") || skinTypes.has("fast_shedding") || climates.has("smoking"))
     cats.push("fragrance-allergen");
-  if (skinTypes.has("rosacea") || skinTypes.has("lupus_rash"))
+  if (skinTypes.has("rosacea") || skinTypes.has("lupus_rash") || climates.has("pregnant") || climates.has("breastfeeding"))
     cats.push("Chemical Sunscreen");
   if (skinTypes.has("hyperpigmentation_prone") || climates.has("high_uv") || skinTypes.has("lupus_rash"))
     cats.push("photo-retinoid", "photo-AHA", "photo-BHA", "photo-brightening", "photo-botanical");
+  if (skinTypes.has("fast_shedding") || climates.has("pregnant"))
+    cats.push("photo-retinoid", "photo-AHA", "photo-BHA");
+  if (skinTypes.has("dry") || skinTypes.has("damaged_barrier") || skinTypes.has("rosacea") || skinTypes.has("fast_shedding") || climates.has("heavy_metal_water"))
+    cats.push("Drying Solvent");
+  if (skinTypes.has("dry") || skinTypes.has("damaged_barrier") || skinTypes.has("eczema") || skinTypes.has("psoriasis"))
+    cats.push("Sulfate Surfactant");
+  if (skinTypes.has("rosacea") || skinTypes.has("lupus_rash"))
+    cats.push("vasodilator");
+  if (skinTypes.has("fungal_acne") || skinTypes.has("seborrheic"))
+    cats.push("fungal-feed");
+  if (climates.has("pregnant") || climates.has("breastfeeding") || climates.has("hormone_sensitive") || climates.has("on_hrt"))
+    cats.push("endocrine disruptor");
+  if (climates.has("hormone_sensitive") || climates.has("on_hrt"))
+    cats.push("phytoestrogen");
+  if (climates.has("pregnant"))
+    cats.push("teratogen");
+  if (climates.has("thyroid_condition"))
+    cats.push("iodine-heavy");
   return [...new Set(cats)];
 }
 

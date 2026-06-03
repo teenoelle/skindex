@@ -6,8 +6,6 @@ export const UNIVERSAL_CONCERN_CATS = [
   "formaldehyde releaser",
   "sensitizing preservative",
   "biocide",
-  "Sulfate Surfactant",
-  "Drying Solvent",
 ];
 
 export const UNIVERSAL_CONCERN_SET = new Set(UNIVERSAL_CONCERN_CATS);
