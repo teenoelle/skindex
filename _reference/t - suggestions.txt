@@ -42148,10 +42148,42 @@ generate-explanations --apply
 
 
 
+● Pushed. Here's the full state after this
+  session:
 
+  Option A (benefit_profiles manual-only):
+  - profilesFromNotes no longer touches
+  benefit_profiles — returns null always.
+  concern_profiles derivation unchanged.
+  - Backfill cleared benefit_profiles from
+  684 DB records. The rendering fix stays in
+  place — if you ever manually set
+  benefit_profiles on a specific ingredient
+  (directly in the DB), it will display
+  correctly in the header without duplicating
+  the note below.
 
+  Idea 1 (retire manual scripts):
+  Seven scripts deleted: fetch-queue,
+  write-queue-explanations,
+  fetch-need-explanation,
+  write-curated-explanations,
+  fetch-need-profile,
+  write-bioactive-profiles,
+  write-fatty-acid-profiles. All their
+  functions are now handled by
+  generate-explanations Queues 0–3. One
+  command does everything.
 
+  Phytonadione now shows:
+  - Soothing — Phytonadione helps reduce the
+  appearance of dark under-eye circles…
+  - Soothing · Reactive, Hot, High UV —
+  Soothing ingredients help calm the
+  inflammatory response…
 
+  Two distinct sentences, two distinct
+  purposes — no duplicate header.
 
 
 
@@ -42163,39 +42195,169 @@ generate-explanations --apply
 
 
 
+the ingredients "100% pure organic natural moroccan rose flower water" and "100% pure organic cold-pressed unrefined extra virgin prickly pear cactus seed oil" and probably others continue to be unreviewed despite generate-explanations runs. why is this?
 
+they were added with the add product feature in admin
 
+users who are not admins can add products that are sent to the admin to approve.
 
+and there is the import products tool, too
 
 
 
 
 
 
+● I can see the full issue now. add-product
+  calls matchIngredients — that's the scan
+  pipeline. Let me see what it does with
+  these long descriptive names:
 
+  Searched for 2 patterns, read 2 files
+  (ctrl+o to expand)
+● Found the two root causes. Let me read the
+  relink script since it could also be
+  responsible:
 
+  Read 1 file (ctrl+o to expand)
 
+● Let me check the INCI name of
+  "Aqua/Water/Eau" since that could explain
+  the false match:
 
+● Bash(node -e "
+      const { createClient } =
+      require('@supabase/supabase-js');…)
+  ⎿  Aqua ingredient: [{"id":"27320478-5
+     892-456f-a4e2-e77e13672a2a","name":
+     "Aqua/Water/Eau","inci_name":"Water
+     … +7 lines (ctrl+o to expand)
 
+> users who are not admins can add products
+  that are sent to the admin to approve.
 
+  and there is the import products tool, too
 
+● Both cases are now clear. The simulation
+  confirms findMatch returns null for both
+  tokens, meaning they correctly go to
+  unreviewed — BUT they never reach
+  ingredient_queue. The culprit is
+  isLikelyJunk:
 
+  if (/^\d+%/.test(t)) return true;   //
+  "100%..." → junk
+  if (words.length > 6) return true;  // 8
+  words / 12 words → junk
+
+  Both rules fire on these names. They're
+  treated as product-description fragments,
+  skipped entirely, and never queued.
+  generate-explanations never sees them
+  because they're not in the queue to begin
+  with.
+
+  The "Aqua/Water/Eau" link on the rose water
+  product is a separate mystery — findMatch
+  returns null now, so it was either linked
+  by an older version of the matching code or
+  by the import tool. Let me check those
+  paths given your new context:
+
+● The url-imports route doesn't touch the
+  queue either. Let me also check
+  update-product since it references the
+  queue:
 
 
 
 
+● Now I have the complete picture. Here's the  full diagnosis:
 
+  ---
+  Three compounding bugs, not one:
 
+  Bug 1 — isLikelyJunk over-fires on these
+  names (the primary cause)
 
+  src/lib/junk-detector.ts has two rules that
+  catch both ingredients:
 
+  if (/^\d+%/.test(t)) return true;   //
+  "100% pure..." → junk ✗
+  if (words.length > 6) return true;  // 8–12
+  words → junk ✗
 
+  The % rule was intended for 2-word
+  fragments like "100% organic". The
+  word-count rule was intended for sentence
+  fragments. Both fire on legitimate
+  single-ingredient product names. The
+  result: isLikelyJunk returns true →
+  ingredient skipped in add-product,
+  scan/route.ts, and update-product → never
+  pushed to ingredient_queue →
+  generate-explanations has nothing to
+  process.
 
+  Bug 2 — approve-submission never queues
+  ingredients
 
+  When a non-admin user submits a product
+  (pending) and an admin approves it via
+  approve-submission, that route just sets
+  is_pending = false. It doesn't call
+  matchIngredients or push unknowns to the
+  queue. So user-submitted products go live
+  with their ingredients completely
+  unprocessed.
+
+  Bug 3 — url-imports never queues
+  ingredients either
+
+  Same situation: imported products'
+  ingredient lists are never matched or
+  queued.
+
+  ---
+  The Aqua/Water/Eau false link is a separate
+  leftover from an older version of
+  relink-product-ingredients that had less
+  strict bidirectional matching guards — it's
+  not caused by the current code.
 
+  ---
+  Fixes needed:
 
+  1. Relax isLikelyJunk: the % prefix rule
+  should only apply to short strings (≤ 3
+  words). Long names starting with a
+  percentage are plausibly real
+  single-ingredient products. Raise the word
+  limit from 6 to something like 10.
+  2. approve-submission: after approval,
+  fire-and-forget the same ingredient
+  matching + queueing logic that add-product
+  does.
+  3. url-imports: same — after import, queue
+  any unrecognised ingredients.
 
+  Want me to implement all three? The
+  isLikelyJunk fix is the most impactful
+  since it affects every ingestion path. The
+  approve-submission and url-imports fixes
+  are copy-paste of the existing
+  fire-and-forget block from add-product. The
+  false Aqua/Water/Eau link on the rose
+  water product should be manually deleted
+  from product_ingredients (one row) — it's
+  not worth a script.
 
+✻ Worked for 9m 55s
 
+─────────────────────────────────────────────
+> implement all three
+────────────────────────────────────
 
 
 
@@ -42203,17 +42365,59 @@ generate-explanations --apply
 
 
 
+implement all three
 
 
+● Pushed. Summary of what landed:
 
+  Fix 1 — isLikelyJunk
+  (src/lib/junk-detector.ts)
 
+  /^\d+%/ now only catches short (≤ 3 word)
+  percentage fragments like "100% organic".
+  Long names like "100% pure organic prickly
+  pear cactus seed oil" pass through. The
+  word-count limit for non-% names went from
+  6 → 10. These two ingredients will now
+  reach the queue when a product containing
+  them is added, approved, or imported.
 
+  Fix 2 — approve-submission
 
+  After setting is_pending = false, fetches
+  the product's ingredient_list and fires
+  queueIngredients — same match + link +
+  queue logic as add-product. All
+  user-submitted products now get their
+  ingredients processed on approval.
 
+  Fix 3 — bulk-import
 
+  After each successful insert, captures the
+  new product ID (added
+  .select("id").single()) and fires
+  queueIngredients. All URL-imported products
+  now get ingredients queued.
 
+  Shared helper —
+  src/lib/queue-ingredients.ts
 
+  Single source of truth for the match → link
+  → queue pipeline, used by all three entry
+  points. Uses upsert on product_ingredients
+  so re-running is safe.
 
+  ---
+  For the two existing products: re-save them
+  (edit any field in the admin panel and
+  save, which triggers update-product's
+  rescanIngredients) or run
+  relink-product-ingredients.ts — either will
+  push them to the queue now that
+  isLikelyJunk no longer blocks them. The
+  spurious "Aqua/Water/Eau" link on the rose
+  water product should be manually removed
+  from product_ingredients.
 
 
 
@@ -42223,7 +42427,89 @@ generate-explanations --apply
 
 
 
-the ingredient "100% pure organic natural moroccan rose flower water" continues to be unreviewed despite generate-explanations runs. why is this?
+
+
+
+
+
+
+Perrigo
+Ketozol Shampoo
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
