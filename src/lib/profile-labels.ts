@@ -102,15 +102,30 @@ export function profilesFromNotes(
   };
 }
 
+// Reverse map: lowercase label → canonical label from our label tables
+const CANONICAL_LABEL = new Map<string, string>(
+  [...Object.values(SKIN_LABEL), ...Object.values(CLIMATE_LABEL)].map((l) => [l.toLowerCase(), l]),
+);
+
+/**
+ * Returns the canonical form of a profile label (as defined in SKIN_LABEL / CLIMATE_LABEL).
+ * Falls back to the input string unchanged if no canonical form is found.
+ */
+export function canonicalizeProfileLabel(label: string): string {
+  return CANONICAL_LABEL.get(label.toLowerCase()) ?? label;
+}
+
 /**
  * Union-merges derived profiles into existing ones, preserving manually-set values.
+ * Existing labels are canonicalized before merging to fix any capitalization drift.
  * Returns null only when the result is empty.
  */
 export function mergeProfileLabels(
   existing: string[] | null | undefined,
   derived: string[] | null | undefined,
 ): string[] | null {
-  const result = [...(existing ?? [])];
+  // Canonicalize existing first so e.g. "Damaged Barrier" → "Damaged barrier"
+  const result = (existing ?? []).map(canonicalizeProfileLabel);
   for (const p of derived ?? []) {
     if (!result.includes(p)) result.push(p);
   }
