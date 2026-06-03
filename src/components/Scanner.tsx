@@ -2837,7 +2837,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   return (
     <div>
       {/* Product context strip — slides in below SiteHeader when product card scrolls off screen */}
-      {showStickyProduct && result?.product && (
+      {showStickyProduct && tab === "search" && result?.product && (
         <div className="fixed top-14 left-0 right-0 z-40 bg-white border-b border-gray-100 shadow-sm">
           <div className="max-w-2xl mx-auto px-6 py-2 flex items-center gap-3">
             {result.product.image_url && (
@@ -3646,7 +3646,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               {" "}Or{" "}
               <button
                 className="underline text-gray-700"
-                onClick={() => { setTab("add"); setAddSubTab("submit"); setSubmitName(query); }}
+                onClick={() => { setTab("add"); setAddSubTab("submit"); setSubmitName(query); window.scrollTo({ top: 0, behavior: "smooth" }); }}
               >
                 add it to the database
               </button>.
@@ -4248,11 +4248,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
           {tab === "search" && query && addSubTab !== "submit" && (
             <p className="text-xs text-gray-400 text-center">
-              Not {query}?{" "}
+              Not {query.replace(/\b\w/g, c => c.toUpperCase())}?{" "}
               <button
                 type="button"
                 className="underline underline-offset-2 hover:text-gray-700"
-                onClick={() => { setTab("add"); setAddSubTab("submit"); setSubmitName(query); }}
+                onClick={() => { setTab("add"); setAddSubTab("submit"); setSubmitName(query); window.scrollTo({ top: 0, behavior: "smooth" }); }}
               >
                 Add it to the database
               </button>
