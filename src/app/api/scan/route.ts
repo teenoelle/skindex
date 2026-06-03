@@ -546,18 +546,60 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Surface "Did you mean" alternatives when a product was found but no variants were collected yet
+    // Surface alternatives when a product was found but no variants were collected yet
     if (dbProduct && !communityVariants?.length && !productId && query) {
-      const { data: alts } = await supabase
-        .from("products")
-        .select("id, name, brand, type")
-        .ilike("name", `%${query}%`)
-        .not("ingredient_list", "is", null)
-        .eq("is_pending", false)
-        .neq("id", dbProduct.id)
-        .limit(10);
-      if (alts?.length) {
-        communityVariants = alts.map((p) => ({ id: p.id, name: p.name, brand: p.brand ?? null, type: p.type ?? null, image_url: null, flaggedCount: 0, sensoryCount: 0, photoCount: 0 }));
+      // Normalize apostrophe variants so "d'or" matches "D'OR", etc.
+      const normApos = (s: string) => s.toLowerCase().replace(/['''‘’ʼ]/g, "'");
+      const brandNorm = normApos(dbProduct.brand ?? "");
+      const queryTokens = query.trim().split(/\s+/).filter((t: string) => t.length >= 2);
+      const isBrandQuery = queryTokens.length > 0 && brandNorm.length > 0 &&
+        queryTokens.every((t: string) => brandNorm.includes(normApos(t)));
+
+      if (isBrandQuery) {
+        // Build AND-chained ILIKE on the longest brand words (apostrophes stripped so
+        // "PURA" matches both "PURA D'OR" and "Pura D'or")
+        const anchorWords = (dbProduct.brand ?? "")
+          .replace(/['''‘’ʼ]/g, "")
+          .split(/\s+/)
+          .filter((w: string) => w.length >= 4)
+          .sort((a: string, b: string) => b.length - a.length)
+          .slice(0, 2);
+
+        if (anchorWords.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let siblingsQuery: any = supabase
+            .from("products")
+            .select("id, name, brand, type")
+            .not("ingredient_list", "is", null)
+            .eq("is_archived", false)
+            .eq("is_pending", false)
+            .neq("id", dbProduct.id)
+            .limit(15);
+          for (const word of anchorWords) {
+            siblingsQuery = siblingsQuery.ilike("brand", `%${word}%`);
+          }
+          const { data: alts } = await siblingsQuery;
+          if (alts?.length) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            communityVariants = alts.map((p: any) => ({ id: p.id, name: p.name, brand: p.brand ?? null, type: p.type ?? null, image_url: null, flaggedCount: 0, sensoryCount: 0, photoCount: 0 }));
+          }
+        }
+      }
+
+      // Fallback: surface alternatives whose name contains the query string
+      if (!communityVariants?.length) {
+        const { data: alts } = await supabase
+          .from("products")
+          .select("id, name, brand, type")
+          .ilike("name", `%${query}%`)
+          .not("ingredient_list", "is", null)
+          .eq("is_pending", false)
+          .neq("id", dbProduct.id)
+          .limit(10);
+        if (alts?.length) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          communityVariants = alts.map((p: any) => ({ id: p.id, name: p.name, brand: p.brand ?? null, type: p.type ?? null, image_url: null, flaggedCount: 0, sensoryCount: 0, photoCount: 0 }));
+        }
       }
     }
 
