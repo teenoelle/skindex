@@ -28,6 +28,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { generateNotes } from "../src/lib/curated-explanation.js";
+import { profilesFromNotes, mergeProfileLabels } from "../src/lib/profile-labels.js";
+import type { SkinClimateNote } from "../src/types/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
@@ -72,6 +74,13 @@ function flatten(s: ExplanationStructured): string {
   return [s.formula_role, s.benefit, s.concern].filter(Boolean).join(" ");
 }
 
+// Normalize profile arrays: split any items joined with " · " into separate strings.
+function normalizeProfiles(profiles: string[] | null | undefined): string[] | null {
+  if (!profiles?.length) return null;
+  const flat = profiles.flatMap(p => p.split(/\s*·\s*/)).filter(Boolean);
+  return flat.length ? flat : null;
+}
+
 const entries: Entry[] = JSON.parse(fs.readFileSync(path.resolve(filePath), "utf8"));
 
 async function main() {
@@ -111,6 +120,12 @@ async function main() {
       structural_category: entry.structural_category,
     });
 
+    // Normalize manually-provided profiles, then union with auto-derived from notes.
+    // Manually-provided values take precedence (they're preserved in the merge).
+    const derived = profilesFromNotes(notes as SkinClimateNote[], entry.flagged_category ?? null);
+    const normalizedBenefit = normalizeProfiles(entry.explanation_structured.benefit_profiles);
+    const normalizedConcern = normalizeProfiles(entry.explanation_structured.concern_profiles);
+
     const needsProfile =
       entry.structural_category === "Emollient" ||
       entry.structural_category === "Plant Extract";
@@ -123,7 +138,11 @@ async function main() {
       flagged_category: entry.flagged_category,
       secondary_flagged_categories: entry.secondary_flagged_categories ?? [],
       explanation: flatten(entry.explanation_structured),
-      explanation_structured: entry.explanation_structured,
+      explanation_structured: {
+        ...entry.explanation_structured,
+        benefit_profiles: mergeProfileLabels(normalizedBenefit, derived.benefit_profiles),
+        concern_profiles: mergeProfileLabels(normalizedConcern, derived.concern_profiles),
+      },
       explanation_source: "curated",
       skin_climate_notes: notes.length > 0 ? notes : null,
       profile_status: needsProfile ? "needs_profile" : null,

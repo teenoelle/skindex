@@ -589,10 +589,7 @@ const CLIMATE_NOTES: Record<ClimateType, string> = {
 function noteLabel(n: SkinClimateNote): string {
   const skinLabels = n.dimensions.map((d) => SKIN_TYPES.find((s) => s.value === d)?.label ?? d);
   const climateLabels = n.climate.map((c) => ALL_MODIFIER_TYPES.find((t) => t.value === c)?.label ?? c);
-  const parts: string[] = [];
-  if (skinLabels.length) parts.push(skinLabels.join(", "));
-  if (climateLabels.length) parts.push(climateLabels.join(", "));
-  return parts.join(" · ");
+  return [...skinLabels, ...climateLabels].join(", ");
 }
 
 function climateNoteStyle(c: ClimateType): string {
@@ -5080,10 +5077,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               <p className="text-xs text-gray-600 leading-relaxed">
                                 {(benefitLabel || secondaryBenefitLabels.length > 0) ? (
                                   <span className="font-semibold text-teal-700">
-                                    {[benefitLabel, ...secondaryBenefitLabels].filter(Boolean).join(", ")} — </span>
+                                    {[benefitLabel, ...secondaryBenefitLabels].filter(Boolean).join(", ")}{structured?.benefit_profiles?.length ? ` · ${structured.benefit_profiles.flatMap(p => p.split(/\s*·\s*/)).join(", ")}` : ""} — </span>
                                 ) : (structured?.benefit_category || (structured?.benefit_profiles?.length ?? 0) > 0) ? (
                                   <span className="font-semibold text-teal-700">
-                                    {[structured?.benefit_category, structured?.benefit_profiles?.join(", ")].filter(Boolean).join(" · ")} — </span>
+                                    {[structured?.benefit_category, (structured?.benefit_profiles ?? []).flatMap(p => p.split(/\s*·\s*/)).join(", ") || null].filter(Boolean).join(" · ")} — </span>
                                 ) : null}
                                 {benefitSentence}
                               </p>
@@ -5091,12 +5088,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             {benefitNote && (
                               <p className="text-xs text-gray-600 leading-relaxed">{benefitNote}</p>
                             )}
-                            {benefitNotes.map((note, i) => (
-                              <p key={i} className="text-xs text-gray-600 leading-relaxed">
-                                {noteLabel(note) && <span className="font-semibold text-teal-700">{noteLabel(note)} — </span>}
-                                {note.text}
-                              </p>
-                            ))}
+                            {benefitNotes.map((note, i) => {
+                              const nl = noteLabel(note);
+                              const fullLabel = [benefitLabel ?? (structured?.benefit_category ?? null), nl].filter(Boolean).join(" · ");
+                              return (
+                                <p key={i} className="text-xs text-gray-600 leading-relaxed">
+                                  {fullLabel && <span className="font-semibold text-teal-700">{fullLabel} — </span>}
+                                  {note.text}
+                                </p>
+                              );
+                            })}
                           </div>
                         );
                       })()}
@@ -5173,7 +5174,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                         ? (sensoryMergedWith === fc && sensoryLabel
                                             ? (sensoryLabelRedundant ? `${catLabel}${sensoryProfileLabel}` : `${catLabel}, ${sensoryLabel}${sensoryProfileLabel}`)
                                             : `${catLabel}${fcProfileLabel}`)
-                                        : [structured?.concern_category, structured?.concern_profiles?.join(", ")].filter(Boolean).join(" · ")
+                                        : [structured?.concern_category, (structured?.concern_profiles ?? []).flatMap(p => p.split(/\s*·\s*/)).join(", ") || null].filter(Boolean).join(" · ")
                                       } —</span>
                                   )}
                                   {(fcProfileCautionNote?.text ?? dbConcernText)}{sensoryMergedWith === fc && sensoryText ? ` ${sensoryText}` : ""}
@@ -5232,12 +5233,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             {/* Other-profile benefit notes — gray stripe */}
                             {otherBenefitNotes.length > 0 && (
                               <div className="pl-3 border-l-2 border-gray-200 space-y-1">
-                                {otherBenefitNotes.map((note, i) => (
-                                  <p key={i} className="text-xs text-gray-500 leading-relaxed">
-                                    {noteLabel(note) && <span className="font-semibold text-gray-500">{noteLabel(note)} — </span>}
-                                    {note.text}
-                                  </p>
-                                ))}
+                                {otherBenefitNotes.map((note, i) => {
+                                  const nl = noteLabel(note);
+                                  const fullLabel = [benefitLabel ?? (structured?.benefit_category ?? null), nl].filter(Boolean).join(" · ");
+                                  return (
+                                    <p key={i} className="text-xs text-gray-500 leading-relaxed">
+                                      {fullLabel && <span className="font-semibold text-gray-500">{fullLabel} — </span>}
+                                      {note.text}
+                                    </p>
+                                  );
+                                })}
                               </div>
                             )}
                           </>

@@ -744,7 +744,7 @@ export default function AdminPage() {
 
   async function loadUpgradeStats() {
     try {
-      const res = await fetch("/api/admin/upgrade-explanations");
+      const res = await fetch("/api/admin/ingredient-stats");
       const data = await res.json();
       setUpgradeStats({ weak: data.weak ?? 0, needsProfile: data.needsProfile ?? 0, total: data.total ?? 0 });
     } catch { }
@@ -2733,7 +2733,7 @@ export default function AdminPage() {
                           <span className="text-xs text-amber-600">{upgradeStats.needsProfile} need fatty acid profile</span>
                         )}
                         {(upgradeStats.weak > 0 || upgradeStats.needsProfile > 0) && (
-                          <code className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded px-2 py-0.5 select-all">/upgrade-explanations</code>
+                          <code className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded px-2 py-0.5 select-all">generate-explanations</code>
                         )}
                       </>
                     )}

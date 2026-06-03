@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "classify-all") {
-    // Bulk classification uses template explanations (fast, upgradeable via upgrade-explanations)
+    // Bulk classification uses template explanations (fast, upgradeable via generate-explanations CLI)
     const { data: allItems } = await supabaseAdmin
       .from("ingredient_queue").select("id").order("times_seen", { ascending: false }).limit(500);
     if (!allItems?.length) return NextResponse.json({ classified: 0, skipped: 0 });

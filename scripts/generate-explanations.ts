@@ -1,10 +1,12 @@
 /**
- * Standalone CLI equivalent of POST /api/admin/upgrade-explanations.
+ * Processes up to --batch N ingredients per run across four queues:
+ *   0. ingredient_queue drain — new ingredients → classify + AI explanation
+ *   1. Explanation upgrade    — explanation_source IN (null, template, template_unclassified)
+ *   2. Fatty acid profile     — Emollient + profile_status = needs_profile
+ *   3. Bioactive profile      — Plant Extract + profile_status = needs_profile
  *
- * Processes up to --batch N ingredients per run across three queues:
- *   1. Explanation upgrade   — explanation_source IN (null, template, template_unclassified)
- *   2. Fatty acid profile    — Emollient + profile_status = needs_profile
- *   3. Bioactive profile     — Plant Extract + profile_status = needs_profile
+ * benefit_profiles and concern_profiles are derived from skin_climate_notes and
+ * merged into explanation_structured automatically at every write.
  *
  * --dry-run  Show what would be processed without making AI calls or DB writes.
  * --batch N  Ingredients per pass (default 20, max 50).
@@ -24,7 +26,8 @@ import { getFattyAcidProfile } from "../src/lib/fatty-acid-ai.js";
 import { getOilCategories, generateFattyAcidNotes } from "../src/lib/fatty-acid-concerns.js";
 import { getBioactiveProfile } from "../src/lib/bioactive-ai.js";
 import { getBioactiveCategories, generateBioactiveNotes } from "../src/lib/bioactive-concerns.js";
-import type { ExplanationStructured } from "../src/types/index.js";
+import { profilesFromNotes, mergeProfileLabels } from "../src/lib/profile-labels.js";
+import type { ExplanationStructured, SkinClimateNote } from "../src/types/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load env before any client is created — dotenv.config must run before
@@ -156,6 +159,7 @@ async function drainQueuePass(passNum: number): Promise<{ inserted: number; rema
       flagged_category: result.flagged_category ?? null,
     };
     const notes = generateNotes(ingContext);
+    const derived = profilesFromNotes(notes, ingContext.flagged_category);
     const needsProfile =
       ingContext.structural_category === "Emollient" ||
       ingContext.structural_category === "Plant Extract";
@@ -169,7 +173,11 @@ async function drainQueuePass(passNum: number): Promise<{ inserted: number; rema
         category: ingContext.category,
         flagged_category: ingContext.flagged_category,
         explanation: result.explanation,
-        explanation_structured: result.explanation_structured,
+        explanation_structured: {
+          ...result.explanation_structured,
+          ...(derived.benefit_profiles ? { benefit_profiles: derived.benefit_profiles } : {}),
+          ...(derived.concern_profiles ? { concern_profiles: derived.concern_profiles } : {}),
+        },
         explanation_source: "curated",
         skin_climate_notes: notes.length > 0 ? notes : null,
         profile_status: needsProfile ? "needs_profile" : null,
@@ -196,7 +204,7 @@ async function drainQueuePass(passNum: number): Promise<{ inserted: number; rema
 async function runPass(passNum: number): Promise<{ upgraded: number; remaining: number }> {
   const { data: ingredients, error } = await supabase
     .from("ingredients")
-    .select("id, name, status, structural_category, category, flagged_category, secondary_flagged_categories, explanation_source, profile_status")
+    .select("id, name, status, structural_category, category, flagged_category, secondary_flagged_categories, explanation_source, profile_status, explanation_structured, skin_climate_notes")
     .or("explanation_source.is.null,explanation_source.eq.template,explanation_source.eq.template_unclassified,profile_status.eq.needs_profile")
     .order("name")
     .limit(BATCH);
@@ -327,6 +335,31 @@ async function runPass(passNum: number): Promise<{ upgraded: number; remaining: 
     }
 
     const combinedUpdate = { ...explanationUpdate, ...profileUpdate, ...bioactiveUpdate };
+
+    // ── Auto-derive and merge explanation profiles ────────────────────────────
+    if (Object.keys(combinedUpdate).length > 0) {
+      const finalNotes = (combinedUpdate.skin_climate_notes as SkinClimateNote[] | null)
+        ?? (Array.isArray(ing.skin_climate_notes) ? ing.skin_climate_notes as SkinClimateNote[] : null);
+      const currentStructured = (combinedUpdate.explanation_structured ?? ing.explanation_structured) as ExplanationStructured | null;
+      if (finalNotes && currentStructured) {
+        const finalFc = (
+          (bioactiveUpdate.flagged_category as string | null | undefined) ??
+          (explanationUpdate.flagged_category as string | null | undefined) ??
+          ing.flagged_category
+        ) ?? null;
+        const derived = profilesFromNotes(finalNotes, finalFc);
+        const mergedBenefit = mergeProfileLabels(currentStructured.benefit_profiles, derived.benefit_profiles);
+        const mergedConcern = mergeProfileLabels(currentStructured.concern_profiles, derived.concern_profiles);
+        if (mergedBenefit !== null || mergedConcern !== null) {
+          combinedUpdate.explanation_structured = {
+            ...currentStructured,
+            ...(mergedBenefit ? { benefit_profiles: mergedBenefit } : {}),
+            ...(mergedConcern ? { concern_profiles: mergedConcern } : {}),
+          };
+        }
+      }
+    }
+
     if (Object.keys(combinedUpdate).length > 0) {
       const { error: updateError } = await supabase
         .from("ingredients")
