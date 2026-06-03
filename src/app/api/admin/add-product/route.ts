@@ -3,8 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { writeAuditLog } from "@/lib/audit-log";
-import { matchIngredients } from "@/lib/scanner";
-import { isLikelyJunk } from "@/lib/junk-detector";
+import { queueIngredients } from "@/lib/queue-ingredients";
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -49,44 +48,10 @@ export async function POST(req: NextRequest) {
 
   await writeAuditLog(userId, "add_product", "product", inserted.id, { name: inserted.name });
 
-  // Fire-and-forget: queue any unrecognised ingredients for /generate-explanations
-  const productName = inserted.name;
-  const productId = inserted.id;
-  Promise.resolve().then(async () => {
-    try {
-      const { unreviewed, safe, flagged } = await matchIngredients(ingredient_list.trim());
-
-      // Link recognised ingredients to the product
-      const seenIds = new Set<string>();
-      const rows = [...safe, ...flagged]
-        .filter((m) => !m.ingredient.id.startsWith("comedo-"))
-        .filter((m) => { if (seenIds.has(m.ingredient.id)) return false; seenIds.add(m.ingredient.id); return true; })
-        .map((m, idx) => ({ product_id: productId, ingredient_id: m.ingredient.id, position: idx + 1 }));
-      if (rows.length > 0) {
-        await supabaseAdmin.from("product_ingredients").insert(rows);
-      }
-
-      // Queue unknowns for AI classification
-      for (const name of unreviewed) {
-        if (isLikelyJunk(name)) continue;
-        const { data: existing } = await supabase
-          .from("ingredient_queue")
-          .select("id, times_seen")
-          .ilike("name", name)
-          .maybeSingle();
-        if (existing) {
-          await supabase
-            .from("ingredient_queue")
-            .update({ times_seen: existing.times_seen + 1, last_seen: new Date().toISOString() })
-            .eq("id", existing.id);
-        } else {
-          await supabase
-            .from("ingredient_queue")
-            .insert({ name, found_in: productName, times_seen: 1 });
-        }
-      }
-    } catch { /* never block the response */ }
-  });
+  // Fire-and-forget: match, link, and queue ingredients for /generate-explanations
+  Promise.resolve()
+    .then(() => queueIngredients(inserted.id, inserted.name, ingredient_list.trim()))
+    .catch(() => {});
 
   return NextResponse.json({ product: inserted });
 }

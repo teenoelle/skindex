@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { extractIngredientsFromUrlWithStatus } from "@/lib/extract-ingredients";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { queueIngredients } from "@/lib/queue-ingredients";
 
 const MAX_URLS = 50;
 
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const { error: insertError } = await supabaseAdmin.from("products").insert({
+      const { data: inserted, error: insertError } = await supabaseAdmin.from("products").insert({
         name,
         brand,
         ingredient_list: extracted.ingredients,
@@ -71,12 +72,19 @@ export async function POST(req: NextRequest) {
         source_url: url,
         ...(extracted.iherb_url ? { iherb_url: extracted.iherb_url } : {}),
         ...(extracted.image_url ? { image_url: extracted.image_url } : {}),
-      });
+      }).select("id").single();
 
       if (insertError) {
         const msg = insertError.message ?? "Database insert failed";
         results.push({ url, status: "failed", reason: "db-error", fetchError: msg });
         continue;
+      }
+
+      // Fire-and-forget: match, link, and queue ingredients
+      if (inserted && extracted.ingredients) {
+        Promise.resolve()
+          .then(() => queueIngredients(inserted.id, name, extracted.ingredients!))
+          .catch(() => {});
       }
 
       results.push({ url, status: "imported", name, brand: brand ?? undefined });

@@ -22,11 +22,16 @@ export function isLikelyJunk(name: string): boolean {
   const t = name.trim();
   if (!t || t.length > 120) return true;
   if (JUNK_PATTERNS.some(p => p.test(t))) return true;
-  // Percentage fragment from a product description (e.g. "100% pure water")
-  if (/^\d+%/.test(t)) return true;
   const words = t.split(/\s+/);
-  // More than 6 words → almost certainly a sentence fragment
-  if (words.length > 6) return true;
+  if (/^\d+%/.test(t)) {
+    // Short percentage fragments like "100% organic" or "100% natural" are product descriptors, not ingredients.
+    // Longer percentage-prefixed names (e.g. "100% pure organic prickly pear cactus seed oil") are valid
+    // single-ingredient product descriptions that should be queued for classification.
+    if (words.length <= 3) return true;
+  } else {
+    // More than 10 words with no percentage prefix → almost certainly a sentence fragment.
+    if (words.length > 10) return true;
+  }
   if (words.length === 1 && JUNK_SINGLE_WORDS.has(words[0].toLowerCase())) return true;
   if (words.length === 2 && JUNK_TWO_WORD_PHRASES.has(t.toLowerCase())) return true;
   return false;

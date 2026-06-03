@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { writeAuditLog } from "@/lib/audit-log";
+import { queueIngredients } from "@/lib/queue-ingredients";
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (!productId) return NextResponse.json({ error: "Missing productId" }, { status: 400 });
 
   const { data: existing } = await supabaseAdmin
-    .from("products").select("name").eq("id", productId).maybeSingle();
+    .from("products").select("name, ingredient_list").eq("id", productId).maybeSingle();
 
   const { error } = await supabaseAdmin
     .from("products")
@@ -28,6 +29,13 @@ export async function POST(req: NextRequest) {
   await writeAuditLog(userId, "approve_submission", "submission", productId, {
     name: existing?.name ?? productId,
   });
+
+  // Fire-and-forget: match, link, and queue ingredients now that the product is live
+  if (existing?.ingredient_list) {
+    Promise.resolve()
+      .then(() => queueIngredients(productId, existing.name, existing.ingredient_list!))
+      .catch(() => {});
+  }
 
   return NextResponse.json({ ok: true });
 }
