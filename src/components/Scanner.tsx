@@ -235,7 +235,7 @@ type ImportResult = {
   httpStatus?: number;
   fetchError?: string;
 };
-type UserList = { id: string; name: string; is_public: boolean; itemCount: number };
+type UserList = { id: string; name: string; is_public: boolean; itemCount: number; containsProduct?: boolean };
 
 type BrowseType = { name: string; count: number };
 type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; ingredient_list: string | null; flaggedCount: number; sensoryCount: number; photoCount: number; universalConcernCount?: number; profileFlaggedCount?: number; profileSensoryCount?: number };
@@ -1231,6 +1231,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [newListName, setNewListName] = useState("");
   const [saveListLoading, setSaveListLoading] = useState<string | null>(null);
   const [savedTo, setSavedTo] = useState<string | null>(null);
+  const [productInList, setProductInList] = useState<string | null>(null);
   const [saveListError, setSaveListError] = useState<string | null>(null);
   const [importUrls, setImportUrls] = useState("");
   const [importLoading, setImportLoading] = useState(false);
@@ -1342,6 +1343,25 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       }
     } catch {}
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Eagerly load user's product lists and check if current product is saved in any
+  useEffect(() => {
+    setProductInList(null);
+    setUserLists([]);
+    setUserListsLoaded(false);
+    if (!result?.product?.id || !isSignedIn) return;
+    const pid = result.product.id;
+    fetch(`/api/lists?productId=${encodeURIComponent(pid)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const lists: UserList[] = data.lists ?? [];
+        setUserLists(lists);
+        setUserListsLoaded(true);
+        const hit = lists.find((l) => l.containsProduct);
+        setProductInList(hit?.name ?? null);
+      })
+      .catch(() => {});
+  }, [result?.product?.id, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load ingredient lists from DB when signed in; migrate from localStorage if DB is empty
   useEffect(() => {
@@ -2055,8 +2075,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       body: JSON.stringify({ productId: result.product.id }),
     });
     setSaveListLoading(null);
-    setUserLists((prev) => prev.map((l) => l.id === listId ? { ...l, itemCount: l.itemCount + 1 } : l));
+    setUserLists((prev) => prev.map((l) => l.id === listId ? { ...l, itemCount: l.itemCount + 1, containsProduct: true } : l));
     setSavedTo(listName);
+    setProductInList(listName);
     setTimeout(() => { setSaveListOpen(false); setSavedTo(null); }, 1800);
   }
 
@@ -2087,11 +2108,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       return;
     }
 
-    setUserLists((prev) => [{ ...createData.list, itemCount: 1 }, ...prev]);
+    setUserLists((prev) => [{ ...createData.list, itemCount: 1, containsProduct: true }, ...prev]);
     setSaveListLoading(null);
     setNewListInputOpen(false);
     setNewListName("");
     setSavedTo(name.trim());
+    setProductInList(name.trim());
     setTimeout(() => { setSaveListOpen(false); setSavedTo(null); }, 1800);
   }
 
@@ -3879,30 +3901,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </button>
                 </div>
 
-                {/* Step tags */}
-                {(result.step_tags ?? []).length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {result.step_tags!.map((tag) => {
-                      const cfg = STEP_TAG_CONFIG[tag];
-                      if (!cfg) return null;
-                      return (
-                        <span key={tag} className="inline-flex items-center gap-0.5">
-                          <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.className}`}>{cfg.label}</span>
-                          <button type="button" onClick={() => setStepTagHint(h => h === tag ? null : tag)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none">ⓘ</button>
-                        </span>
-                      );
-                    })}
-                    {stepTagHint && STEP_TAG_CONFIG[stepTagHint] && (
-                      <div className="w-full mt-0.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                        <span className="font-medium text-gray-700">{STEP_TAG_CONFIG[stepTagHint].label} — </span>
-                        {STEP_TAG_CONFIG[stepTagHint].desc}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Add to routine + Save to a list */}
-                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                {/* Step tags + Add to routine + Save to a list */}
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {(result.step_tags ?? []).map((tag) => {
+                    const cfg = STEP_TAG_CONFIG[tag];
+                    if (!cfg) return null;
+                    return (
+                      <span key={tag} className="inline-flex items-center gap-0.5">
+                        <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.className}`}>{cfg.label}</span>
+                        <button type="button" onClick={() => setStepTagHint(h => h === tag ? null : tag)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none">ⓘ</button>
+                      </span>
+                    );
+                  })}
                   {(() => {
                     const inRoutine = routineProducts.some((p) => p.name === result.product?.name);
                     if (inRoutine) {
@@ -3913,7 +3923,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                             const id = routineProducts.find((p) => p.name === result.product?.name)?.routineId;
                             if (id) removeFromRoutine(id);
                           }}
-                          className="text-xs px-3 py-1 rounded-full border border-gray-300 text-gray-400 hover:border-rose-400 hover:text-rose-500 transition-colors"
+                          className="text-xs px-3 py-1 rounded-full border border-gray-300 text-gray-400 hover:border-gray-500 hover:text-gray-600 transition-colors"
                         >
                           In routine · Remove
                         </button>
@@ -3935,11 +3945,19 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   {result.product.id && (
                     savedTo ? (
                       <p className="text-xs text-teal-700">✓ Saved to {savedTo}</p>
+                    ) : productInList && !saveListOpen ? (
+                      <button
+                        type="button"
+                        onClick={openSaveList}
+                        className="text-xs px-3 py-1 rounded-full border border-[#A984B2] text-[#A984B2] hover:border-[#8c6395] hover:text-[#8c6395] transition-colors"
+                      >
+                        ✓ In a list · Manage
+                      </button>
                     ) : !saveListOpen ? (
                       <button
                         type="button"
                         onClick={openSaveList}
-                        className="text-xs text-gray-500 underline underline-offset-2 hover:text-gray-800"
+                        className="text-xs px-3 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-[#A984B2] hover:text-[#A984B2] transition-colors"
                       >
                         + Save to a list
                       </button>
@@ -3953,6 +3971,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     ) : null
                   )}
                 </div>
+                {stepTagHint && STEP_TAG_CONFIG[stepTagHint] && (
+                  <div className="mt-1 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                    <span className="font-medium text-gray-700">{STEP_TAG_CONFIG[stepTagHint].label} — </span>
+                    {STEP_TAG_CONFIG[stepTagHint].desc}
+                  </div>
+                )}
 
                 {/* Image upload / change — signed-in users only */}
                 {result.product.id && isSignedIn && (
