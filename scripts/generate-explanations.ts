@@ -24,6 +24,7 @@ import { getFattyAcidProfile } from "../src/lib/fatty-acid-ai.js";
 import { getOilCategories, generateFattyAcidNotes } from "../src/lib/fatty-acid-concerns.js";
 import { getBioactiveProfile } from "../src/lib/bioactive-ai.js";
 import { getBioactiveCategories, generateBioactiveNotes } from "../src/lib/bioactive-concerns.js";
+import type { ExplanationStructured } from "../src/types/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load env before any client is created — dotenv.config must run before
@@ -67,6 +68,41 @@ async function getCounts(): Promise<{ weak: number; needsProfile: number }> {
   return { weak: weak ?? 0, needsProfile: needsProfile ?? 0 };
 }
 
+// ── name-starts-with validation ───────────────────────────────────────────────
+
+function passesNameCheck(structured: ExplanationStructured | null | undefined, name: string): boolean {
+  if (!structured) return true;
+  const prefix = name.toLowerCase();
+  for (const text of [structured.formula_role, structured.benefit, structured.concern]) {
+    if (typeof text === "string" && !text.toLowerCase().startsWith(prefix)) return false;
+  }
+  return true;
+}
+
+async function withReclassificationChecked(name: string) {
+  let result = await generateWithReclassification(name);
+  if (result.source === "curated" && !passesNameCheck(result.explanation_structured, name)) {
+    console.log(`(name check failed — retrying) `);
+    result = await generateWithReclassification(name);
+    if (!passesNameCheck(result.explanation_structured, name)) {
+      console.log(`(name check failed after retry — saving anyway) `);
+    }
+  }
+  return result;
+}
+
+async function withCuratedChecked(ingredient: Parameters<typeof generateCuratedExplanation>[0]) {
+  let result = await generateCuratedExplanation(ingredient);
+  if (result.source === "curated" && !passesNameCheck(result.explanation_structured, ingredient.name)) {
+    console.log(`(name check failed — retrying) `);
+    result = await generateCuratedExplanation(ingredient);
+    if (!passesNameCheck(result.explanation_structured, ingredient.name)) {
+      console.log(`(name check failed after retry — saving anyway) `);
+    }
+  }
+  return result;
+}
+
 // ── queue drain (new ingredients → AI classify + explain directly) ────────────
 
 async function drainQueuePass(passNum: number): Promise<{ inserted: number; remaining: number }> {
@@ -106,7 +142,7 @@ async function drainQueuePass(passNum: number): Promise<{ inserted: number; rema
       continue;
     }
 
-    const result = await generateWithReclassification(item.name);
+    const result = await withReclassificationChecked(item.name);
     if (result.source !== "curated") {
       console.log("✗ (AI unavailable — will retry)");
       continue;
@@ -203,7 +239,7 @@ async function runPass(passNum: number): Promise<{ upgraded: number; remaining: 
     // ── explanation upgrade ──────────────────────────────────────────────────
     if (needsExplanation) {
       if (ing.explanation_source === "template_unclassified") {
-        const result = await generateWithReclassification(ing.name);
+        const result = await withReclassificationChecked(ing.name);
         if (result.source === "curated") {
           const updatedIng = {
             status: result.status ?? ing.status,
@@ -222,7 +258,7 @@ async function runPass(passNum: number): Promise<{ upgraded: number; remaining: 
           };
         }
       } else {
-        const { explanation, explanation_structured, source } = await generateCuratedExplanation(ing);
+        const { explanation, explanation_structured, source } = await withCuratedChecked(ing);
         if (source === "curated") {
           const notes = generateNotes(ing);
           explanationUpdate = {
