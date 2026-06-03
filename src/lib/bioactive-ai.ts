@@ -1,4 +1,4 @@
-import { anthropic } from "@/lib/anthropic";
+import { callClaude } from "@/lib/claude-cli";
 import type { BioactiveProfile } from "@/types";
 
 const SYSTEM_PROMPT = `You are a cosmetic chemistry expert with accurate knowledge of plant extract properties.
@@ -39,18 +39,15 @@ const VALID_ACTIONS = new Set([
 ]);
 
 export async function getBioactiveProfile(name: string): Promise<BioactiveProfile | null> {
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 300,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: name }],
-  });
-
-  const raw = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+  const raw = (await callClaude(`${SYSTEM_PROMPT}\n\n${name}`)) ?? "";
   if (!raw || raw === "null") return null;
 
+  const jsonMatch = raw.match(/\{[\s\S]*\}|null/);
+  const cleaned = jsonMatch ? jsonMatch[0] : raw;
+  if (!cleaned || cleaned === "null") return null;
+
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(cleaned);
     if (typeof parsed !== "object" || Array.isArray(parsed) || parsed === null) return null;
 
     const { primary_action, secondary_actions, key_compounds, sensitization_risk } = parsed;

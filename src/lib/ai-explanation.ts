@@ -1,4 +1,4 @@
-import { anthropic } from "./anthropic";
+import { callClaude } from "./claude-cli";
 import { generateExplanation } from "./generate-explanation";
 import type { ExplanationStructured } from "@/types";
 
@@ -94,13 +94,7 @@ function templateFallback(ingredient: IngredientInfo): ExplanationOutput {
 
 export async function generateCuratedExplanation(ingredient: IngredientInfo): Promise<ExplanationOutput> {
   try {
-    const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
-      messages: [{ role: "user", content: buildPrompt(ingredient) }],
-    });
-
-    const raw = msg.content[0].type === "text" ? msg.content[0].text.trim() : null;
+    const raw = await callClaude(buildPrompt(ingredient));
     if (raw) {
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -182,12 +176,7 @@ Return ONLY valid JSON — no other text:
 
 export async function generateWithReclassification(name: string): Promise<ReclassifyOutput> {
   try {
-    const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 400,
-      messages: [{ role: "user", content: buildReclassifyPrompt(name) }],
-    });
-    const raw = msg.content[0].type === "text" ? msg.content[0].text.trim() : null;
+    const raw = await callClaude(buildReclassifyPrompt(name));
     if (raw) {
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (jsonMatch) {

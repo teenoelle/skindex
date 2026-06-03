@@ -1,4 +1,4 @@
-import { anthropic } from "@/lib/anthropic";
+import { callClaude } from "@/lib/claude-cli";
 import type { FattyAcidProfile } from "@/types";
 
 const SYSTEM_PROMPT = `You are a cosmetic chemistry expert with accurate knowledge of plant oil fatty acid composition.
@@ -25,18 +25,15 @@ carnauba wax, lanolin, or any non-oil ingredient), return null.
 Return ONLY valid JSON — either the object or the literal null. No explanation text.`;
 
 export async function getFattyAcidProfile(name: string): Promise<FattyAcidProfile | null> {
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 256,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: name }],
-  });
-
-  const raw = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+  const raw = (await callClaude(`${SYSTEM_PROMPT}\n\n${name}`)) ?? "";
   if (!raw || raw === "null") return null;
 
+  const jsonMatch = raw.match(/\{[\s\S]*\}|null/);
+  const cleaned = jsonMatch ? jsonMatch[0] : raw;
+  if (!cleaned || cleaned === "null") return null;
+
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(cleaned);
     if (typeof parsed !== "object" || Array.isArray(parsed) || parsed === null) return null;
     for (const v of Object.values(parsed)) {
       if (typeof v !== "number" || (v as number) < 0 || (v as number) > 100) return null;
