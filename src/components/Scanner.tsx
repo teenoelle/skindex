@@ -3407,8 +3407,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           )}
                           <div className="flex-1 min-w-0 space-y-1">
                             <div>
-                              <p className="text-sm font-medium text-gray-800 leading-snug">{p.name}</p>
                               {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
+                              <p className="text-sm font-medium text-gray-800 leading-snug">{p.name}</p>
                             </div>
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <ConcernChips
@@ -3669,8 +3669,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   </div>
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div>
+                      {v.brand && <p className={`text-xs${isActive ? " text-gray-600" : " text-gray-400"}`}>{v.brand}</p>}
                       <p className={`text-sm leading-snug${isActive ? " font-semibold text-gray-900" : " font-medium text-gray-800"}`}>{v.name}</p>
-                      {v.brand && <p className={`text-xs mt-0.5${isActive ? " text-gray-600" : " text-gray-400"}`}>{v.brand}</p>}
                       {v.type && (
                         <p className="text-xs text-gray-400 mt-0.5">
                           {[typeBodyAreaMap.get(v.type), v.type].filter(Boolean).join(" · ")}
@@ -4424,8 +4424,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               )}
                               <div className="flex-1 min-w-0 space-y-1.5">
                                 <div>
-                                  <p className="text-sm font-medium text-gray-800 leading-snug">{alt.name}</p>
                                   {alt.brand && <p className="text-xs text-gray-400">{alt.brand}</p>}
+                                  <p className="text-sm font-medium text-gray-800 leading-snug">{alt.name}</p>
                                   {alt.type && (
                                     <p className="text-xs text-gray-400">
                                       {[typeBodyAreaMap.get(alt.type), alt.type].filter(Boolean).join(" · ")}

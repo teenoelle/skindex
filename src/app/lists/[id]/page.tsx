@@ -355,8 +355,8 @@ export default function ListDetailPage() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 leading-snug">{product.name}</p>
                       {product.brand && <p className="text-xs text-gray-400">{product.brand}</p>}
+                      <p className="text-sm font-medium text-gray-900 leading-snug">{product.name}</p>
                       {(product.flaggedCount !== undefined || product.sensoryCount !== undefined) && (
                         <div className="mt-1">
                           <ConcernChips

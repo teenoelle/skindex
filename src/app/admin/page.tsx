@@ -2370,9 +2370,9 @@ export default function AdminPage() {
                         />
                       )}
                       <div className="flex-1 min-w-0">
+                        {p.brand && <p className="text-xs text-gray-400 truncate">{p.brand}</p>}
                         <p className="text-sm font-medium text-gray-900 truncate" title={p.name}>{p.name}</p>
                         <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                          {p.brand && <span className="text-xs text-gray-400">{p.brand}</span>}
                           {p.type && (
                             <span className={`text-xs border rounded-full px-2 py-0.5 shrink-0 ${typeIsNonCanonical ? "text-amber-700 bg-amber-50 border-amber-100" : "text-gray-400 border-gray-200"}`}>
                               {p.type}
