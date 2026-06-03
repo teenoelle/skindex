@@ -2,8 +2,9 @@
 
 Generate curated explanations and profiles for Skindex ingredients. Uses your Claude Pro session — no extra API cost.
 
-Processes up to three queues per run:
-1. **Explanation queue** — ingredients with no curated explanation yet
+Processes up to four queues per run:
+0. **New ingredient queue** — unknown ingredients in `ingredient_queue` (classify + explain from scratch)
+1. **Explanation queue** — ingredients already in the DB missing a curated explanation
 2. **Fatty acid profile queue** — Emollient ingredients missing a fatty acid profile
 3. **Bioactive profile queue** — Plant Extract ingredients missing a bioactive profile
 
@@ -22,6 +23,10 @@ Processes up to three queues per run:
 ### 0. Check queue counts
 
 ```bash
+npx tsx scripts/fetch-queue.ts 1 > scripts/tmp-count.json; node -e "const fs=require('fs');const lines=fs.readFileSync('scripts/tmp-count.json','utf8').split('\n');const i=lines.findIndex(l=>l.trimStart().startsWith('['));const arr=JSON.parse(lines.slice(i).join('\n'));console.log(arr.length+' in ingredient_queue (showing first item if any)');" && rm scripts/tmp-count.json
+```
+
+```bash
 npx tsx scripts/fetch-need-explanation.ts 9999 > scripts/tmp-count.json; node -e "const fs=require('fs');const lines=fs.readFileSync('scripts/tmp-count.json','utf8').split('\n');const i=lines.findIndex(l=>l.trimStart().startsWith('['));console.log(JSON.parse(lines.slice(i).join('\n')).length+' need explanation');" && rm scripts/tmp-count.json
 ```
 
@@ -33,11 +38,88 @@ npx tsx scripts/fetch-need-profile.ts --type emollient 9999 > scripts/tmp-count.
 npx tsx scripts/fetch-need-profile.ts --type plant-extract 9999 > scripts/tmp-count.json; node -e "const fs=require('fs');const lines=fs.readFileSync('scripts/tmp-count.json','utf8').split('\n');const i=lines.findIndex(l=>l.trimStart().startsWith('['));console.log(JSON.parse(lines.slice(i).join('\n')).length+' Plant Extracts need bioactive profile');" && rm scripts/tmp-count.json
 ```
 
-Report all three counts to the user, then proceed with each non-empty queue below.
+Report all four counts to the user, then proceed with each non-empty queue below.
+
+---
+
+## Queue 0 — New Ingredients (ingredient_queue)
+
+Skip this queue if the count from step 0 is 0.
+
+### 0a. Fetch the queue
+
+```bash
+npx tsx scripts/fetch-queue.ts $ARGUMENTS
+```
+
+Output: JSON array of `{ id, name, times_seen, found_in }`.
+
+### 0b. Review and classify each item
+
+For **every** item in the queue, decide one of:
+
+**Skip** (mark `skip: true`) when the name is:
+- An asterisk-only variant of a common ingredient (e.g. `"Aloe Barbadensis Leaf Juice *"`, `"tea tree oil*"`) — the asterisk means "certified organic" on product labels; the base ingredient is already in the DB
+- A fully informal or vague name with no useful INCI meaning (e.g. `"Purified water"`, `"red Korean seaweed extract"` when too vague)
+- A formatting-corrupted name that already has a clean match in the DB (e.g. `"caprylic/ capric triglyceride"`)
+- A duplicate of another item in the same batch (keep the better-cased one, skip the rest)
+
+**Clean the name** before classifying when:
+- The queue name has an asterisk suffix → strip it (e.g. `"spiraea ulmaria flower extract*"` → `"spiraea ulmaria flower extract"`)
+- The queue name has formatting corruption → normalize (e.g. `"houttuynia cordata flower/leaf/ stem water"` → `"houttuynia cordata flower leaf stem water"`)
+- The queue name has bracket suffixes → strip them (e.g. `"citrus paradisi seed extract [citricidal]"` → `"citrus paradisi seed extract"`)
+- Use the cleaned name in the output JSON
+
+**Classify** each non-skipped item:
+- `status`: `"safe"` or `"flagged"`
+- `structural_category`: one of Humectant, Emollient, Fatty Acid, Fatty Alcohol, Ceramide, Peptide, Silicone, Surfactant, Emulsifier, Thickener, Preservative, UV Filter, Plant Extract, Chelating Agent, pH Adjuster, Solvent, Conditioning Agent, Protein, Amino Acid, Active, Colorant, Clay, Exfoliant, Fragrance — or null
+- `category` (if safe): one of soothing, brightening, antioxidant, firming, barrier-repairing, moisturizing, smoothing, Softening, antimicrobial, anti-malassezia, wound-healing, cleansing, Pore-cleansing, Strengthening, Conditioning, chelating, PHA Exfoliant, Anti-inflammatory, prebiotic — or null
+- `flagged_category` (if flagged): one of sensitizer, fragrance-allergen, Synthetic Musk, Chemical Sunscreen, AHA Exfoliant, BHA Exfoliant, Barrier-disrupting, pore-clogger, occlusive, Sulfate Surfactant, Drying Solvent, Irritant, vasodilator, phytoestrogen — or null
+- `secondary_flagged_categories`: array of additional flagged categories, or `[]`
+
+Then generate `explanation_structured` using the same format and quality rules as Queue 1b below.
+
+### 0c. Assemble and write
+
+Build an array where each entry is either:
+
+```json
+{ "queueId": "<original id>", "skip": true }
+```
+
+or:
+
+```json
+{
+  "queueId": "<original id>",
+  "name": "<cleaned name>",
+  "status": "safe" | "flagged",
+  "structural_category": "...",
+  "category": "...",
+  "flagged_category": "...",
+  "secondary_flagged_categories": [...],
+  "explanation_structured": { ... }
+}
+```
+
+Write to `scripts/tmp-queue-explanations.json`, then apply:
+
+```bash
+npx tsx scripts/write-queue-explanations.ts scripts/tmp-queue-explanations.json
+```
+
+Clean up:
+```bash
+rm scripts/tmp-queue-explanations.json
+```
+
+> **Note:** Emollient and Plant Extract items inserted by this step automatically get `profile_status = "needs_profile"` — they will appear in Queues 2 and 3 on this same run. Re-check those queue counts after Queue 0 completes.
 
 ---
 
 ## Queue 1 — Explanations
+
+Skip this queue if the count from step 0 is 0 (and Queue 0 added no items that need explanation upgrades).
 
 ### 1a. Fetch a batch
 
@@ -160,7 +242,7 @@ rm scripts/tmp-explanations.json
 
 ## Queue 2 — Fatty Acid Profiles (Emollients)
 
-Skip this queue if the count from step 0 is 0.
+Skip this queue if the count from step 0 is 0 **and** Queue 0 added no Emollient items.
 
 ### 2a. Fetch a batch
 
@@ -227,7 +309,7 @@ rm scripts/tmp-fatty-acid-profiles.json
 
 ## Queue 3 — Bioactive Profiles (Plant Extracts)
 
-Skip this queue if the count from step 0 is 0.
+Skip this queue if the count from step 0 is 0 **and** Queue 0 added no Plant Extract items.
 
 ### 3a. Fetch a batch
 
@@ -304,6 +386,9 @@ rm scripts/tmp-bioactive-profiles.json
 After all queues are processed, check remaining counts:
 
 ```bash
+npx tsx scripts/fetch-queue.ts 1
+```
+```bash
 npx tsx scripts/fetch-need-explanation.ts 1
 ```
 ```bash
@@ -321,5 +406,6 @@ If items remain in any queue, ask the user whether to continue with the next bat
 
 - `skin_climate_notes`, `category`, and `secondary_benefit_categories` are all computed automatically by the write scripts — you don't need to generate them.
 - Ingredients with `sensitization_risk: "high"` in Queue 3 are automatically reclassified as `flagged/sensitizer` by the write script.
+- Queue 0 items that are Emollient or Plant Extract automatically get `profile_status = "needs_profile"` — they will appear in Queues 2/3 after insertion. Always re-check profile queue counts after Queue 0 runs.
 - If a batch partially fails (some rows return DB errors), the successfully written rows still count. Re-run to retry failed ones.
 - All write scripts are idempotent — running them twice for the same ingredient just overwrites with the same data.
