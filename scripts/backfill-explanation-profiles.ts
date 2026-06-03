@@ -1,15 +1,14 @@
 /**
- * Backfills benefit_profiles and concern_profiles in explanation_structured
- * from each ingredient's existing skin_climate_notes.
+ * Backfills concern_profiles in explanation_structured from skin_climate_notes,
+ * and clears any previously auto-derived benefit_profiles.
  *
- * benefit_profiles  — union of all profile labels from benefit-sentiment notes.
- *                     Applied to all ingredients (safe and flagged) that have benefit notes.
- * concern_profiles  — union of profile labels from caution/strong_caution notes whose
- *                     `concern` field matches the ingredient's flagged_category.
+ * concern_profiles  — union of profile labels from caution/strong_caution notes
+ *                     whose `concern` field matches the ingredient's flagged_category.
  *                     Only applied to flagged ingredients.
  *
- * Skips any field that is already set (non-null, non-empty) — does not overwrite
- * manually-curated values from write-queue-explanations.
+ * benefit_profiles  — cleared (set to null/removed) for all ingredients.
+ *                     benefit_profiles is manual-only; auto-derivation duplicates
+ *                     what profileBenefitNotes already shows in the UI.
  *
  * Usage:
  *   npx tsx scripts/backfill-explanation-profiles.ts [--dry-run]
@@ -55,34 +54,28 @@ async function main() {
     const notes = Array.isArray(ing.skin_climate_notes) ? ing.skin_climate_notes as SkinClimateNote[] : [];
     const structured = ing.explanation_structured as Record<string, unknown>;
 
-    const existingBenefit = Array.isArray(structured.benefit_profiles)
-      ? (structured.benefit_profiles as string[]).filter(Boolean)
-      : [];
+    const hasBenefitProfiles = Array.isArray(structured.benefit_profiles) && (structured.benefit_profiles as unknown[]).length > 0;
     const existingConcern = Array.isArray(structured.concern_profiles)
       ? (structured.concern_profiles as string[]).filter(Boolean)
       : [];
 
-    const { benefit_profiles: derivedBenefit, concern_profiles: derivedConcern } =
-      profilesFromNotes(notes, ing.flagged_category ?? null);
+    const { concern_profiles: derivedConcern } = profilesFromNotes(notes, ing.flagged_category ?? null);
 
-    const newBenefit = mergeProfileLabels(existingBenefit.length ? existingBenefit : null, derivedBenefit);
     const newConcern = ing.status === "flagged"
       ? mergeProfileLabels(existingConcern.length ? existingConcern : null, derivedConcern)
       : null;
 
-    // Skip if nothing changed
-    const benefitChanged = newBenefit !== null &&
-      JSON.stringify(newBenefit) !== JSON.stringify(existingBenefit.length ? existingBenefit : null);
+    const benefitClear = hasBenefitProfiles;
     const concernChanged = newConcern !== null &&
       JSON.stringify(newConcern) !== JSON.stringify(existingConcern.length ? existingConcern : null);
 
-    if (!benefitChanged && !concernChanged) { noop++; continue; }
+    if (!benefitClear && !concernChanged) { noop++; continue; }
 
     const label = ing.name.length > 50 ? ing.name.slice(0, 47) + "…" : ing.name;
 
     if (DRY_RUN) {
       console.log(`  ${label}`);
-      if (benefitChanged) console.log(`    benefit_profiles: ${JSON.stringify(newBenefit)}`);
+      if (benefitClear) console.log(`    benefit_profiles: cleared`);
       if (concernChanged) console.log(`    concern_profiles: ${JSON.stringify(newConcern)}`);
       updated++;
       continue;
@@ -90,9 +83,11 @@ async function main() {
 
     process.stdout.write(`  ${label} … `);
 
+    // Build updated structured: remove benefit_profiles key, set concern_profiles if changed
+    const { benefit_profiles: _drop, ...structuredWithoutBenefit } = structured as Record<string, unknown> & { benefit_profiles?: unknown };
+    void _drop;
     const updatedStructured = {
-      ...structured,
-      ...(benefitChanged && newBenefit ? { benefit_profiles: newBenefit } : {}),
+      ...structuredWithoutBenefit,
       ...(concernChanged && newConcern ? { concern_profiles: newConcern } : {}),
     };
 
@@ -106,7 +101,7 @@ async function main() {
       failed++;
     } else {
       const tags: string[] = [];
-      if (benefitChanged) tags.push(`benefit → [${newBenefit!.join(", ")}]`);
+      if (benefitClear) tags.push("benefit_profiles cleared");
       if (concernChanged) tags.push(`concern → [${newConcern!.join(", ")}]`);
       console.log(`✓ ${tags.join(" + ")}`);
       updated++;

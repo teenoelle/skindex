@@ -73,31 +73,33 @@ function labelsFromNote(note: SkinClimateNote): string[] {
 }
 
 /**
- * Derives benefit_profiles and concern_profiles from skin_climate_notes.
+ * Derives concern_profiles from skin_climate_notes.
  *
- * benefit_profiles  — union of all labels from benefit-sentiment notes.
  * concern_profiles  — union of labels from caution/strong_caution notes whose
  *                     `concern` field matches flaggedCategory (case-insensitive).
+ *
+ * benefit_profiles is intentionally not auto-derived here — it is manual-only
+ * metadata, set per-ingredient when a specific skin profile is a defining
+ * characteristic of the benefit (rather than a generic category match).
+ * Auto-deriving from notes duplicates what profileBenefitNotes already shows.
  */
 export function profilesFromNotes(
   notes: SkinClimateNote[],
   flaggedCategory?: string | null,
-): { benefit_profiles: string[] | null; concern_profiles: string[] | null } {
-  const benefit = new Set<string>();
+): { benefit_profiles: null; concern_profiles: string[] | null } {
   const concern = new Set<string>();
   const fcLower = flaggedCategory?.toLowerCase() ?? "";
 
   for (const note of notes) {
-    const labels = labelsFromNote(note);
-    if (note.sentiment === "benefit") {
-      labels.forEach((l) => benefit.add(l));
-    } else if ((note.sentiment === "caution" || note.sentiment === "strong_caution") && fcLower) {
-      if (note.concern?.toLowerCase() === fcLower) labels.forEach((l) => concern.add(l));
+    if ((note.sentiment === "caution" || note.sentiment === "strong_caution") && fcLower) {
+      if (note.concern?.toLowerCase() === fcLower) {
+        labelsFromNote(note).forEach((l) => concern.add(l));
+      }
     }
   }
 
   return {
-    benefit_profiles: benefit.size > 0 ? [...benefit] : null,
+    benefit_profiles: null,
     concern_profiles: concern.size > 0 ? [...concern] : null,
   };
 }

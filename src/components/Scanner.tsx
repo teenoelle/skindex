@@ -5073,31 +5073,44 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         if (!benefitSentence && !benefitNotes.length && !benefitNote) return null;
                         return (
                           <div className="pl-3 border-l-2 border-teal-500 space-y-0.5">
-                            {benefitSentence && (
-                              <p className="text-xs text-gray-600 leading-relaxed">
-                                {(benefitLabel || secondaryBenefitLabels.length > 0) ? (
-                                  <span className="font-semibold text-teal-700">
-                                    {[benefitLabel, ...secondaryBenefitLabels].filter(Boolean).join(", ")}{structured?.benefit_profiles?.length ? ` · ${structured.benefit_profiles.flatMap(p => p.split(/\s*·\s*/)).join(", ")}` : ""} — </span>
-                                ) : (structured?.benefit_category || (structured?.benefit_profiles?.length ?? 0) > 0) ? (
-                                  <span className="font-semibold text-teal-700">
-                                    {[structured?.benefit_category, (structured?.benefit_profiles ?? []).flatMap(p => p.split(/\s*·\s*/)).join(", ") || null].filter(Boolean).join(" · ")} — </span>
-                                ) : null}
-                                {benefitSentence}
-                              </p>
-                            )}
-                            {benefitNote && (
-                              <p className="text-xs text-gray-600 leading-relaxed">{benefitNote}</p>
-                            )}
-                            {benefitNotes.map((note, i) => {
-                              const nl = noteLabel(note);
-                              const fullLabel = [benefitLabel ?? (structured?.benefit_category ?? null), nl].filter(Boolean).join(" · ");
+                            {(() => {
+                              // Compute the benefit header label once so notes can detect redundancy.
+                              const benefitProfilesSuffix = structured?.benefit_profiles?.length
+                                ? ` · ${structured.benefit_profiles.flatMap(p => p.split(/\s*·\s*/)).join(", ")}`
+                                : "";
+                              const benefitHeaderLabel = (benefitLabel || secondaryBenefitLabels.length > 0)
+                                ? `${[benefitLabel, ...secondaryBenefitLabels].filter(Boolean).join(", ")}${benefitProfilesSuffix}`
+                                : (() => {
+                                    const profs = (structured?.benefit_profiles ?? []).flatMap(p => p.split(/\s*·\s*/)).join(", ") || null;
+                                    return [structured?.benefit_category, profs].filter(Boolean).join(" · ");
+                                  })();
                               return (
-                                <p key={i} className="text-xs text-gray-600 leading-relaxed">
-                                  {fullLabel && <span className="font-semibold text-teal-700">{fullLabel} — </span>}
-                                  {note.text}
-                                </p>
+                                <>
+                                  {benefitSentence && (
+                                    <p className="text-xs text-gray-600 leading-relaxed">
+                                      {benefitHeaderLabel
+                                        ? <span className="font-semibold text-teal-700">{benefitHeaderLabel} — </span>
+                                        : null}
+                                      {benefitSentence}
+                                    </p>
+                                  )}
+                                  {benefitNote && (
+                                    <p className="text-xs text-gray-600 leading-relaxed">{benefitNote}</p>
+                                  )}
+                                  {benefitNotes.map((note, i) => {
+                                    const nl = noteLabel(note);
+                                    const fullLabel = [benefitLabel ?? (structured?.benefit_category ?? null), nl].filter(Boolean).join(" · ");
+                                    const isRedundant = !!benefitHeaderLabel && fullLabel === benefitHeaderLabel;
+                                    return (
+                                      <p key={i} className="text-xs text-gray-600 leading-relaxed">
+                                        {fullLabel && !isRedundant && <span className="font-semibold text-teal-700">{fullLabel} — </span>}
+                                        {note.text}
+                                      </p>
+                                    );
+                                  })}
+                                </>
                               );
-                            })}
+                            })()}
                           </div>
                         );
                       })()}
