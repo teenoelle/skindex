@@ -1207,7 +1207,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [autoSearching, setAutoSearching] = useState(false);
   const [autoSearchResult, setAutoSearchResult] = useState<"found" | "not-found" | null>(null);
-  const [submitOpen, setSubmitOpen] = useState(false);
+  const [addSubTab, setAddSubTab] = useState<"url" | "submit">("url");
   const [submitName, setSubmitName] = useState("");
   const [submitBrand, setSubmitBrand] = useState("");
   const [submitType, setSubmitType] = useState("");
@@ -1530,7 +1530,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setUploadError(null);
     setAutoSearching(false);
     setAutoSearchResult(null);
-    setSubmitOpen(false);
+    setAddSubTab("url");
     setSubmitName("");
     setSubmitBrand("");
     setSubmitType("");
@@ -1720,7 +1720,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setUploadError(null);
     setAutoSearching(false);
     setAutoSearchResult(null);
-    setSubmitOpen(false);
+    setAddSubTab("url");
     setReportOpen(false);
     setReportDone(false);
     setSaveListOpen(false);
@@ -1945,7 +1945,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setSubmitLoading(false);
 
     if (submitRes.status === 409 && submitData.productId) {
-      setSubmitOpen(false);
+      setAddSubTab("url");
+      setTab("search");
       scanVariant({ productId: submitData.productId });
       return;
     }
@@ -1955,7 +1956,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       setSubmitError(msg);
       return;
     }
-    setSubmitOpen(false);
+    setAddSubTab("url");
     setSubmitDone(true);
     setSubmitName("");
     setSubmitBrand("");
@@ -2913,6 +2914,24 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         </div>
       )}
       {tab === "add" && (
+        <div className="flex mb-3 rounded-full border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setAddSubTab("url")}
+            className={`flex-1 py-1.5 text-xs font-medium transition-colors ${addSubTab === "url" ? "bg-gray-900 text-white" : "bg-white text-gray-500 hover:text-gray-700"}`}
+          >
+            From URL
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddSubTab("submit")}
+            className={`flex-1 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${addSubTab === "submit" ? "bg-gray-900 text-white" : "bg-white text-gray-500 hover:text-gray-700"}`}
+          >
+            Submit manually
+          </button>
+        </div>
+      )}
+      {tab === "add" && addSubTab === "url" && (
         <textarea
           value={importUrls}
           onChange={(e) => setImportUrls(e.target.value)}
@@ -2922,13 +2941,137 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400 mb-1 resize-none font-mono leading-relaxed disabled:bg-gray-50 disabled:text-gray-400"
         />
       )}
-      {tab === "add" && isSignedIn && (
+      {tab === "add" && addSubTab === "url" && isSignedIn && (
         addTabUrlCount > 1
           ? <p className="text-xs text-gray-400 mb-3">{addTabUrlCount} URLs{addTabUrlCount > 50 ? " — first 50 will be imported" : ""}</p>
           : <div className="mb-3" />
       )}
+      {tab === "add" && addSubTab === "submit" && (
+        <div className="space-y-3">
+          {submitDone && (
+            <div className="p-4 bg-teal-50 border border-teal-200 rounded-xl text-sm text-teal-800 flex items-start gap-2">
+              <span className="text-base leading-none mt-0.5">✓</span>
+              <div>
+                <p className="font-medium">Product submitted for review</p>
+                <p className="text-teal-700 mt-0.5">It will appear in search results once approved.</p>
+              </div>
+              <button type="button" onClick={() => setSubmitDone(false)} className="ml-auto text-teal-500 hover:text-teal-800 text-xs shrink-0">Dismiss</button>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={submitBrand}
+              onChange={(e) => setSubmitBrand(e.target.value)}
+              placeholder="Brand (optional)"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+            />
+            <select
+              value={submitType}
+              onChange={(e) => setSubmitType(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400 bg-white"
+            >
+              <option value="">Type (optional)</option>
+              {PRODUCT_TYPE_GROUPS.map(({ label, types }) => (
+                <optgroup key={label} label={label}>
+                  {types.map((t) => <option key={t} value={t}>{t}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <input
+            value={submitName}
+            onChange={(e) => setSubmitName(e.target.value)}
+            placeholder="Product name"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+          />
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setSubmitMode("paste")}
+              className={`flex-1 py-1 text-xs font-medium rounded-md transition-all ${submitMode === "paste" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}
+            >
+              Paste list
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubmitMode("url")}
+              className={`flex-1 py-1 text-xs font-medium rounded-md transition-all ${submitMode === "url" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}
+            >
+              From URL (INCIDecoder)
+            </button>
+          </div>
+          {submitMode === "paste" ? (
+            <textarea
+              value={submitIngredients}
+              onChange={(e) => setSubmitIngredients(e.target.value)}
+              placeholder="Paste the full ingredients list here…"
+              rows={5}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400 resize-none font-mono leading-relaxed"
+            />
+          ) : (
+            <input
+              type="url"
+              value={submitUrl}
+              onChange={(e) => setSubmitUrl(e.target.value)}
+              placeholder="https://incidecoder.com/products/..."
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+            />
+          )}
+          <div className="space-y-2 pt-1 border-t border-gray-100">
+            <p className="text-xs text-gray-400">Optional links</p>
+            <input
+              type="url"
+              value={submitIherbUrl}
+              onChange={(e) => setSubmitIherbUrl(e.target.value)}
+              placeholder="iHerb URL (optional)"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+            />
+            <input
+              type="url"
+              value={submitSourceUrl}
+              onChange={(e) => setSubmitSourceUrl(e.target.value)}
+              placeholder="Product page URL — Sephora, brand site, etc. (optional)"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+            />
+            <input
+              type="url"
+              value={submitImageUrl}
+              onChange={(e) => setSubmitImageUrl(e.target.value)}
+              placeholder="Product image URL (optional)"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+            />
+          </div>
+          {submitError && <p className="text-xs text-rose-600">{submitError}</p>}
+          <div className="flex gap-2">
+            {isSignedIn ? (
+              <button
+                type="button"
+                onClick={handleSubmitProduct}
+                disabled={submitLoading || !submitName.trim() || (submitMode === "paste" ? !submitIngredients.trim() : !submitUrl.trim())}
+                className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {submitLoading ? "Submitting…" : "Submit for review"}
+              </button>
+            ) : (
+              <Link
+                href="/sign-in"
+                className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium text-center"
+              >
+                Sign in to submit
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => setAddSubTab("url")}
+              className="text-sm text-gray-400 hover:text-gray-700 px-3"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
-      {tab === "add" ? (
+      {tab === "add" && addSubTab === "submit" ? null : tab === "add" ? (
         !isSignedIn ? (
           <Link href="/sign-in" className="block w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:border-gray-400 hover:text-gray-900 transition-colors text-center">
             Sign in to add products
@@ -3498,12 +3641,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             Paste the ingredient list
           </button>
           {" "}instead.
-          {!submitOpen && (
+          {addSubTab !== "submit" && (
             <>
               {" "}Or{" "}
               <button
                 className="underline text-gray-700"
-                onClick={() => { setSubmitOpen(true); setSubmitName(query); }}
+                onClick={() => { setTab("add"); setAddSubTab("submit"); setSubmitName(query); }}
               >
                 add it to the database
               </button>.
@@ -3512,132 +3655,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         </div>
       )}
 
-      {/* Community submission form */}
-      {submitDone && (
-        <div className="mt-4 p-4 bg-teal-50 border border-teal-200 rounded-xl text-sm text-teal-800 flex items-start gap-2">
-          <span className="text-base leading-none mt-0.5">✓</span>
-          <div>
-            <p className="font-medium">Product submitted for review</p>
-            <p className="text-teal-700 mt-0.5">It will appear in search results once approved.</p>
-          </div>
-          <button type="button" onClick={() => setSubmitDone(false)} className="ml-auto text-teal-500 hover:text-teal-800 text-xs shrink-0">Dismiss</button>
-        </div>
-      )}
-      {submitOpen && (
-        <div className="mt-4 border border-gray-200 rounded-xl p-4 space-y-3">
-          <p className="text-sm font-semibold text-gray-800">Add this product</p>
-          <input
-            value={submitName}
-            onChange={(e) => setSubmitName(e.target.value)}
-            placeholder="Product name"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              value={submitBrand}
-              onChange={(e) => setSubmitBrand(e.target.value)}
-              placeholder="Brand (optional)"
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
-            />
-            <select
-              value={submitType}
-              onChange={(e) => setSubmitType(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400 bg-white"
-            >
-              <option value="">Type (optional)</option>
-              {PRODUCT_TYPE_GROUPS.map(({ label, types }) => (
-                <optgroup key={label} label={label}>
-                  {types.map((t) => <option key={t} value={t}>{t}</option>)}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-            <button
-              type="button"
-              onClick={() => setSubmitMode("paste")}
-              className={`flex-1 py-1 text-xs font-medium rounded-md transition-all ${submitMode === "paste" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}
-            >
-              Paste list
-            </button>
-            <button
-              type="button"
-              onClick={() => setSubmitMode("url")}
-              className={`flex-1 py-1 text-xs font-medium rounded-md transition-all ${submitMode === "url" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}
-            >
-              From URL (INCIDecoder)
-            </button>
-          </div>
-          {submitMode === "paste" ? (
-            <textarea
-              value={submitIngredients}
-              onChange={(e) => setSubmitIngredients(e.target.value)}
-              placeholder="Paste the full ingredients list here…"
-              rows={5}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400 resize-none font-mono leading-relaxed"
-            />
-          ) : (
-            <input
-              type="url"
-              value={submitUrl}
-              onChange={(e) => setSubmitUrl(e.target.value)}
-              placeholder="https://incidecoder.com/products/..."
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
-            />
-          )}
-          <div className="space-y-2 pt-1 border-t border-gray-100">
-            <p className="text-xs text-gray-400">Optional links</p>
-            <input
-              type="url"
-              value={submitIherbUrl}
-              onChange={(e) => setSubmitIherbUrl(e.target.value)}
-              placeholder="iHerb URL (optional)"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
-            />
-            <input
-              type="url"
-              value={submitSourceUrl}
-              onChange={(e) => setSubmitSourceUrl(e.target.value)}
-              placeholder="Product page URL — Sephora, brand site, etc. (optional)"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
-            />
-            <input
-              type="url"
-              value={submitImageUrl}
-              onChange={(e) => setSubmitImageUrl(e.target.value)}
-              placeholder="Product image URL (optional)"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
-            />
-          </div>
-          {submitError && <p className="text-xs text-rose-600">{submitError}</p>}
-          <div className="flex gap-2">
-            {isSignedIn ? (
-              <button
-                type="button"
-                onClick={handleSubmitProduct}
-                disabled={submitLoading || !submitName.trim() || (submitMode === "paste" ? !submitIngredients.trim() : !submitUrl.trim())}
-                className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {submitLoading ? "Submitting…" : "Submit for review"}
-              </button>
-            ) : (
-              <Link
-                href="/sign-in"
-                className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium text-center"
-              >
-                Sign in to submit
-              </Link>
-            )}
-            <button
-              type="button"
-              onClick={() => setSubmitOpen(false)}
-              className="text-sm text-gray-400 hover:text-gray-700 px-3"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Did you mean */}
       {pinnedTopProduct && pinnedVariants && pinnedVariants.length > 0 && (
@@ -4229,13 +4246,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
           )}
 
-          {tab === "search" && query && !submitOpen && (
+          {tab === "search" && query && addSubTab !== "submit" && (
             <p className="text-xs text-gray-400 text-center">
               Not {query}?{" "}
               <button
                 type="button"
                 className="underline underline-offset-2 hover:text-gray-700"
-                onClick={() => { setSubmitOpen(true); setSubmitName(query); }}
+                onClick={() => { setTab("add"); setAddSubTab("submit"); setSubmitName(query); }}
               >
                 Add it to the database
               </button>
