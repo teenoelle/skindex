@@ -1210,8 +1210,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [autoSearching, setAutoSearching] = useState(false);
   const [autoSearchResult, setAutoSearchResult] = useState<"found" | "not-found" | null>(null);
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewResult, setReviewResult] = useState<{ reviewed: number; total: number } | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submitName, setSubmitName] = useState("");
   const [submitBrand, setSubmitBrand] = useState("");
@@ -1514,12 +1512,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     }
   }, [result]);
 
-  // Auto-trigger review when scan finds unreviewed ingredients.
-  useEffect(() => {
-    if (!result?.unreviewed?.length || reviewLoading || reviewResult !== null) return;
-    const t = setTimeout(() => handleReview(), 500);
-    return () => clearTimeout(t);
-  }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleScan(override?: { tab?: Tab; query?: string }) {
     setLoading(true);
@@ -1541,8 +1533,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setUploadError(null);
     setAutoSearching(false);
     setAutoSearchResult(null);
-    setReviewLoading(false);
-    setReviewResult(null);
     setSubmitOpen(false);
     setSubmitName("");
     setSubmitBrand("");
@@ -1733,8 +1723,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setUploadError(null);
     setAutoSearching(false);
     setAutoSearchResult(null);
-    setReviewLoading(false);
-    setReviewResult(null);
     setSubmitOpen(false);
     setReportOpen(false);
     setReportDone(false);
@@ -1841,23 +1829,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setImageUploading(false);
   }
 
-  async function handleReview() {
-    setReviewLoading(true);
-    setReviewResult(null);
-    let totalInserted = 0;
-    let totalProcessed = 0;
-    try {
-      for (let i = 0; i < 60; i++) {
-        const res = await fetch("/api/review-ingredients", { method: "POST" });
-        const data = await res.json();
-        totalInserted += data.reviewed ?? 0;
-        totalProcessed += data.total ?? 0;
-        setReviewResult({ reviewed: totalInserted, total: totalProcessed });
-        if ((data.remaining ?? data.total) === 0) break;
-      }
-    } catch { /* stop on error */ }
-    setReviewLoading(false);
-  }
 
   async function handleEditProduct() {
     if (!result?.product?.id) return;
@@ -5389,27 +5360,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   Unreviewed — {result.unreviewed.length}
                   <span className="text-stone-300">{showUnreviewed ? "▲" : "▼"}</span>
                 </button>
-                {reviewLoading ? (
-                  <span className="text-xs text-gray-400">
-                    Reviewing{reviewResult && reviewResult.reviewed > 0 ? ` — ${reviewResult.reviewed} done` : "…"}
-                  </span>
-                ) : reviewResult ? (
-                  <span className="text-xs text-gray-400">
-                    {reviewResult.reviewed > 0
-                      ? `${reviewResult.reviewed} classified — rescan to see results`
-                      : reviewResult.total > 0
-                      ? "Already in database — rescan to see results"
-                      : "Queued for review — rescan later"}
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleReview}
-                    className="text-xs text-gray-400 underline underline-offset-2 hover:text-gray-700 shrink-0"
-                  >
-                    Review now
-                  </button>
-                )}
+                <span className="text-xs text-gray-400">Queued for next /generate-explanations run</span>
               </div>
               {showUnreviewed && (
                 <div className="mt-2 divide-y divide-stone-100">

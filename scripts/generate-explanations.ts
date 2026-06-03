@@ -46,6 +46,13 @@ const BATCH = batchArg
 
 // ── queue counts ──────────────────────────────────────────────────────────────
 
+async function getQueueCount(): Promise<number> {
+  const { count } = await supabase
+    .from("ingredient_queue")
+    .select("id", { count: "exact", head: true });
+  return count ?? 0;
+}
+
 async function getCounts(): Promise<{ weak: number; needsProfile: number }> {
   const [{ count: weak }, { count: needsProfile }] = await Promise.all([
     supabase
@@ -58,6 +65,94 @@ async function getCounts(): Promise<{ weak: number; needsProfile: number }> {
       .eq("profile_status", "needs_profile"),
   ]);
   return { weak: weak ?? 0, needsProfile: needsProfile ?? 0 };
+}
+
+// ── queue drain (new ingredients → AI classify + explain directly) ────────────
+
+async function drainQueuePass(passNum: number): Promise<{ inserted: number; remaining: number }> {
+  const { data: queue, error } = await supabase
+    .from("ingredient_queue")
+    .select("id, name")
+    .order("times_seen", { ascending: false })
+    .limit(BATCH);
+
+  if (error) throw new Error(`Queue fetch: ${error.message}`);
+  if (!queue?.length) return { inserted: 0, remaining: 0 };
+
+  if (DRY_RUN) {
+    console.log(`\nQueue pass ${passNum} — ${queue.length} item(s) would be processed:\n`);
+    for (const item of queue) {
+      console.log(`  ${item.name} → classify + AI explanation`);
+    }
+    return { inserted: 0, remaining: await getQueueCount() };
+  }
+
+  let inserted = 0;
+  const doneIds: string[] = [];
+
+  for (const item of queue) {
+    const label = item.name.length > 50 ? item.name.slice(0, 47) + "…" : item.name;
+    process.stdout.write(`  [queue] ${label} … `);
+
+    const { data: existing } = await supabase
+      .from("ingredients")
+      .select("id")
+      .ilike("name", item.name)
+      .maybeSingle();
+
+    if (existing) {
+      console.log("already exists");
+      doneIds.push(item.id);
+      continue;
+    }
+
+    const result = await generateWithReclassification(item.name);
+    if (result.source !== "curated") {
+      console.log("✗ (AI unavailable — will retry)");
+      continue;
+    }
+
+    const ingContext = {
+      name: item.name,
+      status: result.status ?? "safe" as const,
+      structural_category: result.structural_category ?? null,
+      category: result.category ?? null,
+      flagged_category: result.flagged_category ?? null,
+    };
+    const notes = generateNotes(ingContext);
+    const needsProfile =
+      ingContext.structural_category === "Emollient" ||
+      ingContext.structural_category === "Plant Extract";
+
+    const { error: insertError } = await supabase
+      .from("ingredients")
+      .insert({
+        name: item.name,
+        status: ingContext.status,
+        structural_category: ingContext.structural_category,
+        category: ingContext.category,
+        flagged_category: ingContext.flagged_category,
+        explanation: result.explanation,
+        explanation_structured: result.explanation_structured,
+        explanation_source: "curated",
+        skin_climate_notes: notes.length > 0 ? notes : null,
+        profile_status: needsProfile ? "needs_profile" : null,
+      });
+
+    if (insertError) {
+      console.log(`✗ (${insertError.message})`);
+    } else {
+      console.log(`✓ classified + AI explanation${needsProfile ? " + queued for profile" : ""}`);
+      inserted++;
+      doneIds.push(item.id);
+    }
+  }
+
+  if (doneIds.length > 0) {
+    await supabase.from("ingredient_queue").delete().in("id", doneIds);
+  }
+
+  return { inserted, remaining: await getQueueCount() };
 }
 
 // ── single pass ───────────────────────────────────────────────────────────────
@@ -226,7 +321,9 @@ async function runPass(passNum: number): Promise<{ upgraded: number; remaining: 
 
 async function main() {
   const initial = await getCounts();
+  const initialQueue = await getQueueCount();
   console.log(`\nGenerate Explanations`);
+  console.log(`  Queue (new)       : ${initialQueue}`);
   console.log(`  Weak explanations : ${initial.weak}`);
   console.log(`  Needs profile     : ${initial.needsProfile}`);
   console.log(`  Batch size        : ${BATCH}`);
@@ -234,25 +331,36 @@ async function main() {
   if (LOOP) console.log(`  Mode              : LOOP until empty`);
   console.log("");
 
-  if (initial.weak + initial.needsProfile === 0) {
+  if (initialQueue + initial.weak + initial.needsProfile === 0) {
     console.log("All queues empty — nothing to do.\n");
     return;
   }
 
   let pass = 1;
   while (true) {
-    const { upgraded, remaining } = await runPass(pass);
-    if (!DRY_RUN) {
-      console.log(`\n  Pass ${pass}: ${upgraded} processed, ${remaining} remaining\n`);
+    let queueRemaining = 0;
+    if (initialQueue > 0 || pass > 1) {
+      const { inserted, remaining } = await drainQueuePass(pass);
+      queueRemaining = remaining;
+      if (!DRY_RUN) {
+        console.log(`\n  Queue pass ${pass}: ${inserted} classified, ${remaining} remaining\n`);
+      }
     }
-    if (!LOOP || remaining === 0 || DRY_RUN) break;
+
+    const { upgraded, remaining: explRemaining } = await runPass(pass);
+    if (!DRY_RUN) {
+      console.log(`\n  Pass ${pass}: ${upgraded} processed, ${explRemaining} remaining\n`);
+    }
+
+    if (!LOOP || (queueRemaining === 0 && explRemaining === 0) || DRY_RUN) break;
     pass++;
     await new Promise(r => setTimeout(r, 2000));
   }
 
   if (!DRY_RUN && LOOP) {
     const final = await getCounts();
-    if (final.weak + final.needsProfile === 0) {
+    const finalQueue = await getQueueCount();
+    if (finalQueue + final.weak + final.needsProfile === 0) {
       console.log("All queues empty.\n");
     }
   }
