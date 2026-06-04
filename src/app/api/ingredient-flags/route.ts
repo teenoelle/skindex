@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Sign in to flag explanations" }, { status: 401 });
 
-  const { ingredientId, reason } = await req.json().catch(() => ({}));
+  const { ingredientId, reasons, productId, userProfileSnapshot } = await req.json().catch(() => ({}));
   if (!ingredientId) return NextResponse.json({ error: "Missing ingredientId" }, { status: 400 });
 
   const { data: ing } = await supabaseAdmin
@@ -19,7 +19,9 @@ export async function POST(req: NextRequest) {
   await supabaseAdmin.from("ingredient_flags").insert({
     ingredient_id: ingredientId,
     flagged_by_user_id: userId,
-    reason: reason?.trim() || null,
+    reasons: Array.isArray(reasons) && reasons.length > 0 ? reasons : null,
+    product_id: productId ?? null,
+    user_profile_snapshot: userProfileSnapshot ?? null,
   });
 
   return NextResponse.json({ ok: true });

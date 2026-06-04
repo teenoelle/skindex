@@ -12,6 +12,7 @@ export default function SiteHeader() {
   const { isSignedIn, isLoaded } = useUser();
   const [isAdmin, setIsAdmin] = useState(false);
   const [recentCount, setRecentCount] = useState(0);
+  const [notifCount, setNotifCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -19,11 +20,16 @@ export default function SiteHeader() {
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((d) => {
-        if (!d.isAdmin) return;
-        setIsAdmin(true);
-        fetch("/api/admin/submissions")
+        if (d.isAdmin) {
+          setIsAdmin(true);
+          fetch("/api/admin/submissions")
+            .then((r) => r.json())
+            .then((s) => setRecentCount(s.recentCount ?? 0))
+            .catch(() => {});
+        }
+        fetch("/api/notifications")
           .then((r) => r.json())
-          .then((s) => setRecentCount(s.recentCount ?? 0))
+          .then((n) => setNotifCount(n.newCount ?? 0))
           .catch(() => {});
       })
       .catch(() => {});
@@ -78,6 +84,15 @@ export default function SiteHeader() {
                   </Link>
                 )}
                 <Link
+                  href="/notifications"
+                  className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-900 transition-colors"
+                >
+                  Activity
+                  {notifCount > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                  )}
+                </Link>
+                <Link
                   href="/lists"
                   className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
                 >
@@ -113,6 +128,16 @@ export default function SiteHeader() {
             <div className="max-w-2xl mx-auto px-6 py-3 space-y-1">
               {isLoaded && isSignedIn && (
                 <>
+                  <Link
+                    href="/notifications"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-1.5 text-sm text-gray-700 hover:text-gray-900 py-1.5"
+                  >
+                    Activity
+                    {notifCount > 0 && (
+                      <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                    )}
+                  </Link>
                   <Link
                     href="/lists"
                     onClick={() => setMenuOpen(false)}

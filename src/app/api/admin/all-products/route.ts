@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("products")
-    .select("id, name, brand, type, image_url, iherb_url, source_url, source, created_at, ingredient_list")
+    .select("id, name, brand, type, image_url, iherb_url, source_url, source, created_at, ingredient_list, is_pending, submitted_at, is_archived")
     .eq("is_archived", false)
     .limit(500);
 

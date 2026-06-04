@@ -1304,6 +1304,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [lifestyleHint, setLifestyleHint] = useState<ClimateType | null>(null);
   const [flaggedIngredients, setFlaggedIngredients] = useState<Set<string>>(new Set());
   const [flagging, setFlagging] = useState<string | null>(null);
+  const [flagPanelIngId, setFlagPanelIngId] = useState<string | null>(null);
+  const [flagSelectedReasons, setFlagSelectedReasons] = useState<Set<string>>(new Set());
   const [stepTagHint, setStepTagHint] = useState<string | null>(null);
   const [routineStepHint, setRoutineStepHint] = useState<string | null>(null);
   const [whatNextHint, setWhatNextHint] = useState<string | null>(null);
@@ -1686,19 +1688,37 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     });
   }
 
-  async function flagIngredient(ingId: string) {
+  async function flagIngredient(ingId: string, reasons: string[], productId: string | null) {
     if (flagging || flaggedIngredients.has(ingId)) return;
     setFlagging(ingId);
     try {
       await fetch("/api/ingredient-flags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ingredientId: ingId }),
+        body: JSON.stringify({
+          ingredientId: ingId,
+          reasons: reasons.length > 0 ? reasons : undefined,
+          productId: productId ?? undefined,
+          userProfileSnapshot: {
+            skinTypes: [...activeSkinTypes],
+            climates: [...activeClimates],
+          },
+        }),
       });
       setFlaggedIngredients((prev) => new Set([...prev, ingId]));
+      setFlagPanelIngId(null);
+      setFlagSelectedReasons(new Set());
     } catch { }
     setFlagging(null);
   }
+
+  const FLAG_REASON_CHIPS = [
+    "Wrong information",
+    "Too harsh — I use this fine",
+    "Too mild — I react to this",
+    "Wrong ingredient name",
+    "Other",
+  ];
 
   function handleIngredientClick(
     item: string,
@@ -5378,18 +5398,59 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       })()}
                       {/* Flag explanation — signed-in users only, only when ingredient is in DB */}
                       {ingId && isSignedIn && (
-                        <div className="flex justify-end pt-0.5">
+                        <div className="pt-0.5">
                           {flaggedIngredients.has(ingId) ? (
-                            <span className="text-xs text-gray-400">Flagged for review</span>
+                            <p className="text-xs text-gray-400 text-right">Flagged for review</p>
+                          ) : flagPanelIngId === ingId ? (
+                            <div className="space-y-2 pt-1">
+                              <p className="text-xs text-gray-500">What seems wrong? (optional — select all that apply)</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {FLAG_REASON_CHIPS.map((chip) => {
+                                  const selected = flagSelectedReasons.has(chip);
+                                  return (
+                                    <button
+                                      key={chip}
+                                      type="button"
+                                      onClick={() => setFlagSelectedReasons((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(chip)) next.delete(chip); else next.add(chip);
+                                        return next;
+                                      })}
+                                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selected ? "bg-gray-800 text-white border-gray-800" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}
+                                    >
+                                      {chip}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  disabled={flagging === ingId}
+                                  onClick={() => flagIngredient(ingId, [...flagSelectedReasons], result?.product?.id ?? null)}
+                                  className="text-xs px-3 py-1 bg-gray-800 text-white rounded-lg disabled:opacity-50 hover:bg-gray-700"
+                                >
+                                  {flagging === ingId ? "Sending…" : "Send flag"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setFlagPanelIngId(null); setFlagSelectedReasons(new Set()); }}
+                                  className="text-xs text-gray-400 hover:text-gray-600"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => flagIngredient(ingId)}
-                              disabled={flagging === ingId}
-                              className="text-xs text-gray-300 hover:text-gray-500 transition-colors disabled:opacity-50"
-                            >
-                              {flagging === ingId ? "Flagging…" : "Flag explanation"}
-                            </button>
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => { setFlagPanelIngId(ingId); setFlagSelectedReasons(new Set()); }}
+                                className="text-xs text-gray-300 hover:text-gray-500 transition-colors"
+                              >
+                                Flag explanation
+                              </button>
+                            </div>
                           )}
                         </div>
                       )}

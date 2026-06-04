@@ -8,17 +8,23 @@ export default function NavAuth() {
   const { isSignedIn, isLoaded } = useUser();
   const [isAdmin, setIsAdmin] = useState(false);
   const [recentCount, setRecentCount] = useState(0);
+  const [notifCount, setNotifCount] = useState(0);
 
   useEffect(() => {
     if (!isSignedIn) return;
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((d) => {
-        if (!d.isAdmin) return;
-        setIsAdmin(true);
-        fetch("/api/admin/submissions")
+        if (d.isAdmin) {
+          setIsAdmin(true);
+          fetch("/api/admin/submissions")
+            .then((r) => r.json())
+            .then((s) => setRecentCount(s.recentCount ?? 0))
+            .catch(() => {});
+        }
+        fetch("/api/notifications")
           .then((r) => r.json())
-          .then((s) => setRecentCount(s.recentCount ?? 0))
+          .then((n) => setNotifCount(n.newCount ?? 0))
           .catch(() => {});
       })
       .catch(() => {});
@@ -36,6 +42,12 @@ export default function NavAuth() {
           )}
         </Link>
       )}
+      <Link href="/notifications" className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-900 transition-colors">
+        Activity
+        {notifCount > 0 && (
+          <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+        )}
+      </Link>
       <Link href="/lists" className="text-sm text-gray-400 hover:text-gray-900 transition-colors">
         My Lists
       </Link>
