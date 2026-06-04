@@ -483,8 +483,12 @@ export default function AdminPage() {
   const [filterMissingIngredients, setFilterMissingIngredients] = useState(false);
   const [filterPending, setFilterPending] = useState(false);
   const [filterFlaggedByUser, setFilterFlaggedByUser] = useState(false);
+  const [filterFailedImport, setFilterFailedImport] = useState(false);
   const [reportedProductIds, setReportedProductIds] = useState<Set<string>>(new Set());
   const [approvingProduct, setApprovingProduct] = useState<string | null>(null);
+  const [retryingImport, setRetryingImport] = useState<string | null>(null);
+  const [retryResult, setRetryResult] = useState<Record<string, "ok" | "failed">>({});
+  const [urlOpenConfirming, setUrlOpenConfirming] = useState<Set<string>>(new Set());
   const [allEdits, setAllEdits] = useState<Record<string, AllEditState>>({});
   const [allSaving, setAllSaving] = useState<string | null>(null);
   const [allSaved, setAllSaved] = useState<Set<string>>(new Set());
@@ -999,6 +1003,28 @@ export default function AdminPage() {
     } catch { }
   }
 
+  async function handleRetryImport(p: AllProduct) {
+    setRetryingImport(p.id);
+    try {
+      const res = await fetch("/api/admin/retry-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: p.id }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setRetryResult((prev) => ({ ...prev, [p.id]: "ok" }));
+        // Reload the product list so the updated product appears correctly
+        await loadAllProducts();
+      } else {
+        setRetryResult((prev) => ({ ...prev, [p.id]: "failed" }));
+      }
+    } catch {
+      setRetryResult((prev) => ({ ...prev, [p.id]: "failed" }));
+    }
+    setRetryingImport(null);
+  }
+
   async function handleApproveProduct(p: AllProduct) {
     setApprovingProduct(p.id);
     try {
@@ -1470,6 +1496,7 @@ export default function AdminPage() {
     suspicious: allProducts.filter((p) => hasSuspiciousIngredients(p.ingredient_list)).length,
     pending: allProducts.filter((p) => p.is_pending).length,
     flaggedByUser: allProducts.filter((p) => reportedProductIds.has(p.id)).length,
+    failedImport: allProducts.filter((p) => p.source === "failed-import").length,
   };
 
   const sortedAllProducts = useMemo(() => [...allProducts].sort((a, b) => {
@@ -1495,8 +1522,9 @@ export default function AdminPage() {
     .filter((p) => !filterMissingIngredients || !p.ingredient_list)
     .filter((p) => !filterSuspicious || hasSuspiciousIngredients(p.ingredient_list))
     .filter((p) => !filterPending || p.is_pending)
-    .filter((p) => !filterFlaggedByUser || reportedProductIds.has(p.id)),
-  [sortedAllProducts, allSearch, allBrandFilter, filterMissingSource, filterMissingIherb, filterMissingImage, filterMissingType, filterMissingIngredients, filterSuspicious, filterPending, filterFlaggedByUser, reportedProductIds, activeTypesSet]);
+    .filter((p) => !filterFlaggedByUser || reportedProductIds.has(p.id))
+    .filter((p) => !filterFailedImport || p.source === "failed-import"),
+  [sortedAllProducts, allSearch, allBrandFilter, filterMissingSource, filterMissingIherb, filterMissingImage, filterMissingType, filterMissingIngredients, filterSuspicious, filterPending, filterFlaggedByUser, filterFailedImport, reportedProductIds, activeTypesSet]);
 
   const filteredAuditLog = useMemo(() => {
     const search = auditSearch.toLowerCase();
@@ -2172,6 +2200,7 @@ export default function AdminPage() {
                 {([
                   ["Pending", filterPending, setFilterPending, allStats.pending],
                   ["Flagged by user", filterFlaggedByUser, setFilterFlaggedByUser, allStats.flaggedByUser],
+                  ["Failed imports", filterFailedImport, setFilterFailedImport, allStats.failedImport],
                   ["Missing source", filterMissingSource, setFilterMissingSource, allStats.missingSource],
                   ["Missing iHerb", filterMissingIherb, setFilterMissingIherb, allStats.missingIherb],
                   ["Missing image", filterMissingImage, setFilterMissingImage, allStats.missingImage],
@@ -2221,13 +2250,17 @@ export default function AdminPage() {
                 const confirming = clearConfirming[p.id] ?? null;
                 const marked = clearMarked[p.id] ?? new Set<string>();
 
-                const UrlField = ({ field, placeholder, href, alwaysEnabled, btnLabel, rowLabel }: {
+                const TRUSTED_DOMAINS = new Set(["iherb.com", "sephora.com", "ulta.com", "amazon.com", "incidecoder.com", "cosdna.com", "yesstyle.com"]);
+                const isFailedImport = p.source === "failed-import";
+
+                const UrlField = ({ field, placeholder, href, alwaysEnabled, btnLabel, rowLabel, secure }: {
                   field: "source_url" | "image_url" | "iherb_url";
                   placeholder: string;
                   href: string | undefined;
                   alwaysEnabled: boolean;
                   btnLabel: string;
                   rowLabel: string;
+                  secure?: boolean;
                 }) => {
                   const isMarked = marked.has(field);
                   const storedValue = p[field];
@@ -2235,11 +2268,55 @@ export default function AdminPage() {
                   const isConfirming = confirming === field;
                   const showClear = !isMarked && !isConfirming && (!!storedValue || !!editValue);
                   const btnDisabled = !alwaysEnabled && !href;
+                  const confirmKey = `${p.id}:${field}`;
+                  const isOpenConfirming = urlOpenConfirming.has(confirmKey);
+
+                  let domain = "";
+                  let isTrusted = false;
+                  if (secure && href) {
+                    try {
+                      domain = new URL(href).hostname.replace(/^www\./, "");
+                      isTrusted = TRUSTED_DOMAINS.has(domain);
+                    } catch { /* ignore */ }
+                  }
+
                   return (
                     <div className="flex gap-2">
                       <span className="text-xs text-gray-400 w-14 shrink-0 pt-1.5">{rowLabel}</span>
                       <div className="flex-1 min-w-0">
+                        {secure && domain && (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            {isTrusted
+                              ? <span className="text-xs text-teal-600 bg-teal-50 border border-teal-100 rounded px-1.5 py-0.5">✓ {domain}</span>
+                              : <span className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5">⚠ {domain}</span>
+                            }
+                          </div>
+                        )}
                         <div className="flex gap-1 items-center">
+                          {secure ? (
+                            isOpenConfirming ? (
+                              <>
+                                <a
+                                  href={href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={() => setUrlOpenConfirming((prev) => { const next = new Set(prev); next.delete(confirmKey); return next; })}
+                                  className="text-xs px-2 py-1.5 rounded-lg border border-teal-200 text-teal-700 hover:bg-teal-50 shrink-0 whitespace-nowrap"
+                                >
+                                  Confirm open ↗
+                                </a>
+                                <button type="button" onClick={() => setUrlOpenConfirming((prev) => { const next = new Set(prev); next.delete(confirmKey); return next; })}
+                                  className="text-xs text-gray-400 hover:text-gray-600 shrink-0 px-1">✕</button>
+                              </>
+                            ) : (
+                              <button type="button" disabled={btnDisabled}
+                                onClick={() => setUrlOpenConfirming((prev) => new Set([...prev, confirmKey]))}
+                                className={`text-xs px-2 py-1.5 rounded-lg border flex items-center justify-center shrink-0 transition-colors whitespace-nowrap ${btnDisabled ? "border-gray-100 text-gray-300 cursor-not-allowed" : "border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700"}`}
+                              >
+                                Open ↗
+                              </button>
+                            )
+                          ) : (
                           <a
                             href={btnDisabled ? undefined : href}
                             target="_blank"
@@ -2251,6 +2328,7 @@ export default function AdminPage() {
                           >
                             {btnLabel} ↗
                           </a>
+                          )}
                           <input
                             type="url"
                             value={isMarked ? "" : editValue}
@@ -2337,6 +2415,9 @@ export default function AdminPage() {
                         {p.brand && <p className="text-xs text-gray-400 truncate">{p.brand}</p>}
                         <p className="text-sm font-medium text-gray-900 truncate" title={p.name}>{p.name}</p>
                         <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                          {p.source === "failed-import" && (
+                            <span className="text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-full px-2 py-0.5 shrink-0">Failed import</span>
+                          )}
                           {p.is_pending && (
                             <span className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5 shrink-0">Pending</span>
                           )}
@@ -2393,7 +2474,7 @@ export default function AdminPage() {
                           ))}
                         </select>
                       </div>
-                      <UrlField field="source_url" rowLabel="Source" placeholder="Source URL" href={sourceHref} alwaysEnabled={false} btnLabel="INCIDecoder" />
+                      <UrlField field="source_url" rowLabel={isFailedImport ? "Submitted URL" : "Source"} placeholder="Source URL" href={sourceHref} alwaysEnabled={false} btnLabel={isFailedImport ? "Open" : "INCIDecoder"} secure={isFailedImport} />
                       <UrlField field="image_url" rowLabel="Image" placeholder="Image URL" href={imageHref} alwaysEnabled={true} btnLabel="Image" />
                       <UrlField field="iherb_url" rowLabel="iHerb" placeholder="iHerb URL" href={iherbHref} alwaysEnabled={true} btnLabel="iHerb" />
                       <div>
@@ -2425,6 +2506,18 @@ export default function AdminPage() {
                           {approvingProduct === p.id ? "Approving…" : "Approve & Publish"}
                         </button>
                       )}
+                      {isFailedImport && (
+                        <button
+                          type="button"
+                          onClick={() => handleRetryImport(p)}
+                          disabled={retryingImport === p.id}
+                          className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-40 hover:bg-indigo-700 transition-colors"
+                        >
+                          {retryingImport === p.id ? "Retrying…" : "Retry import"}
+                        </button>
+                      )}
+                      {retryResult[p.id] === "ok" && <span className="text-xs text-teal-600">Import succeeded.</span>}
+                      {retryResult[p.id] === "failed" && <span className="text-xs text-rose-600">Still failing — check URL.</span>}
                       {isSaved && <span className="text-xs text-teal-600">Saved.</span>}
                       {error && <span className="text-xs text-rose-600">{error}</span>}
                       <Link

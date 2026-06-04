@@ -16,6 +16,18 @@ function obfFullImage(url: string | null | undefined): string | null {
   return url.replace(/\.\d+\.jpg$/, ".full.jpg");
 }
 
+function nameFromUrl(url: string): string {
+  try {
+    const segments = new URL(url).pathname.split("/").filter(Boolean);
+    // Use last non-numeric, non-empty segment and convert slug to title case
+    const slug = [...segments].reverse().find((s) => !/^\d+$/.test(s)) ?? "";
+    if (!slug) return "Unknown product";
+    return slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  } catch {
+    return "Unknown product";
+  }
+}
+
 import type { FormulaWarning, PhotoCategory } from "@/types";
 
 function detectCombinationWarnings(items: string[], flaggedItems: { flagged_category: string | null }[]): FormulaWarning[] {
@@ -673,13 +685,29 @@ export async function POST(req: NextRequest) {
     const extracted = await extractIngredientsFromUrl(url);
     if (!extracted) {
       const isIHerb = url.toLowerCase().includes("iherb.com");
-      // Fire-and-forget: log the failed URL import for admin review
       import("@/lib/supabase-admin").then(({ supabaseAdmin: sa }) => {
+        // Log to search_misses
         sa.rpc("upsert_search_miss", {
           p_query: url,
           p_kind: "url",
           p_failure: isIHerb ? "iherb_blocked" : "extraction_failed",
         }).then(() => {});
+        // Create a skeleton product so admins can review the URL and retry
+        sa.from("products")
+          .select("id")
+          .eq("source_url", url)
+          .maybeSingle()
+          .then(({ data: existing }) => {
+            if (!existing) {
+              sa.from("products").insert({
+                name: nameFromUrl(url),
+                source: "failed-import",
+                source_url: url,
+                is_pending: false,
+                is_archived: false,
+              }).then(() => {});
+            }
+          });
       }).catch(() => {});
       return NextResponse.json({ notFound: true, iHerbBlocked: isIHerb });
     }
