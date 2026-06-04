@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { SkinProfileProvider } from "@/context/SkinProfileContext";
+import SidePanel from "@/components/SidePanel";
 import "./globals.css";
 
 const geist = Geist({
@@ -22,7 +24,10 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" className={`${geist.variable} h-full antialiased`}>
         <body className="min-h-full flex flex-col bg-white text-gray-900">
-          <div className="flex-1">{children}</div>
+          <SkinProfileProvider>
+            <SidePanel />
+            <div className="flex-1">{children}</div>
+          </SkinProfileProvider>
           <footer className="border-t border-gray-100 px-6 py-4 mt-8">
             <p className="text-xs text-gray-400 text-center">
               SKINdex is for informational purposes only. Always consult a dermatologist before making changes to your skincare routine.{" "}

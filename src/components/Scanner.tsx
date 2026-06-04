@@ -11,6 +11,12 @@ import { SENSORY_PROFILE_MAP, CONCERN_PROFILE_TYPES } from "@/lib/sensory";
 import { tokenFuzzyFilter } from "@/lib/search";
 import { splitIngredientList } from "@/lib/scanner";
 import ConcernChips from "@/components/ConcernChips";
+import { useSkinProfile } from "@/context/SkinProfileContext";
+import type { SkinType, ClimateType } from "@/lib/skin-profile";
+import {
+  SKIN_TYPES, CLIMATE_TYPES, WATER_TYPES, DEVICE_TYPES, SUPPLEMENT_TYPES,
+  DIET_TYPES, HORMONE_TYPES, LIFESTYLE_TYPES, ALL_MODIFIER_TYPES, climateNoteStyle,
+} from "@/lib/skin-profile";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -433,93 +439,10 @@ const RINSE_OFF_TYPES = new Set([
   "Clay Mask", "Rinse-Off Mask",
 ]);
 
-type SkinType = "oily" | "dry" | "reactive" | "damaged_barrier" | "acne_prone" | "mature" | "hyperpigmentation_prone" | "fungal_acne" | "rosacea" | "seborrheic" | "eczema" | "psoriasis" | "lupus_rash" | "keratosis_pilaris" | "body_acne" | "fast_shedding";
-type ClimateType = "humid" | "dry_climate" | "cold" | "hot" | "high_uv" | "hard_water" | "chlorinated_water" | "iron_water" | "heavy_metal_water" | "red_nir" | "blue_light" | "amber_light" | "vibration_sonic" | "heat_steam" | "microcurrent" | "iodine_load" | "phytoestrogen_load" | "anti_androgenic" | "vasodilating_supps" | "immune_stimulating" | "insulin_sensitizing" | "anabolic_dht" | "high_dose_b12" | "collagen_support" | "high_glycemic" | "dairy_regular" | "gluten_sensitive" | "histamine_foods" | "alcohol_regular" | "spicy_foods" | "high_iodine_diet" | "sulfites_diet" | "benzoates_diet" | "nitrites_diet" | "bha_bht_diet" | "propionates_diet" | "carmine_diet" | "pregnant" | "breastfeeding" | "hormone_sensitive" | "thyroid_condition" | "on_hrt" | "smoking";
+// SkinType and ClimateType are imported from @/lib/skin-profile
 
-const SKIN_TYPES: { value: SkinType; label: string }[] = [
-  { value: "oily", label: "Oily" },
-  { value: "dry", label: "Dry" },
-  { value: "reactive", label: "Reactive" },
-  { value: "damaged_barrier", label: "Damaged barrier" },
-  { value: "acne_prone", label: "Acne" },
-  { value: "mature", label: "Mature" },
-  { value: "hyperpigmentation_prone", label: "Hyperpigmentation" },
-  { value: "fungal_acne", label: "Fungal acne" },
-  { value: "rosacea", label: "Rosacea" },
-  { value: "seborrheic", label: "Seborrheic dermatitis" },
-  { value: "eczema", label: "Eczema" },
-  { value: "psoriasis", label: "Psoriasis" },
-  { value: "lupus_rash", label: "Lupus rash" },
-  { value: "keratosis_pilaris", label: "Keratosis pilaris" },
-  { value: "body_acne", label: "Body acne" },
-  { value: "fast_shedding", label: "Fast-shedding" },
-];
-
-const CLIMATE_TYPES: { value: ClimateType; label: string }[] = [
-  { value: "humid", label: "Humid" },
-  { value: "dry_climate", label: "Dry" },
-  { value: "cold", label: "Cold" },
-  { value: "hot", label: "Hot" },
-  { value: "high_uv", label: "High UV" },
-];
-
-const WATER_TYPES: { value: ClimateType; label: string }[] = [
-  { value: "hard_water", label: "Hard / mineral" },
-  { value: "chlorinated_water", label: "Chlorinated" },
-  { value: "iron_water", label: "Iron / rust" },
-  { value: "heavy_metal_water", label: "Lead / metals" },
-];
-
-const DEVICE_TYPES: { value: ClimateType; label: string }[] = [
-  { value: "red_nir", label: "Red / NIR" },
-  { value: "blue_light", label: "Blue light" },
-  { value: "amber_light", label: "Amber / yellow" },
-  { value: "vibration_sonic", label: "Vibration / sonic" },
-  { value: "heat_steam", label: "Heat / steam" },
-  { value: "microcurrent", label: "Microcurrent" },
-];
-
-const SUPPLEMENT_TYPES: { value: ClimateType; label: string }[] = [
-  { value: "iodine_load", label: "Iodine load" },
-  { value: "phytoestrogen_load", label: "Phytoestrogen" },
-  { value: "anti_androgenic", label: "Anti-androgenic" },
-  { value: "vasodilating_supps", label: "Vasodilating" },
-  { value: "immune_stimulating", label: "Immune stimulating" },
-  { value: "insulin_sensitizing", label: "Insulin sensitizing" },
-  { value: "anabolic_dht", label: "Anabolic / DHT" },
-  { value: "high_dose_b12", label: "High-dose B12" },
-  { value: "collagen_support", label: "Collagen support" },
-];
-
-const DIET_TYPES: { value: ClimateType; label: string }[] = [
-  { value: "high_glycemic", label: "High glycemic" },
-  { value: "dairy_regular", label: "Dairy" },
-  { value: "gluten_sensitive", label: "Gluten" },
-  { value: "histamine_foods", label: "Histamine foods" },
-  { value: "alcohol_regular", label: "Alcohol" },
-  { value: "spicy_foods", label: "Spicy foods" },
-  { value: "high_iodine_diet", label: "High-iodine diet" },
-  { value: "sulfites_diet", label: "Sulfites" },
-  { value: "benzoates_diet", label: "Benzoates" },
-  { value: "nitrites_diet", label: "Nitrites / nitrates" },
-  { value: "bha_bht_diet", label: "BHT / BHA (food)" },
-  { value: "propionates_diet", label: "Propionates" },
-  { value: "carmine_diet", label: "Carmine / red dye" },
-];
-
-const HORMONE_TYPES: { value: ClimateType; label: string }[] = [
-  { value: "pregnant", label: "Pregnant" },
-  { value: "breastfeeding", label: "Breastfeeding" },
-  { value: "hormone_sensitive", label: "Hormone-sensitive" },
-  { value: "thyroid_condition", label: "Thyroid condition" },
-  { value: "on_hrt", label: "On HRT" },
-];
-
-const LIFESTYLE_TYPES: { value: ClimateType; label: string }[] = [
-  { value: "smoking", label: "Smoking / tobacco" },
-];
-
-const ALL_MODIFIER_TYPES = [...CLIMATE_TYPES, ...WATER_TYPES, ...DEVICE_TYPES, ...SUPPLEMENT_TYPES, ...DIET_TYPES, ...HORMONE_TYPES, ...LIFESTYLE_TYPES];
+// SKIN_TYPES, CLIMATE_TYPES, WATER_TYPES, DEVICE_TYPES, SUPPLEMENT_TYPES,
+// DIET_TYPES, HORMONE_TYPES, LIFESTYLE_TYPES, ALL_MODIFIER_TYPES imported from @/lib/skin-profile
 
 const SKIN_TYPE_NOTES: Record<SkinType, string> = {
   oily: "Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.",
@@ -592,15 +515,7 @@ function noteLabel(n: SkinClimateNote): string {
   return [...skinLabels, ...climateLabels].join(", ");
 }
 
-function climateNoteStyle(c: ClimateType): string {
-  const amberSet = new Set<ClimateType>(["heavy_metal_water", "heat_steam", "iodine_load", "immune_stimulating", "anabolic_dht", "high_dose_b12", "smoking"]);
-  if (amberSet.has(c)) return "text-amber-800 bg-amber-50 border-amber-200";
-  if (DEVICE_TYPES.some(d => d.value === c)) return "text-blue-800 bg-blue-50 border-blue-200";
-  if (DIET_TYPES.some(d => d.value === c)) return "text-emerald-800 bg-emerald-50 border-emerald-200";
-  if (SUPPLEMENT_TYPES.some(s => s.value === c)) return "text-violet-800 bg-violet-50 border-violet-100";
-  if (HORMONE_TYPES.some(h => h.value === c)) return "text-pink-800 bg-pink-50 border-pink-200";
-  return "text-gray-600 bg-gray-50 border-gray-100";
-}
+// climateNoteStyle imported from @/lib/skin-profile
 
 function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateType>): string[] {
   const cats: string[] = [];
@@ -1276,8 +1191,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [pinnedTopProduct, setPinnedTopProduct] = useState<CommunityVariant | null>(null);
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
   const [typeBodyAreaMap, setTypeBodyAreaMap] = useState<Map<string, string>>(new Map());
-  const [activeSkinTypes, setActiveSkinTypes] = useState<Set<SkinType>>(new Set());
-  const [activeClimates, setActiveClimates] = useState<Set<ClimateType>>(new Set());
+  const { activeSkinTypes, activeClimates, toggleSkinType, toggleClimate } = useSkinProfile();
   const [concernExpanded, setConcernExpanded] = useState<Set<string>>(new Set());
   const [neutralGroupOpen, setNeutralGroupOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -1338,13 +1252,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   useEffect(() => {
     try {
-      const st = localStorage.getItem("skindex:skinTypes");
-      const cl = localStorage.getItem("skindex:climates");
       const routinesRaw = localStorage.getItem("skindex:routines");
       const activeIdRaw = localStorage.getItem("skindex:activeRoutineId");
       const legacyRt = localStorage.getItem("skindex:routine");
-      if (st) setActiveSkinTypes(new Set(JSON.parse(st) as SkinType[]));
-      if (cl) setActiveClimates(new Set(JSON.parse(cl) as ClimateType[]));
       if (routinesRaw) {
         const loaded = JSON.parse(routinesRaw) as Routine[];
         setRoutines(loaded);
@@ -2284,23 +2194,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setQuickListProductId(null);
   }
 
-  function toggleSkinType(t: SkinType) {
-    setActiveSkinTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(t)) next.delete(t); else next.add(t);
-      try { localStorage.setItem("skindex:skinTypes", JSON.stringify([...next])); } catch {}
-      return next;
-    });
-  }
-
-  function toggleClimate(c: ClimateType) {
-    setActiveClimates((prev) => {
-      const next = new Set(prev);
-      if (next.has(c)) next.delete(c); else next.add(c);
-      try { localStorage.setItem("skindex:climates", JSON.stringify([...next])); } catch {}
-      return next;
-    });
-  }
+  // toggleSkinType and toggleClimate are provided by SkinProfileContext
 
   function isProfileNote(n: SkinClimateNote): boolean {
     const skinMatch = n.dimensions.length === 0 || n.dimensions.some((d) => activeSkinTypes.has(d as SkinType));
