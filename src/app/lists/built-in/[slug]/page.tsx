@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import SiteHeader from "@/components/SiteHeader";
-
 type ExplanationStructured = {
   formula_role: string | null;
   benefit: string | null;
@@ -345,7 +343,7 @@ export default function BuiltInListPage() {
   if (!meta) {
     return (
       <div className="min-h-screen bg-white">
-        <SiteHeader />
+
         <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-16 text-center">
           <p className="text-gray-400 text-sm">List not found.</p>
           <Link href="/lists" className="text-sm text-gray-700 underline underline-offset-2 mt-4 block">← My Lists</Link>
@@ -359,7 +357,6 @@ export default function BuiltInListPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <SiteHeader />
       <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-16">
         <Link href="/lists" className="text-xs text-gray-400 hover:text-gray-700 mb-6 block">← My Lists</Link>
 

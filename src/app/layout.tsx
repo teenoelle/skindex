@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { SkinProfileProvider } from "@/context/SkinProfileContext";
 import SidePanel from "@/components/SidePanel";
+import SiteHeader from "@/components/SiteHeader";
 import "./globals.css";
 
 const geist = Geist({
@@ -25,6 +26,7 @@ export default function RootLayout({
       <html lang="en" className={`${geist.variable} h-full antialiased`}>
         <body className="min-h-full flex flex-col bg-white text-gray-900">
           <SkinProfileProvider>
+            <SiteHeader />
             <SidePanel />
             <div className="flex-1">{children}</div>
           </SkinProfileProvider>

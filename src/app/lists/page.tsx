@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
-import SiteHeader from "@/components/SiteHeader";
+
 
 type UserList = {
   id: string;
@@ -325,7 +325,7 @@ export default function ListsPage() {
   if (!isLoaded || loading) {
     return (
       <div className="min-h-screen bg-white">
-        <SiteHeader />
+
         <main className="max-w-2xl mx-auto px-6 py-16 pt-[4.5rem]">
           <p className="text-sm text-gray-400">Loading…</p>
         </main>
@@ -336,7 +336,7 @@ export default function ListsPage() {
   if (!isSignedIn) {
     return (
       <div className="min-h-screen bg-white">
-        <SiteHeader />
+
         <main className="max-w-2xl mx-auto px-6 py-16 pt-[4.5rem] text-center">
           <p className="text-gray-500 mb-4">Sign in to create and view your lists.</p>
           <SignInButton mode="modal">
@@ -351,8 +351,6 @@ export default function ListsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <SiteHeader />
-
       <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-10">
         {/* Page title + skin profile row */}
         <div className="mb-6">

@@ -8,7 +8,7 @@ import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
-import SiteHeader from "@/components/SiteHeader";
+
 import {
   Smile, Palette, Heart, PersonStanding, Scissors,
   FlaskConical, Sparkles, Eye, Shield, BrushCleaning,
@@ -1710,7 +1710,7 @@ export default function AdminPage() {
   if (!isLoaded || loading) {
     return (
       <div className="min-h-screen bg-white">
-        <SiteHeader />
+
         <main className="max-w-3xl mx-auto px-6 pt-[4.5rem] pb-16">
           <p className="text-sm text-gray-400">Loading…</p>
         </main>
@@ -1721,7 +1721,7 @@ export default function AdminPage() {
   if (!isSignedIn || forbidden) {
     return (
       <div className="min-h-screen bg-white">
-        <SiteHeader />
+
         <main className="max-w-3xl mx-auto px-6 pt-[4.5rem] pb-16 text-center">
           <p className="text-sm text-gray-500">You don&apos;t have access to this page.</p>
         </main>
@@ -1731,7 +1731,6 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <SiteHeader />
       <main className="max-w-3xl mx-auto px-6 pt-[4.5rem] pb-8 space-y-8">
 
         {/* Stats */}

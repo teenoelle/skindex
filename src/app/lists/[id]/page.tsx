@@ -8,8 +8,6 @@ import Link from "next/link";
 import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import ConcernChips from "@/components/ConcernChips";
-import SiteHeader from "@/components/SiteHeader";
-
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Ampoule: Pipette, Balm: Sparkles, Blush: Sparkles, "Body Wash": Waves, Chapstick: Pipette,
   Concealer: Brush, Cream: Droplets, Emulsion: Droplets, Extract: FlaskConical, "Face Mask": Sparkles,
@@ -230,7 +228,7 @@ export default function ListDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-white">
-        <SiteHeader />
+
         <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-16">
           <p className="text-sm text-gray-400">Loading…</p>
         </main>
@@ -241,7 +239,7 @@ export default function ListDetailPage() {
   if (notFound || !list) {
     return (
       <div className="min-h-screen bg-white">
-        <SiteHeader />
+
         <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-16 text-center">
           <p className="text-gray-400 text-sm">List not found.</p>
           <Link href="/lists" className="text-sm text-gray-700 underline underline-offset-2 mt-4 block">
@@ -254,7 +252,6 @@ export default function ListDetailPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <SiteHeader />
       <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-16">
         {/* Back link */}
         <Link href="/lists" className="text-xs text-gray-400 hover:text-gray-700 mb-6 block">

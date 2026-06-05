@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import SiteHeader from "@/components/SiteHeader";
+
 
 type Submission = {
   type: "submission";
@@ -81,8 +81,6 @@ export default function NotificationsPage() {
   const isEmpty = !loading && submissions.length === 0 && flags.length === 0 && productUpdates.length === 0;
 
   return (
-    <>
-    <SiteHeader />
     <main className="max-w-lg mx-auto px-6 pt-24 pb-16">
       <h1 className="text-2xl font-semibold tracking-tight text-gray-900 mb-8">Activity</h1>
 
@@ -245,6 +243,5 @@ export default function NotificationsPage() {
         </section>
       )}
     </main>
-    </>
   );
 }

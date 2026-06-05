@@ -1,4 +1,3 @@
-import SiteHeader from "@/components/SiteHeader";
 import Scanner from "@/components/Scanner";
 
 const UUID_RE = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
@@ -11,7 +10,6 @@ export default async function ProductPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-white">
-      <SiteHeader />
       <div className="pt-14">
         <main className="max-w-2xl mx-auto px-6 py-16">
           <Scanner initialProductId={id} />
