@@ -386,6 +386,46 @@ async function runPass(passNum: number): Promise<{ upgraded: number; remaining: 
   return { upgraded, remaining: counts.weak + counts.needsProfile };
 }
 
+// ── product watch notifications ───────────────────────────────────────────────
+
+async function notifyWatchers(): Promise<void> {
+  const { data: watches } = await supabase
+    .from("product_watch")
+    .select("id, user_id, product_id, unreviewed_names");
+
+  if (!watches?.length) return;
+
+  for (const watch of watches) {
+    const names: string[] = watch.unreviewed_names ?? [];
+    if (!names.length) continue;
+
+    // Check if any of the watched ingredient names are still pending in the queue
+    let anyRemaining = false;
+    for (const name of names) {
+      const { count } = await supabase
+        .from("ingredient_queue")
+        .select("id", { count: "exact", head: true })
+        .ilike("name", name);
+      if ((count ?? 0) > 0) {
+        anyRemaining = true;
+        break;
+      }
+    }
+
+    if (!anyRemaining) {
+      if (!DRY_RUN) {
+        await supabase.from("product_notifications").insert({
+          user_id: watch.user_id,
+          product_id: watch.product_id,
+          type: "ingredients_ready",
+        });
+        await supabase.from("product_watch").delete().eq("id", watch.id);
+      }
+      console.log(`  [watch] Notified user ${watch.user_id} — all ingredients ready`);
+    }
+  }
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -413,6 +453,7 @@ async function main() {
       queueRemaining = remaining;
       if (!DRY_RUN) {
         console.log(`\n  Queue pass ${pass}: ${inserted} classified, ${remaining} remaining\n`);
+        if (inserted > 0) await notifyWatchers();
       }
     }
 

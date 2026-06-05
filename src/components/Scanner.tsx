@@ -1110,6 +1110,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [limitReached, setLimitReached] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showUnreviewed, setShowUnreviewed] = useState(false);
+  const [watchingProduct, setWatchingProduct] = useState(false);
+  const [watchLoading, setWatchLoading] = useState(false);
   const [showObfVariants, setShowObfVariants] = useState(false);
   const [explanations, setExplanations] = useState<Record<string, string | null>>({});
   const [explanationsStructured, setExplanationsStructured] = useState<Record<string, ExplanationStructured | null>>({});
@@ -1293,6 +1295,16 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       })
       .catch(() => {});
   }, [result?.product?.id, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check if user is watching this product for ingredient generation
+  useEffect(() => {
+    setWatchingProduct(false);
+    if (!isSignedIn || !result?.product?.id || !result.unreviewed?.length) return;
+    fetch(`/api/product-watch?productId=${result.product.id}`)
+      .then((r) => r.json())
+      .then((d) => setWatchingProduct(!!d.watching))
+      .catch(() => {});
+  }, [result?.product?.id, result?.unreviewed?.length, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load ingredient lists from DB when signed in; migrate from localStorage if DB is empty
   useEffect(() => {
@@ -1961,6 +1973,25 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     const data = await res.json();
     setUserLists(data.lists ?? []);
     setUserListsLoaded(true);
+  }
+
+  async function toggleProductWatch() {
+    if (!result?.product?.id || !isSignedIn) return;
+    setWatchLoading(true);
+    try {
+      if (watchingProduct) {
+        await fetch(`/api/product-watch?productId=${result.product.id}`, { method: "DELETE" });
+        setWatchingProduct(false);
+      } else {
+        await fetch("/api/product-watch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: result.product.id, unreviewedNames: result.unreviewed }),
+        });
+        setWatchingProduct(true);
+      }
+    } catch {}
+    setWatchLoading(false);
   }
 
   async function quickCreateListAndAdd(name: string, productId: string) {
@@ -5436,7 +5467,27 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   Unreviewed — {result.unreviewed.length}
                   <span className="text-stone-300">{showUnreviewed ? "▲" : "▼"}</span>
                 </button>
-                <span className="text-xs text-gray-400">Queued for next /generate-explanations run</span>
+                {isSignedIn && result.product?.id ? (
+                  watchingProduct ? (
+                    <button
+                      onClick={toggleProductWatch}
+                      disabled={watchLoading}
+                      className="text-xs text-stone-500 hover:text-rose-400 transition-colors"
+                    >
+                      Notified when ready ✓
+                    </button>
+                  ) : (
+                    <button
+                      onClick={toggleProductWatch}
+                      disabled={watchLoading}
+                      className="text-xs text-indigo-600 hover:underline"
+                    >
+                      Notify me when ready
+                    </button>
+                  )
+                ) : (
+                  <span className="text-xs text-gray-400">Queued for generation</span>
+                )}
               </div>
               {showUnreviewed && (
                 <div className="mt-2 divide-y divide-stone-100">

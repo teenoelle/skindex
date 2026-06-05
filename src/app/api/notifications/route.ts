@@ -97,7 +97,7 @@ export async function GET() {
   };
 
   const productUpdates = ((productNotifsRes.data ?? []) as unknown as PNRow[]).map((n) => ({
-    type: "product_updated" as const,
+    type: (n.type ?? "product_updated") as string,
     id: n.id,
     productId: n.product_id,
     productName: n.products?.name ?? null,

@@ -28,7 +28,7 @@ type Flag = {
 };
 
 type ProductUpdate = {
-  type: "product_updated";
+  type: string;
   id: string;
   productId: string;
   productName: string | null;
@@ -89,12 +89,42 @@ export default function NotificationsPage() {
         <p className="text-sm text-gray-400">No activity yet — submit a product or flag an ingredient explanation to see updates here.</p>
       )}
 
+      {/* Ingredients ready notifications */}
+      {productUpdates.filter((n) => n.type === "ingredients_ready").length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Ingredients analyzed</h2>
+          <div className="space-y-2">
+            {productUpdates.filter((n) => n.type === "ingredients_ready").map((n) => (
+              <div key={n.id} className="py-3 border-b border-gray-100 last:border-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{n.productName ?? "Product"}</p>
+                    {n.productBrand && <p className="text-xs text-gray-400">{n.productBrand}</p>}
+                    <p className="text-xs text-gray-400 mt-0.5">{relativeTime(n.createdAt)}</p>
+                  </div>
+                  <span className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-full px-2.5 py-1 shrink-0">
+                    Ready
+                  </span>
+                </div>
+                {n.productPath && (
+                  <div className="mt-2">
+                    <Link href={n.productPath} className="text-xs text-indigo-600 hover:underline">
+                      See full ingredient analysis ↗
+                    </Link>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Product updates (flagged products reviewed by admin) */}
-      {productUpdates.length > 0 && (
+      {productUpdates.filter((n) => n.type !== "ingredients_ready").length > 0 && (
         <section className="mb-10">
           <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Products you flagged</h2>
           <div className="space-y-2">
-            {productUpdates.map((n) => (
+            {productUpdates.filter((n) => n.type !== "ingredients_ready").map((n) => (
               <div key={n.id} className="py-3 border-b border-gray-100 last:border-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
