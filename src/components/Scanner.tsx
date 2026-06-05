@@ -3445,7 +3445,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         >
                           <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5v-2z"/></svg>
                           {activeFilterCount > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 text-[9px] leading-none bg-rose-500 text-white rounded-full w-4 h-4 flex items-center justify-center font-bold">{activeFilterCount}</span>
+                            <span className="absolute -top-1.5 -right-1.5 text-[9px] leading-none bg-gray-700 text-white rounded-full w-4 h-4 flex items-center justify-center font-bold">{activeFilterCount}</span>
                           )}
                         </button>
                         {filtersPanelOpen && (
