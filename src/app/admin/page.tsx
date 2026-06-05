@@ -76,17 +76,17 @@ type AllEditState = {
 
 type ProductType = { id: string; name: string; body_area: string; is_rinse_off: boolean };
 
-type AdminUser = {
-  clerk_id: string; email: string | null; name: string | null;
-  granted_by: string | null; granted_by_email: string | null;
-  granted_at: string | null; activity_count: number; is_self: boolean;
+type AppUser = {
+  clerk_id: string; email: string | null; name: string | null; image_url: string | null;
+  role: "admin" | "user" | null; granted_at: string | null; granted_by_email: string | null;
+  is_self: boolean; joined_at: string | null; last_active: string | null;
+  submission_count: number; flag_count: number; watch_count: number; admin_action_count: number;
 };
 type AdminInvite = {
   id: string; code: string; expires_at: string; is_expired: boolean;
   claimed_by: string | null; claimed_by_email: string | null; claimed_at: string | null;
   created_by: string; created_by_email: string | null; created_at: string;
 };
-type LookupResult = { found: boolean; clerk_id?: string; email?: string; name?: string | null; role?: string | null };
 
 type AuditEntry = {
   id: string; action: string; entity_type: string; entity_id: string | null;
@@ -640,16 +640,17 @@ export default function AdminPage() {
   const [bannerUpdating, setBannerUpdating] = useState<string | null>(null);
   const [bannerDeleting, setBannerDeleting] = useState<string | null>(null);
 
-  const [adminsOpen, setAdminsOpen] = useState(false);
-  const [adminsList, setAdminsList] = useState<AdminUser[]>([]);
+  const [usersOpen, setUsersOpen] = useState(false);
+  const [usersList, setUsersList] = useState<AppUser[]>([]);
   const [invites, setInvites] = useState<AdminInvite[]>([]);
-  const [adminsLoading, setAdminsLoading] = useState(false);
-  const [adminMenuOpen, setAdminMenuOpen] = useState<string | null>(null);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [inviteHistoryOpen, setInviteHistoryOpen] = useState(false);
-  const [lookupEmail, setLookupEmail] = useState("");
-  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [grantingAdmin, setGrantingAdmin] = useState(false);
+  const [usersSearch, setUsersSearch] = useState("");
+  const [usersRoleFilter, setUsersRoleFilter] = useState<"all" | "admin" | "user">("all");
+  const [usersActivityFilter, setUsersActivityFilter] = useState<Set<string>>(new Set());
+  const [usersSort, setUsersSort] = useState<"joined" | "last_active" | "submissions">("joined");
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [grantingAdmin, setGrantingAdmin] = useState<string | null>(null);
   const [revokingAdmin, setRevokingAdmin] = useState<string | null>(null);
   const [inviteExpiry, setInviteExpiry] = useState("7d");
   const [inviteCustomDate, setInviteCustomDate] = useState("");
@@ -940,50 +941,40 @@ export default function AdminPage() {
     setBannerDeleting(null);
   }
 
-  async function loadAdmins() {
-    setAdminsLoading(true);
+  async function loadUsers() {
+    setUsersLoading(true);
     try {
-      const res = await fetch("/api/admin/admins");
-      if (res.ok) {
-        const data = await res.json();
-        setAdminsList(data.admins ?? []);
+      const [usersRes, invitesRes] = await Promise.all([
+        fetch("/api/admin/users"),
+        fetch("/api/admin/admins"),
+      ]);
+      if (usersRes.ok) {
+        const data = await usersRes.json();
+        setUsersList(data.users ?? []);
+      }
+      if (invitesRes.ok) {
+        const data = await invitesRes.json();
         setInvites(data.invites ?? []);
       }
     } catch { }
-    setAdminsLoading(false);
-  }
-
-  async function lookupUser() {
-    if (!lookupEmail.trim()) return;
-    setLookupLoading(true);
-    setLookupResult(null);
-    try {
-      const res = await fetch("/api/admin/admins", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "lookup", email: lookupEmail.trim() }),
-      });
-      const data = await res.json();
-      setLookupResult(data);
-    } catch { }
-    setLookupLoading(false);
+    setUsersLoading(false);
   }
 
   async function grantAdmin(clerkId: string, email: string | null, name: string | null) {
-    setGrantingAdmin(true);
+    setGrantingAdmin(clerkId);
     try {
       await fetch("/api/admin/admins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "grant", clerk_id: clerkId }),
       });
-      setAdminsList((prev) => prev.some((a) => a.clerk_id === clerkId) ? prev : [
-        ...prev,
-        { clerk_id: clerkId, email, name, granted_by: null, granted_by_email: null, granted_at: new Date().toISOString(), activity_count: 0, is_self: false },
-      ]);
-      setLookupResult((prev) => prev ? { ...prev, role: "admin" } : null);
+      setUsersList((prev) => prev.map((u) =>
+        u.clerk_id === clerkId ? { ...u, role: "admin" as const, granted_at: new Date().toISOString() } : u
+      ));
     } catch { }
-    setGrantingAdmin(false);
+    setGrantingAdmin(null);
+    // suppress unused-var warning — name kept for API parity
+    void email; void name;
   }
 
   async function revokeAdmin(clerkId: string) {
@@ -995,8 +986,9 @@ export default function AdminPage() {
         body: JSON.stringify({ action: "revoke", clerk_id: clerkId }),
       });
       if (res.ok) {
-        setAdminsList((prev) => prev.filter((a) => a.clerk_id !== clerkId));
-        setLookupResult((prev) => prev?.clerk_id === clerkId ? { ...prev, role: null } : prev);
+        setUsersList((prev) => prev.map((u) =>
+          u.clerk_id === clerkId ? { ...u, role: "user" as const } : u
+        ));
       }
     } catch { }
     setRevokingAdmin(null);
@@ -1587,7 +1579,7 @@ export default function AdminPage() {
     setMerging(false);
   }
 
-  function adminInitials(a: { email: string | null; name: string | null }): string {
+  function userInitials(a: { email: string | null; name: string | null }): string {
     if (a.name) return a.name.split(" ").map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
     return (a.email?.[0] ?? "?").toUpperCase();
   }
@@ -1702,6 +1694,24 @@ export default function AdminPage() {
     }
     return groups;
   }, [filteredAuditLog]);
+
+  const filteredUsers = useMemo(() => {
+    let list = usersList;
+    if (usersSearch.trim()) {
+      const q = usersSearch.toLowerCase();
+      list = list.filter((u) => u.email?.toLowerCase().includes(q) || u.name?.toLowerCase().includes(q));
+    }
+    if (usersRoleFilter === "admin") list = list.filter((u) => u.role === "admin");
+    else if (usersRoleFilter === "user") list = list.filter((u) => u.role !== "admin");
+    if (usersActivityFilter.has("submissions")) list = list.filter((u) => u.submission_count > 0);
+    if (usersActivityFilter.has("flags")) list = list.filter((u) => u.flag_count > 0);
+    if (usersActivityFilter.has("watches")) list = list.filter((u) => u.watch_count > 0);
+    return [...list].sort((a, b) => {
+      if (usersSort === "last_active") return (b.last_active ?? "").localeCompare(a.last_active ?? "");
+      if (usersSort === "submissions") return b.submission_count - a.submission_count;
+      return (b.joined_at ?? "").localeCompare(a.joined_at ?? "");
+    });
+  }, [usersList, usersSearch, usersRoleFilter, usersActivityFilter, usersSort]);
 
   const totalPages = Math.max(1, Math.ceil(filteredAllProducts.length / PAGE_SIZE));
   const displayedAllProducts = filteredAllProducts.slice((allPage - 1) * PAGE_SIZE, allPage * PAGE_SIZE);
@@ -3425,187 +3435,217 @@ export default function AdminPage() {
           )}
         </section>
 
-        {/* Admin Management */}
+        {/* Users */}
         <section>
           <button
             type="button"
-            onClick={() => { const o = !adminsOpen; setAdminsOpen(o); if (o && adminsList.length === 0) loadAdmins(); }}
+            onClick={() => { const o = !usersOpen; setUsersOpen(o); if (o && usersList.length === 0) loadUsers(); }}
             className="flex items-center gap-3 mb-4 group"
           >
-            <h2 className="text-xl font-semibold tracking-tight text-gray-900">Admin Management</h2>
-            {adminsList.length > 0 && <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">{adminsList.length}</span>}
-            <svg className={`w-4 h-4 text-gray-400 transition-transform ${adminsOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">Users</h2>
+            {usersList.length > 0 && <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">{usersList.length}</span>}
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${usersOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
           </button>
 
-          {adminsOpen && (
+          {usersOpen && (
             <>
-              {adminsLoading && <p className="text-sm text-gray-400">Loading…</p>}
-              {!adminsLoading && (
-                <div className="space-y-6">
-                  {/* Unified access list */}
-                  {(adminsList.length > 0 || invites.filter((i) => !i.is_expired && !i.claimed_by).length > 0) && (
-                    <div className="border border-gray-100 rounded-xl overflow-visible divide-y divide-gray-50">
-                      {adminsList.map((a) => (
-                        <div key={a.clerk_id} className="flex items-center gap-3 px-4 py-3">
-                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold shrink-0 select-none">
-                            {adminInitials(a)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm text-gray-900 font-medium truncate">{a.email ?? a.clerk_id}</span>
-                              {a.is_self && <span className="text-xs text-gray-400 shrink-0">You</span>}
+              {usersLoading && <p className="text-sm text-gray-400">Loading…</p>}
+              {!usersLoading && (
+                <div className="space-y-4">
+                  {/* Search + filters */}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <input
+                      type="text"
+                      value={usersSearch}
+                      onChange={(e) => setUsersSearch(e.target.value)}
+                      placeholder="Search by name or email…"
+                      className="flex-1 min-w-48 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400"
+                    />
+                    {(["all", "admin", "user"] as const).map((f) => (
+                      <button key={f} type="button" onClick={() => setUsersRoleFilter(f)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${usersRoleFilter === f ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+                        {f === "all" ? "All" : f === "admin" ? "Admins" : "Users"}
+                      </button>
+                    ))}
+                    <div className="w-px bg-gray-100 self-stretch" />
+                    {(["submissions", "flags", "watches"] as const).map((f) => (
+                      <button key={f} type="button"
+                        onClick={() => setUsersActivityFilter((prev) => { const next = new Set(prev); next.has(f) ? next.delete(f) : next.add(f); return next; })}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${usersActivityFilter.has(f) ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-400 hover:border-gray-400"}`}>
+                        {f === "submissions" ? "Has submissions" : f === "flags" ? "Has flags" : "Has watches"}
+                      </button>
+                    ))}
+                    <div className="w-px bg-gray-100 self-stretch" />
+                    <select value={usersSort} onChange={(e) => setUsersSort(e.target.value as typeof usersSort)}
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-gray-400 text-gray-500 bg-white">
+                      <option value="joined">Newest first</option>
+                      <option value="last_active">Last active</option>
+                      <option value="submissions">Most submissions</option>
+                    </select>
+                  </div>
+
+                  {/* User list */}
+                  {filteredUsers.length === 0 && <p className="text-sm text-gray-400">No users match the current filters.</p>}
+                  {filteredUsers.length > 0 && (
+                    <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
+                      {filteredUsers.map((u) => (
+                        <div key={u.clerk_id}>
+                          <div
+                            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                            onClick={() => setExpandedUser(expandedUser === u.clerk_id ? null : u.clerk_id)}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold shrink-0 select-none">
+                              {userInitials(u)}
                             </div>
-                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                              {a.granted_at && (
-                                <span className="text-xs text-gray-400">Admin since {new Date(a.granted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-                              )}
-                              {a.granted_by_email && (
-                                <span className="text-xs text-gray-300">· Added by {a.granted_by_email}</span>
-                              )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm text-gray-900 font-medium truncate">{u.email ?? u.clerk_id}</span>
+                                {u.role === "admin" && (
+                                  <span className="text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-2 py-0.5 shrink-0">Admin</span>
+                                )}
+                                {u.is_self && <span className="text-xs text-gray-400 shrink-0">You</span>}
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap mt-0.5 text-xs text-gray-400">
+                                {u.joined_at && <span>Joined {new Date(u.joined_at).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>}
+                                {u.submission_count > 0 && <span>· {u.submission_count} submission{u.submission_count !== 1 ? "s" : ""}</span>}
+                                {u.flag_count > 0 && <span>· {u.flag_count} flag{u.flag_count !== 1 ? "s" : ""}</span>}
+                              </div>
                             </div>
+                            <svg className={`w-4 h-4 text-gray-300 transition-transform shrink-0 ${expandedUser === u.clerk_id ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
                           </div>
-                          {a.activity_count > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => { setAuditAdminFilter(a.clerk_id); setAuditAdminFilterEmail(a.email); setAuditExpanded(true); }}
-                              className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 hover:bg-indigo-100 hover:text-indigo-700 transition-colors shrink-0"
-                              title="View activity"
-                            >
-                              {a.activity_count} actions
-                            </button>
-                          )}
-                          <div className="relative shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => setAdminMenuOpen(adminMenuOpen === a.clerk_id ? null : a.clerk_id)}
-                              className="text-gray-400 hover:text-gray-700 px-1 py-0.5 text-lg leading-none"
-                            >
-                              ⋯
-                            </button>
-                            {adminMenuOpen === a.clerk_id && (
-                              <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
-                                <button
-                                  type="button"
-                                  onClick={() => { setAuditAdminFilter(a.clerk_id); setAuditAdminFilterEmail(a.email); setAuditExpanded(true); setAdminMenuOpen(null); }}
-                                  className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50 text-gray-700"
-                                >
-                                  View activity
-                                </button>
-                                {!a.is_self && (
-                                  <button
-                                    type="button"
-                                    onClick={() => { if (!confirm(`Revoke admin access for ${a.email ?? a.clerk_id}?`)) return; revokeAdmin(a.clerk_id); setAdminMenuOpen(null); }}
-                                    disabled={revokingAdmin === a.clerk_id}
-                                    className="w-full text-left text-xs px-3 py-2 hover:bg-rose-50 text-rose-600 disabled:opacity-40"
-                                  >
-                                    {revokingAdmin === a.clerk_id ? "Revoking…" : "Revoke access"}
+
+                          {expandedUser === u.clerk_id && (
+                            <div className="px-4 py-4 bg-gray-50 border-t border-gray-100 space-y-4">
+                              {/* Identity */}
+                              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                                {u.name && <div><span className="text-gray-400">Name </span><span className="text-gray-700">{u.name}</span></div>}
+                                <div><span className="text-gray-400">Email </span><span className="text-gray-700">{u.email ?? "—"}</span></div>
+                                <div className="col-span-2"><span className="text-gray-400">ID </span><code className="text-gray-500 font-mono text-[10px]">{u.clerk_id}</code></div>
+                                {u.joined_at && <div><span className="text-gray-400">Joined </span><span className="text-gray-700">{new Date(u.joined_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span></div>}
+                                {u.last_active && <div><span className="text-gray-400">Last active </span><span className="text-gray-700">{relativeTime(u.last_active)}</span></div>}
+                              </div>
+
+                              {/* Contributions */}
+                              <div>
+                                <p className="text-xs text-gray-400 font-medium mb-1">Contributions</p>
+                                <div className="flex gap-4 text-xs text-gray-600">
+                                  <span>{u.submission_count} submission{u.submission_count !== 1 ? "s" : ""}</span>
+                                  <span>{u.flag_count} flag{u.flag_count !== 1 ? "s" : ""}</span>
+                                  <span>{u.watch_count} watch{u.watch_count !== 1 ? "es" : ""}</span>
+                                  {u.admin_action_count > 0 && <span>{u.admin_action_count} admin action{u.admin_action_count !== 1 ? "s" : ""}</span>}
+                                </div>
+                              </div>
+
+                              {/* Admin history */}
+                              {u.role === "admin" && u.granted_at && (
+                                <p className="text-xs text-gray-400">
+                                  Admin since {new Date(u.granted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                  {u.granted_by_email && <span> · Added by {u.granted_by_email}</span>}
+                                </p>
+                              )}
+
+                              {/* Actions */}
+                              <div className="flex items-center gap-4 flex-wrap">
+                                {u.admin_action_count > 0 && (
+                                  <button type="button"
+                                    onClick={() => { setAuditAdminFilter(u.clerk_id); setAuditAdminFilterEmail(u.email); setAuditExpanded(true); setExpandedUser(null); }}
+                                    className="text-xs text-indigo-600 hover:underline">
+                                    View in activity log ↗
+                                  </button>
+                                )}
+                                {u.role === "admin" ? (
+                                  !u.is_self && (
+                                    <button type="button"
+                                      onClick={() => { if (!confirm(`Revoke admin access for ${u.email ?? u.clerk_id}?`)) return; revokeAdmin(u.clerk_id); }}
+                                      disabled={revokingAdmin === u.clerk_id}
+                                      className="text-xs text-rose-500 hover:text-rose-700 disabled:opacity-40">
+                                      {revokingAdmin === u.clerk_id ? "Revoking…" : "Revoke admin"}
+                                    </button>
+                                  )
+                                ) : (
+                                  <button type="button"
+                                    onClick={() => grantAdmin(u.clerk_id, u.email ?? null, u.name ?? null)}
+                                    disabled={grantingAdmin === u.clerk_id}
+                                    className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition-colors">
+                                    {grantingAdmin === u.clerk_id ? "Granting…" : "Make admin"}
                                   </button>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-
-                      {invites.filter((i) => !i.is_expired && !i.claimed_by).map((inv) => (
-                        <div key={inv.id} className="flex items-center gap-3 px-4 py-3">
-                          <div className="w-8 h-8 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-400 shrink-0 text-xs">✉</div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-500">Pending invite</p>
-                            <p className="text-xs text-gray-400">Expires {relativeTime(inv.expires_at)}{inv.created_by_email ? ` · from ${inv.created_by_email}` : ""}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => revokeInvite(inv.id)}
-                            disabled={revokingInvite === inv.id}
-                            className="text-xs text-gray-400 hover:text-rose-500 disabled:opacity-40 shrink-0"
-                          >
-                            {revokingInvite === inv.id ? "Revoking…" : "Revoke"}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Invite history */}
-                  {invites.filter((i) => i.is_expired || i.claimed_by).length > 0 && (
-                    <div>
-                      <button type="button" onClick={() => setInviteHistoryOpen((v) => !v)} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
-                        {inviteHistoryOpen ? "Hide" : "Show"} invite history ({invites.filter((i) => i.is_expired || i.claimed_by).length})
-                      </button>
-                      {inviteHistoryOpen && (
-                        <div className="mt-2 border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
-                          {invites.filter((i) => i.is_expired || i.claimed_by).map((inv) => (
-                            <div key={inv.id} className="flex items-center gap-3 px-4 py-2.5">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <code className="text-xs font-mono text-gray-400">{inv.code.slice(0, 8)}…</code>
-                                  <span className={`text-xs rounded-full px-2 py-0.5 ${inv.claimed_by ? "bg-teal-50 text-teal-600" : "bg-gray-50 text-gray-400"}`}>
-                                    {inv.claimed_by ? "Claimed" : "Expired"}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                  {inv.claimed_by_email ? `by ${inv.claimed_by_email}` : ""}
-                                  {inv.claimed_at ? ` · ${relativeTime(inv.claimed_at)}` : ""}
-                                </p>
-                              </div>
                             </div>
-                          ))}
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
                   )}
 
-                  {/* Add by email */}
-                  <div>
-                    <p className="text-xs text-gray-400 mb-2 font-medium">Add by email</p>
-                    <div className="flex gap-2">
-                      <input type="email" value={lookupEmail} onChange={(e) => { setLookupEmail(e.target.value); setLookupResult(null); }} onKeyDown={(e) => { if (e.key === "Enter") lookupUser(); }} placeholder="Email address…" className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400 min-w-0" />
-                      <button type="button" onClick={lookupUser} disabled={lookupLoading || !lookupEmail.trim()} className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors disabled:opacity-40">
-                        {lookupLoading ? "Looking…" : "Look up"}
-                      </button>
-                    </div>
-                    {lookupResult && !lookupResult.found && <p className="text-xs text-gray-400 mt-2">No account found for that email.</p>}
-                    {lookupResult?.found && (
-                      <div className="mt-2 flex items-center justify-between gap-4 border border-gray-100 rounded-lg px-3 py-2">
-                        <div>
-                          <p className="text-sm text-gray-900">{lookupResult.email}</p>
-                          {lookupResult.name && <p className="text-xs text-gray-400">{lookupResult.name}</p>}
+                  {/* Admin invites */}
+                  <div className="border-t border-gray-100 pt-4 space-y-4">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Admin Invites</p>
+
+                    {invites.filter((i) => !i.is_expired && !i.claimed_by).map((inv) => (
+                      <div key={inv.id} className="flex items-center gap-3 border border-gray-100 rounded-xl px-4 py-3">
+                        <div className="w-8 h-8 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-400 shrink-0 text-xs">✉</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-500">Pending invite</p>
+                          <p className="text-xs text-gray-400">Expires {relativeTime(inv.expires_at)}{inv.created_by_email ? ` · from ${inv.created_by_email}` : ""}</p>
                         </div>
-                        {lookupResult.role === "admin" ? (
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs text-teal-600">Already admin</span>
-                            <button type="button" onClick={() => { if (!confirm(`Revoke admin access for ${lookupResult.email}?`)) return; revokeAdmin(lookupResult.clerk_id!); }} disabled={revokingAdmin === lookupResult.clerk_id} className="text-xs text-rose-400 hover:text-rose-600 disabled:opacity-40">Revoke</button>
+                        <button type="button" onClick={() => revokeInvite(inv.id)} disabled={revokingInvite === inv.id}
+                          className="text-xs text-gray-400 hover:text-rose-500 disabled:opacity-40 shrink-0">
+                          {revokingInvite === inv.id ? "Revoking…" : "Revoke"}
+                        </button>
+                      </div>
+                    ))}
+
+                    {invites.filter((i) => i.is_expired || i.claimed_by).length > 0 && (
+                      <div>
+                        <button type="button" onClick={() => setInviteHistoryOpen((v) => !v)} className="text-xs text-gray-400 hover:text-gray-600">
+                          {inviteHistoryOpen ? "Hide" : "Show"} invite history ({invites.filter((i) => i.is_expired || i.claimed_by).length})
+                        </button>
+                        {inviteHistoryOpen && (
+                          <div className="mt-2 border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
+                            {invites.filter((i) => i.is_expired || i.claimed_by).map((inv) => (
+                              <div key={inv.id} className="flex items-center gap-3 px-4 py-2.5">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <code className="text-xs font-mono text-gray-400">{inv.code.slice(0, 8)}…</code>
+                                    <span className={`text-xs rounded-full px-2 py-0.5 ${inv.claimed_by ? "bg-teal-50 text-teal-600" : "bg-gray-50 text-gray-400"}`}>
+                                      {inv.claimed_by ? "Claimed" : "Expired"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-400 mt-0.5">
+                                    {inv.claimed_by_email ? `by ${inv.claimed_by_email}` : ""}
+                                    {inv.claimed_at ? ` · ${relativeTime(inv.claimed_at)}` : ""}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        ) : (
-                          <button type="button" onClick={() => grantAdmin(lookupResult.clerk_id!, lookupResult.email ?? null, lookupResult.name ?? null)} disabled={grantingAdmin} className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition-colors">
-                            {grantingAdmin ? "Granting…" : "Make admin"}
-                          </button>
                         )}
                       </div>
                     )}
-                  </div>
 
-                  {/* Invite link */}
-                  <div>
-                    <p className="text-xs text-gray-400 mb-2 font-medium">Generate invite link</p>
-                    <div className="flex flex-wrap gap-2 items-center">
-                      {(["24h", "7d", "30d", "custom"] as const).map((preset) => (
-                        <button key={preset} type="button" onClick={() => setInviteExpiry(preset)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${inviteExpiry === preset ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}>
-                          {preset === "24h" ? "24 hours" : preset === "7d" ? "7 days" : preset === "30d" ? "30 days" : "Custom"}
+                    <div>
+                      <p className="text-xs text-gray-400 mb-2 font-medium">Generate invite link</p>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {(["24h", "7d", "30d", "custom"] as const).map((preset) => (
+                          <button key={preset} type="button" onClick={() => setInviteExpiry(preset)}
+                            className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${inviteExpiry === preset ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+                            {preset === "24h" ? "24 hours" : preset === "7d" ? "7 days" : preset === "30d" ? "30 days" : "Custom"}
+                          </button>
+                        ))}
+                        {inviteExpiry === "custom" && <input type="datetime-local" value={inviteCustomDate} onChange={(e) => setInviteCustomDate(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400" />}
+                        <button type="button" onClick={createInvite} disabled={creatingInvite || (inviteExpiry === "custom" && !inviteCustomDate)}
+                          className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-40 transition-colors">
+                          {creatingInvite ? "Creating…" : "Generate link"}
                         </button>
-                      ))}
-                      {inviteExpiry === "custom" && <input type="datetime-local" value={inviteCustomDate} onChange={(e) => setInviteCustomDate(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400" />}
-                      <button type="button" onClick={createInvite} disabled={creatingInvite || (inviteExpiry === "custom" && !inviteCustomDate)} className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-40 transition-colors">
-                        {creatingInvite ? "Creating…" : "Generate link"}
-                      </button>
-                    </div>
-                    {newInviteCode && (
-                      <div className="mt-2 flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-                        <code className="text-xs text-indigo-800 flex-1 break-all">{newInviteCode}</code>
-                        <button type="button" onClick={() => navigator.clipboard.writeText(newInviteCode)} className="text-xs text-indigo-500 hover:text-indigo-700 shrink-0">Copy</button>
                       </div>
-                    )}
+                      {newInviteCode && (
+                        <div className="mt-2 flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                          <code className="text-xs text-indigo-800 flex-1 break-all">{newInviteCode}</code>
+                          <button type="button" onClick={() => navigator.clipboard.writeText(newInviteCode)} className="text-xs text-indigo-500 hover:text-indigo-700 shrink-0">Copy</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
