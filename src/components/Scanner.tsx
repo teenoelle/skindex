@@ -3324,25 +3324,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
             <>
             <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
-            <div className="mb-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Quick filters</p>
-              <div className="flex flex-wrap gap-1.5">
-                <button type="button" onClick={() => setBrowseNoUniversal(v => !v)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${browseNoUniversal ? "bg-rose-600 text-white border-rose-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                  ✗ Universal Concerns
-                </button>
-                {(activeSkinTypes.size + activeClimates.size) > 0 && (
-                  <button type="button" onClick={() => setBrowseProfileLinked(v => !v)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${browseProfileLinked ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                    ✗ My Sensitivities
-                  </button>
-                )}
-                <button type="button" onClick={() => setBrowseCleanOnly(v => !v)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${browseCleanOnly ? "bg-green-700 text-white border-green-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                  ✓ Neutral &amp; Beneficial
-                </button>
-                <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                  Sun-safe
-                </button>
-              </div>
-            </div>
             <div className="space-y-5">
               {(() => {
                 const AREA_ORDER = ["Face", "Makeup", "Lip", "Hands", "Nails", "Hair", "Body", "Home"];
@@ -3480,14 +3461,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                 My Sensitivities
                               </button>
                             )}
-                            <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${browsePhotosafe ? "bg-yellow-50 text-yellow-700" : "text-gray-600 hover:bg-gray-50"}`}>
-                              <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${browsePhotosafe ? "bg-yellow-500 border-yellow-500 text-white" : "border-gray-300"}`}>{browsePhotosafe ? "✓" : ""}</span>
-                              Sun-safe only
-                            </button>
                             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest pb-1 pt-2">Show only</p>
                             <button type="button" onClick={() => setBrowseCleanOnly(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${browseCleanOnly ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50"}`}>
                               <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${browseCleanOnly ? "bg-green-700 border-green-700 text-white" : "border-gray-300"}`}>{browseCleanOnly ? "✓" : ""}</span>
                               Neutral &amp; Beneficial
+                            </button>
+                            <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${browsePhotosafe ? "bg-yellow-50 text-yellow-700" : "text-gray-600 hover:bg-gray-50"}`}>
+                              <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${browsePhotosafe ? "bg-yellow-500 border-yellow-500 text-white" : "border-gray-300"}`}>{browsePhotosafe ? "✓" : ""}</span>
+                              Sun-safe only
                             </button>
                             {ingredientLists.length > 0 && (
                               <div className="border-t border-gray-100 pt-2 mt-1 space-y-2">
@@ -3498,9 +3479,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                     <div key={l.id} className="flex items-center gap-2">
                                       <span className="text-xs text-gray-700 flex-1 truncate min-w-0">{l.name}</span>
                                       <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0 text-[10px]">
-                                        <button type="button" onClick={() => setListModes(prev => ({ ...prev, [l.id]: "exclude" }))} className={`px-1.5 py-0.5 transition-colors ${mode === "exclude" ? "bg-rose-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>✗ Excl</button>
-                                        <button type="button" onClick={() => setListModes(prev => ({ ...prev, [l.id]: "off" }))} className={`px-1.5 py-0.5 border-x border-gray-200 transition-colors ${mode === "off" ? "bg-gray-100 text-gray-600" : "text-gray-400 hover:bg-gray-50"}`}>Off</button>
                                         <button type="button" onClick={() => setListModes(prev => ({ ...prev, [l.id]: "include" }))} className={`px-1.5 py-0.5 transition-colors ${mode === "include" ? "bg-teal-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>✓ Incl</button>
+                                        <button type="button" onClick={() => setListModes(prev => ({ ...prev, [l.id]: "exclude" }))} className={`px-1.5 py-0.5 border-x border-gray-200 transition-colors ${mode === "exclude" ? "bg-rose-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>✗ Excl</button>
+                                        <button type="button" onClick={() => setListModes(prev => ({ ...prev, [l.id]: "off" }))} className={`px-1.5 py-0.5 transition-colors ${mode === "off" ? "bg-gray-100 text-gray-600" : "text-gray-400 hover:bg-gray-50"}`}>Off</button>
                                       </div>
                                     </div>
                                   );
