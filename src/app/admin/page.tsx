@@ -44,7 +44,15 @@ type AllProduct = {
   ingredient_list: string | null;
   is_pending: boolean | null;
   submitted_at: string | null;
+  submitted_by: string | null;
+  ingredients_ready: boolean | null;
   is_archived: boolean | null;
+};
+
+type ReportDiff = {
+  snapshot: Record<string, { explanation: string | null; explanation_structured: unknown }> | null;
+  current: Record<string, { explanation: string | null; explanation_structured: unknown; status: string | null; category: string | null }>;
+  hasInReviewReports: boolean;
 };
 
 type ArchivedProduct = {
@@ -483,8 +491,18 @@ export default function AdminPage() {
   const [filterMissingIngredients, setFilterMissingIngredients] = useState(false);
   const [filterPending, setFilterPending] = useState(false);
   const [filterFlaggedByUser, setFilterFlaggedByUser] = useState(false);
+  const [filterInReview, setFilterInReview] = useState(false);
   const [filterFailedImport, setFilterFailedImport] = useState(false);
   const [reportedProductIds, setReportedProductIds] = useState<Set<string>>(new Set());
+  const [inReviewProductIds, setInReviewProductIds] = useState<Set<string>>(new Set());
+  const [requeueingProduct, setRequeuingProduct] = useState<string | null>(null);
+  const [requeueResult, setRequeueResult] = useState<Record<string, "ok" | "failed">>({});
+  const [reportDiffs, setReportDiffs] = useState<Record<string, ReportDiff>>({});
+  const [diffLoading, setDiffLoading] = useState<string | null>(null);
+  const [resolvingProduct, setResolvingProduct] = useState<string | null>(null);
+  const [resolveResult, setResolveResult] = useState<Record<string, "ok" | "failed">>({});
+  const [notifyingSubmitter, setNotifyingSubmitter] = useState<string | null>(null);
+  const [submitterNotified, setSubmitterNotified] = useState<Set<string>>(new Set());
   const [approvingProduct, setApprovingProduct] = useState<string | null>(null);
   const [retryingImport, setRetryingImport] = useState<string | null>(null);
   const [retryResult, setRetryResult] = useState<Record<string, "ok" | "failed">>({});
@@ -999,8 +1017,78 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/product-reports");
       if (!res.ok) return;
       const data = await res.json();
-      setReportedProductIds(new Set(data.productIds ?? []));
+      setReportedProductIds(new Set(data.openProductIds ?? []));
+      setInReviewProductIds(new Set(data.inReviewProductIds ?? []));
     } catch { }
+  }
+
+  async function handleRequeueProduct(p: AllProduct) {
+    setRequeuingProduct(p.id);
+    try {
+      const res = await fetch("/api/admin/requeue-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: p.id }),
+      });
+      if (res.ok) {
+        setRequeueResult((prev) => ({ ...prev, [p.id]: "ok" }));
+        setReportedProductIds((prev) => { const n = new Set(prev); n.delete(p.id); return n; });
+        setInReviewProductIds((prev) => new Set([...prev, p.id]));
+      } else {
+        setRequeueResult((prev) => ({ ...prev, [p.id]: "failed" }));
+      }
+    } catch {
+      setRequeueResult((prev) => ({ ...prev, [p.id]: "failed" }));
+    }
+    setRequeuingProduct(null);
+  }
+
+  async function loadReportDiff(productId: string) {
+    setDiffLoading(productId);
+    try {
+      const res = await fetch(`/api/admin/product-report-detail/${productId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setReportDiffs((prev) => ({ ...prev, [productId]: data }));
+      }
+    } catch { }
+    setDiffLoading(null);
+  }
+
+  async function handleResolveReports(productId: string) {
+    setResolvingProduct(productId);
+    try {
+      const res = await fetch("/api/admin/resolve-reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId }),
+      });
+      if (res.ok) {
+        setResolveResult((prev) => ({ ...prev, [productId]: "ok" }));
+        setInReviewProductIds((prev) => { const n = new Set(prev); n.delete(productId); return n; });
+      } else {
+        setResolveResult((prev) => ({ ...prev, [productId]: "failed" }));
+      }
+    } catch {
+      setResolveResult((prev) => ({ ...prev, [productId]: "failed" }));
+    }
+    setResolvingProduct(null);
+  }
+
+  async function handleNotifySubmitter(productId: string) {
+    setNotifyingSubmitter(productId);
+    try {
+      const res = await fetch("/api/admin/notify-submitter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId }),
+      });
+      if (res.ok) {
+        setSubmitterNotified((prev) => new Set([...prev, productId]));
+        setAllProducts((prev) => prev.map((p) => p.id === productId ? { ...p, ingredients_ready: true } : p));
+      }
+    } catch { }
+    setNotifyingSubmitter(null);
   }
 
   async function handleRetryImport(p: AllProduct) {
@@ -1496,6 +1584,7 @@ export default function AdminPage() {
     suspicious: allProducts.filter((p) => hasSuspiciousIngredients(p.ingredient_list)).length,
     pending: allProducts.filter((p) => p.is_pending).length,
     flaggedByUser: allProducts.filter((p) => reportedProductIds.has(p.id)).length,
+    inReview: allProducts.filter((p) => inReviewProductIds.has(p.id)).length,
     failedImport: allProducts.filter((p) => p.source === "failed-import").length,
   };
 
@@ -1523,8 +1612,9 @@ export default function AdminPage() {
     .filter((p) => !filterSuspicious || hasSuspiciousIngredients(p.ingredient_list))
     .filter((p) => !filterPending || p.is_pending)
     .filter((p) => !filterFlaggedByUser || reportedProductIds.has(p.id))
+    .filter((p) => !filterInReview || inReviewProductIds.has(p.id))
     .filter((p) => !filterFailedImport || p.source === "failed-import"),
-  [sortedAllProducts, allSearch, allBrandFilter, filterMissingSource, filterMissingIherb, filterMissingImage, filterMissingType, filterMissingIngredients, filterSuspicious, filterPending, filterFlaggedByUser, filterFailedImport, reportedProductIds, activeTypesSet]);
+  [sortedAllProducts, allSearch, allBrandFilter, filterMissingSource, filterMissingIherb, filterMissingImage, filterMissingType, filterMissingIngredients, filterSuspicious, filterPending, filterFlaggedByUser, filterInReview, filterFailedImport, reportedProductIds, inReviewProductIds, activeTypesSet]);
 
   const filteredAuditLog = useMemo(() => {
     const search = auditSearch.toLowerCase();
@@ -2200,6 +2290,7 @@ export default function AdminPage() {
                 {([
                   ["Pending", filterPending, setFilterPending, allStats.pending],
                   ["Flagged by user", filterFlaggedByUser, setFilterFlaggedByUser, allStats.flaggedByUser],
+                  ["In Review", filterInReview, setFilterInReview, allStats.inReview],
                   ["Failed imports", filterFailedImport, setFilterFailedImport, allStats.failedImport],
                   ["Missing source", filterMissingSource, setFilterMissingSource, allStats.missingSource],
                   ["Missing iHerb", filterMissingIherb, setFilterMissingIherb, allStats.missingIherb],
@@ -2506,6 +2597,56 @@ export default function AdminPage() {
                           {approvingProduct === p.id ? "Approving…" : "Approve & Publish"}
                         </button>
                       )}
+                      {!p.is_pending && p.submitted_by && !p.ingredients_ready && !submitterNotified.has(p.id) && (
+                        <button
+                          type="button"
+                          onClick={() => handleNotifySubmitter(p.id)}
+                          disabled={notifyingSubmitter === p.id}
+                          className="text-xs px-3 py-1.5 bg-teal-600 text-white rounded-lg disabled:opacity-40 hover:bg-teal-700 transition-colors"
+                        >
+                          {notifyingSubmitter === p.id ? "Notifying…" : "Notify submitter"}
+                        </button>
+                      )}
+                      {submitterNotified.has(p.id) && <span className="text-xs text-teal-600">Submitter notified.</span>}
+                      {reportedProductIds.has(p.id) && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleRequeueProduct(p)}
+                            disabled={requeueingProduct === p.id}
+                            className="text-xs px-3 py-1.5 bg-amber-600 text-white rounded-lg disabled:opacity-40 hover:bg-amber-700 transition-colors"
+                          >
+                            {requeueingProduct === p.id ? "Queuing…" : "Re-queue ingredients"}
+                          </button>
+                          {requeueResult[p.id] === "ok" && <span className="text-xs text-teal-600">Queued — run /generate-explanations.</span>}
+                          {requeueResult[p.id] === "failed" && <span className="text-xs text-rose-600">Re-queue failed.</span>}
+                        </>
+                      )}
+                      {inReviewProductIds.has(p.id) && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => !reportDiffs[p.id] && loadReportDiff(p.id)}
+                            disabled={diffLoading === p.id}
+                            className="text-xs px-3 py-1.5 bg-violet-600 text-white rounded-lg disabled:opacity-40 hover:bg-violet-700 transition-colors"
+                          >
+                            {diffLoading === p.id ? "Loading…" : reportDiffs[p.id] ? "Diff loaded ✓" : "Review ingredient changes"}
+                          </button>
+                          {resolveResult[p.id] !== "ok" && (
+                            <button
+                              type="button"
+                              onClick={() => handleResolveReports(p.id)}
+                              disabled={resolvingProduct === p.id || !reportDiffs[p.id]}
+                              className="text-xs px-3 py-1.5 bg-teal-600 text-white rounded-lg disabled:opacity-40 hover:bg-teal-700 transition-colors"
+                              title={!reportDiffs[p.id] ? "Load ingredient changes first" : undefined}
+                            >
+                              {resolvingProduct === p.id ? "Resolving…" : "Mark resolved & notify"}
+                            </button>
+                          )}
+                          {resolveResult[p.id] === "ok" && <span className="text-xs text-teal-600">Resolved — reporter notified.</span>}
+                          {resolveResult[p.id] === "failed" && <span className="text-xs text-rose-600">Resolve failed.</span>}
+                        </>
+                      )}
                       {isFailedImport && (
                         <button
                           type="button"
@@ -2536,6 +2677,52 @@ export default function AdminPage() {
                         {archivingProduct === p.id ? "Archiving…" : "Archive"}
                       </button>
                     </div>
+
+                    {/* Ingredient diff panel — shown when in review and diff is loaded */}
+                    {inReviewProductIds.has(p.id) && reportDiffs[p.id] && (() => {
+                      const diff = reportDiffs[p.id];
+                      const allNames = new Set([
+                        ...Object.keys(diff.snapshot ?? {}),
+                        ...Object.keys(diff.current),
+                      ]);
+                      const changed = [...allNames].filter((name) => {
+                        const before = diff.snapshot?.[name]?.explanation ?? null;
+                        const after = diff.current[name]?.explanation ?? null;
+                        return before !== after;
+                      });
+                      const unchanged = [...allNames].filter((name) => !changed.includes(name));
+                      return (
+                        <div className="mt-3 border border-violet-100 rounded-xl bg-violet-50/40 p-3 space-y-3">
+                          <p className="text-xs font-semibold text-violet-700">
+                            Ingredient changes — {changed.length} updated, {unchanged.length} unchanged
+                          </p>
+                          {changed.length === 0 && (
+                            <p className="text-xs text-gray-400">No explanation changes detected yet. Run /generate-explanations first.</p>
+                          )}
+                          <div className="space-y-3">
+                            {changed.map((name) => {
+                              const before = diff.snapshot?.[name]?.explanation ?? null;
+                              const after = diff.current[name]?.explanation ?? null;
+                              return (
+                                <div key={name} className="space-y-1">
+                                  <p className="text-xs font-medium text-gray-700">{name}</p>
+                                  {before && (
+                                    <div className="text-[11px] text-gray-500 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5 line-through decoration-rose-300">
+                                      {before}
+                                    </div>
+                                  )}
+                                  {after && (
+                                    <div className="text-[11px] text-gray-700 bg-teal-50 border border-teal-100 rounded-lg px-2 py-1.5">
+                                      {after}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}

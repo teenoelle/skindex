@@ -17,20 +17,26 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("product_reports")
-    .select("product_id, note, created_at")
+    .select("product_id, status, note, created_at")
+    .in("status", ["open", "in_review"])
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Return unique product_ids and full report details grouped by product
-  const byProduct = new Map<string, { note: string | null; created_at: string }[]>();
+  const openIds = new Set<string>();
+  const inReviewIds = new Set<string>();
+  const byProduct = new Map<string, { note: string | null; created_at: string; status: string }[]>();
+
   for (const row of data ?? []) {
+    if (row.status === "open") openIds.add(row.product_id);
+    if (row.status === "in_review") inReviewIds.add(row.product_id);
     if (!byProduct.has(row.product_id)) byProduct.set(row.product_id, []);
-    byProduct.get(row.product_id)!.push({ note: row.note, created_at: row.created_at });
+    byProduct.get(row.product_id)!.push({ note: row.note, created_at: row.created_at, status: row.status });
   }
 
   return NextResponse.json({
-    productIds: [...byProduct.keys()],
+    openProductIds: [...openIds],
+    inReviewProductIds: [...inReviewIds],
     reports: Object.fromEntries(byProduct),
   });
 }

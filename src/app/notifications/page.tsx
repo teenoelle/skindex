@@ -9,7 +9,7 @@ type Submission = {
   id: string;
   productName: string;
   productBrand: string | null;
-  status: "pending" | "approved";
+  status: "pending" | "processing" | "approved";
   submittedAt: string | null;
   productPath: string | null;
 };
@@ -27,6 +27,16 @@ type Flag = {
   productName: string | null;
 };
 
+type ProductUpdate = {
+  type: "product_updated";
+  id: string;
+  productId: string;
+  productName: string | null;
+  productBrand: string | null;
+  productPath: string | null;
+  createdAt: string;
+};
+
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const days = Math.floor(diff / 86400000);
@@ -41,6 +51,7 @@ export default function NotificationsPage() {
   const { isSignedIn, isLoaded } = useUser();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [flags, setFlags] = useState<Flag[]>([]);
+  const [productUpdates, setProductUpdates] = useState<ProductUpdate[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,6 +61,7 @@ export default function NotificationsPage() {
       .then((d) => {
         setSubmissions(d.submissions ?? []);
         setFlags(d.flags ?? []);
+        setProductUpdates(d.productUpdates ?? []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -65,7 +77,7 @@ export default function NotificationsPage() {
     );
   }
 
-  const isEmpty = !loading && submissions.length === 0 && flags.length === 0;
+  const isEmpty = !loading && submissions.length === 0 && flags.length === 0 && productUpdates.length === 0;
 
   return (
     <main className="max-w-lg mx-auto px-6 pt-24 pb-16">
@@ -75,6 +87,39 @@ export default function NotificationsPage() {
 
       {isEmpty && (
         <p className="text-sm text-gray-400">No activity yet — submit a product or flag an ingredient explanation to see updates here.</p>
+      )}
+
+      {/* Product updates (flagged products reviewed by admin) */}
+      {productUpdates.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Products you flagged</h2>
+          <div className="space-y-2">
+            {productUpdates.map((n) => (
+              <div key={n.id} className="py-3 border-b border-gray-100 last:border-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{n.productName ?? "Product"}</p>
+                    {n.productBrand && <p className="text-xs text-gray-400">{n.productBrand}</p>}
+                    <p className="text-xs text-gray-400 mt-0.5">{relativeTime(n.createdAt)}</p>
+                  </div>
+                  <span className="text-xs text-teal-700 bg-teal-50 border border-teal-100 rounded-full px-2.5 py-1 shrink-0">
+                    Updated
+                  </span>
+                </div>
+                {n.productPath && (
+                  <div className="mt-2">
+                    <Link
+                      href={n.productPath}
+                      className="text-xs text-indigo-600 hover:underline"
+                    >
+                      See updated ingredient information ↗
+                    </Link>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Submissions */}
@@ -93,6 +138,11 @@ export default function NotificationsPage() {
                   {s.status === "pending" && (
                     <span className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-full px-2.5 py-1">
                       Pending review
+                    </span>
+                  )}
+                  {s.status === "processing" && (
+                    <span className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-1">
+                      Processing ingredients
                     </span>
                   )}
                   {s.status === "approved" && s.productPath && (

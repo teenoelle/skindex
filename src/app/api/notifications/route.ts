@@ -15,10 +15,10 @@ export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [submissionsRes, flagsRes] = await Promise.all([
+  const [submissionsRes, flagsRes, productNotifsRes] = await Promise.all([
     supabaseAdmin
       .from("products")
-      .select("id, name, brand, is_pending, submitted_at, reviewed_at")
+      .select("id, name, brand, is_pending, ingredients_ready, submitted_at, reviewed_at")
       .eq("submitted_by", userId)
       .eq("is_archived", false)
       .order("submitted_at", { ascending: false })
@@ -30,17 +30,31 @@ export async function GET() {
       .eq("flagged_by_user_id", userId)
       .order("created_at", { ascending: false })
       .limit(50),
+
+    supabaseAdmin
+      .from("product_notifications")
+      .select("id, product_id, type, created_at, products(id, name, brand)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50),
   ]);
 
-  const submissions = (submissionsRes.data ?? []).map((p) => ({
-    type: "submission" as const,
-    id: p.id,
-    productName: p.name,
-    productBrand: p.brand ?? null,
-    status: p.is_pending ? "pending" : "approved",
-    submittedAt: p.submitted_at,
-    productPath: !p.is_pending ? productPath(p.name, p.brand, p.id) : null,
-  }));
+  const submissions = (submissionsRes.data ?? []).map((p) => {
+    const status = p.is_pending
+      ? "pending"
+      : p.ingredients_ready
+        ? "approved"
+        : "processing";
+    return {
+      type: "submission" as const,
+      id: p.id,
+      productName: p.name,
+      productBrand: p.brand ?? null,
+      status,
+      submittedAt: p.submitted_at,
+      productPath: status === "approved" ? productPath(p.name, p.brand, p.id) : null,
+    };
+  });
 
   type FlagRow = {
     id: string;
@@ -74,11 +88,32 @@ export async function GET() {
     };
   });
 
+  type PNRow = {
+    id: string;
+    product_id: string;
+    type: string;
+    created_at: string;
+    products: { id: string; name: string; brand: string | null } | null;
+  };
+
+  const productUpdates = ((productNotifsRes.data ?? []) as unknown as PNRow[]).map((n) => ({
+    type: "product_updated" as const,
+    id: n.id,
+    productId: n.product_id,
+    productName: n.products?.name ?? null,
+    productBrand: n.products?.brand ?? null,
+    productPath: n.products
+      ? productPath(n.products.name, n.products.brand, n.products.id)
+      : null,
+    createdAt: n.created_at,
+  }));
+
   // Badge count: resolved items from the last 30 days
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const newCount =
     submissions.filter((s) => s.status === "approved" && s.submittedAt && s.submittedAt > cutoff).length +
-    flags.filter((f) => f.status !== "pending" && f.reviewedAt && f.reviewedAt > cutoff).length;
+    flags.filter((f) => f.status !== "pending" && f.reviewedAt && f.reviewedAt > cutoff).length +
+    productUpdates.filter((n) => n.createdAt > cutoff).length;
 
-  return NextResponse.json({ submissions, flags, newCount });
+  return NextResponse.json({ submissions, flags, productUpdates, newCount });
 }
