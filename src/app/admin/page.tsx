@@ -300,9 +300,29 @@ function hasSuspiciousIngredients(ingredientList: string | null): boolean {
   return splitIngredientList(ingredientList).some((item) => isJunkIngredient(item));
 }
 
-function SortableIngredientChip({ id, item, onRemove }: { id: string; item: string; onRemove: () => void }) {
+function SortableIngredientChip({ id, item, onRemove, onRename }: { id: string; item: string; onRemove: () => void; onRename: (v: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const junk = isJunkIngredient(item);
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(item);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function startEdit() {
+    setEditValue(item);
+    setEditing(true);
+    setTimeout(() => inputRef.current?.select(), 0);
+  }
+
+  function confirmEdit() {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== item) onRename(trimmed);
+    setEditing(false);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+  }
+
   return (
     <span
       ref={setNodeRef}
@@ -312,15 +332,36 @@ function SortableIngredientChip({ id, item, onRemove }: { id: string; item: stri
         junk ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-gray-50 border-gray-200 text-gray-700"
       }`}
     >
-      <span
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 leading-none select-none"
-        aria-label="Drag to reorder"
-      >
-        ⠿
-      </span>
-      {item.length > 40 ? item.slice(0, 40) + "…" : item}
+      {!editing && (
+        <span
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 leading-none select-none"
+          aria-label="Drag to reorder"
+        >
+          ⠿
+        </span>
+      )}
+      {editing ? (
+        <input
+          ref={inputRef}
+          autoFocus
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); confirmEdit(); }
+            if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
+          }}
+          onBlur={confirmEdit}
+          className="text-xs bg-transparent border-b border-indigo-400 outline-none"
+          style={{ width: `${Math.max(editValue.length, 6)}ch` }}
+        />
+      ) : (
+        <span onDoubleClick={startEdit} className="cursor-text select-none">
+          {item.length > 40 ? item.slice(0, 40) + "…" : item}
+        </span>
+      )}
       <button
         type="button"
         onClick={onRemove}
@@ -336,6 +377,7 @@ function IngredientChipEditor({ value, onChange }: { value: string; onChange: (v
   const items = splitIngredientList(value);
   const ids = items.map((item, i) => `${i}::${item}`);
   const [addInput, setAddInput] = useState("");
+  const [replaceError, setReplaceError] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -355,11 +397,28 @@ function IngredientChipEditor({ value, onChange }: { value: string; onChange: (v
     onChange(items.filter((_, i) => i !== idx).join(", "));
   }
 
+  function renameItem(idx: number, newName: string) {
+    const updated = [...items];
+    updated[idx] = newName;
+    onChange(updated.join(", "));
+  }
+
   function addItem() {
     const trimmed = addInput.trim();
     if (!trimmed) return;
     onChange([...items, trimmed].join(", "));
     setAddInput("");
+  }
+
+  async function replaceFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      const normalized = splitIngredientList(text).join(", ");
+      if (normalized) onChange(normalized);
+    } catch {
+      setReplaceError(true);
+      setTimeout(() => setReplaceError(false), 2000);
+    }
   }
 
   return (
@@ -368,7 +427,7 @@ function IngredientChipEditor({ value, onChange }: { value: string; onChange: (v
         <SortableContext items={ids} strategy={rectSortingStrategy}>
           <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-1">
             {items.map((item, i) => (
-              <SortableIngredientChip key={ids[i]} id={ids[i]} item={item} onRemove={() => removeItem(i)} />
+              <SortableIngredientChip key={ids[i]} id={ids[i]} item={item} onRemove={() => removeItem(i)} onRename={(v) => renameItem(i, v)} />
             ))}
             {items.length === 0 && <span className="text-xs text-gray-400 italic">No ingredients</span>}
           </div>
@@ -390,6 +449,14 @@ function IngredientChipEditor({ value, onChange }: { value: string; onChange: (v
           className="text-xs px-2.5 py-1 border border-gray-200 rounded-lg text-gray-500 hover:border-gray-400 disabled:opacity-40"
         >
           Add
+        </button>
+        <button
+          type="button"
+          onClick={replaceFromClipboard}
+          title="Replace all ingredients with clipboard contents"
+          className={`text-xs px-2.5 py-1 border rounded-lg ${replaceError ? "border-rose-300 text-rose-500" : "border-gray-200 text-gray-500 hover:border-indigo-400 hover:text-indigo-600"}`}
+        >
+          {replaceError ? "No clipboard access" : "Replace from clipboard"}
         </button>
       </div>
     </div>
