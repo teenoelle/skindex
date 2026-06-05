@@ -3723,7 +3723,7 @@ export default function AdminPage() {
                                   onClick={(e) => { e.stopPropagation(); setAuditAdminFilter(entry.admin_clerk_id); setAuditAdminFilterEmail(entry.admin_email); }}
                                   className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-semibold flex items-center justify-center shrink-0 mt-0.5 hover:bg-indigo-200 transition-colors"
                                 >
-                                  {adminInitials({ email: entry.admin_email, name: entry.admin_name })}
+                                  {userInitials({ email: entry.admin_email, name: entry.admin_name })}
                                 </button>
                                 <span className={`text-sm ${actionColor(entry.action)} flex-1 min-w-0`}>
                                   {describeAction(entry)}
