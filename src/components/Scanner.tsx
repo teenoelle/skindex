@@ -1128,7 +1128,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [browseNoUniversal, setBrowseNoUniversal] = useState(false);
   const [browseCleanOnly, setBrowseCleanOnly] = useState(false);
   const [listModes, setListModes] = useState<Record<string, "include" | "exclude" | "off">>({});
-  const [listsPanelOpen, setListsPanelOpen] = useState(false);
+  const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
   const [ingredientLists, setIngredientLists] = useState<IngredientList[]>([]);
   const [addToListMenu, setAddToListMenu] = useState<string | null>(null);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
@@ -3441,67 +3441,75 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 const activeFilterCount = (browseSearch.trim() ? 1 : 0) + (browsePhotosafe ? 1 : 0) + (browseProfileLinked ? 1 : 0) + (browseNoUniversal ? 1 : 0) + (browseCleanOnly ? 1 : 0) + activeListCount;
                 return (
                   <>
-                    <input
-                      type="text"
-                      value={browseSearch}
-                      onChange={(e) => setBrowseSearch(e.target.value)}
-                      placeholder={`Search ${browseSelectedType ?? "products"}…`}
-                      className="w-full text-sm border border-gray-200 rounded-xl px-3 py-1.5 mb-3 focus:outline-none focus:border-gray-400"
-                    />
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      <button type="button" onClick={() => setBrowseNoUniversal(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseNoUniversal ? "bg-rose-600 text-white border-rose-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>✗ Universal Concerns</button>
-                      {profileCats.length > 0 && (
-                        <button type="button" onClick={() => setBrowseProfileLinked(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseProfileLinked ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>✗ My Sensitivities</button>
-                      )}
-                      <button type="button" onClick={() => setBrowseCleanOnly(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseCleanOnly ? "bg-green-700 text-white border-green-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>✓ Neutral &amp; Beneficial</button>
-                      <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Sun-safe</button>
-                      {ingredientLists.length > 0 && (
-                        <div className="relative">
-                          {listsPanelOpen && (
-                            <div className="fixed inset-0 z-40" onClick={() => setListsPanelOpen(false)} />
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setListsPanelOpen(v => !v)}
-                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeListCount > 0 ? "bg-violet-600 text-white border-violet-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}
-                          >
-                            My Lists{activeListCount > 0 ? ` (${activeListCount})` : ""}
-                          </button>
-                          {listsPanelOpen && (
-                            <div className="absolute left-0 top-7 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-3 min-w-[240px] space-y-2">
-                              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest pb-1">Filter by ingredient list</p>
-                              {ingredientLists.map(l => {
-                                const mode = listModes[l.id] ?? "off";
-                                return (
-                                  <div key={l.id} className="flex items-center gap-2">
-                                    <span className="text-xs text-gray-700 flex-1 truncate min-w-0">{l.name}</span>
-                                    <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0 text-[10px]">
-                                      <button
-                                        type="button"
-                                        onClick={() => setListModes(prev => ({ ...prev, [l.id]: "exclude" }))}
-                                        className={`px-1.5 py-0.5 transition-colors ${mode === "exclude" ? "bg-rose-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
-                                      >✗ Excl</button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setListModes(prev => ({ ...prev, [l.id]: "off" }))}
-                                        className={`px-1.5 py-0.5 border-x border-gray-200 transition-colors ${mode === "off" ? "bg-gray-100 text-gray-600" : "text-gray-400 hover:bg-gray-50"}`}
-                                      >Off</button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setListModes(prev => ({ ...prev, [l.id]: "include" }))}
-                                        className={`px-1.5 py-0.5 transition-colors ${mode === "include" ? "bg-teal-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
-                                      >✓ Incl</button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        type="text"
+                        value={browseSearch}
+                        onChange={(e) => setBrowseSearch(e.target.value)}
+                        placeholder={`Search ${browseSelectedType ?? "products"}…`}
+                        className="flex-1 min-w-0 text-sm border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:border-gray-400"
+                      />
                       {activeFilterCount > 0 && filtered.length !== browseProducts.length && (
-                        <span className="text-xs text-gray-400 self-center">{filtered.length} of {browseProducts.length}</span>
+                        <span className="text-xs text-gray-400 shrink-0 tabular-nums">{filtered.length}/{browseProducts.length}</span>
                       )}
+                      <div className="relative shrink-0">
+                        {filtersPanelOpen && (
+                          <div className="fixed inset-0 z-40" onClick={() => setFiltersPanelOpen(false)} />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setFiltersPanelOpen(v => !v)}
+                          title="Filters"
+                          className={`relative flex items-center justify-center w-8 h-[30px] rounded-xl border transition-colors ${activeFilterCount > 0 ? "bg-gray-900 text-white border-gray-900" : "text-gray-400 border-gray-200 hover:border-gray-400 hover:text-gray-600"}`}
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5v-2z"/></svg>
+                          {activeFilterCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 text-[9px] leading-none bg-rose-500 text-white rounded-full w-4 h-4 flex items-center justify-center font-bold">{activeFilterCount}</span>
+                          )}
+                        </button>
+                        {filtersPanelOpen && (
+                          <div className="absolute right-0 top-10 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-64 space-y-1">
+                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest pb-1">Exclude from results</p>
+                            <button type="button" onClick={() => setBrowseNoUniversal(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${browseNoUniversal ? "bg-rose-50 text-rose-700" : "text-gray-600 hover:bg-gray-50"}`}>
+                              <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${browseNoUniversal ? "bg-rose-600 border-rose-600 text-white" : "border-gray-300"}`}>{browseNoUniversal ? "✓" : ""}</span>
+                              Universal Concerns
+                            </button>
+                            {profileCats.length > 0 && (
+                              <button type="button" onClick={() => setBrowseProfileLinked(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${browseProfileLinked ? "bg-amber-50 text-amber-700" : "text-gray-600 hover:bg-gray-50"}`}>
+                                <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${browseProfileLinked ? "bg-amber-600 border-amber-600 text-white" : "border-gray-300"}`}>{browseProfileLinked ? "✓" : ""}</span>
+                                My Sensitivities
+                              </button>
+                            )}
+                            <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${browsePhotosafe ? "bg-yellow-50 text-yellow-700" : "text-gray-600 hover:bg-gray-50"}`}>
+                              <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${browsePhotosafe ? "bg-yellow-500 border-yellow-500 text-white" : "border-gray-300"}`}>{browsePhotosafe ? "✓" : ""}</span>
+                              Sun-safe only
+                            </button>
+                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest pb-1 pt-2">Show only</p>
+                            <button type="button" onClick={() => setBrowseCleanOnly(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${browseCleanOnly ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50"}`}>
+                              <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${browseCleanOnly ? "bg-green-700 border-green-700 text-white" : "border-gray-300"}`}>{browseCleanOnly ? "✓" : ""}</span>
+                              Neutral &amp; Beneficial
+                            </button>
+                            {ingredientLists.length > 0 && (
+                              <div className="border-t border-gray-100 pt-2 mt-1 space-y-2">
+                                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest pb-1">My Ingredient Lists</p>
+                                {ingredientLists.map(l => {
+                                  const mode = listModes[l.id] ?? "off";
+                                  return (
+                                    <div key={l.id} className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-700 flex-1 truncate min-w-0">{l.name}</span>
+                                      <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0 text-[10px]">
+                                        <button type="button" onClick={() => setListModes(prev => ({ ...prev, [l.id]: "exclude" }))} className={`px-1.5 py-0.5 transition-colors ${mode === "exclude" ? "bg-rose-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>✗ Excl</button>
+                                        <button type="button" onClick={() => setListModes(prev => ({ ...prev, [l.id]: "off" }))} className={`px-1.5 py-0.5 border-x border-gray-200 transition-colors ${mode === "off" ? "bg-gray-100 text-gray-600" : "text-gray-400 hover:bg-gray-50"}`}>Off</button>
+                                        <button type="button" onClick={() => setListModes(prev => ({ ...prev, [l.id]: "include" }))} className={`px-1.5 py-0.5 transition-colors ${mode === "include" ? "bg-teal-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>✓ Incl</button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {filtered.length === 0 && (
                       <p className="text-sm text-gray-400 text-center py-6">No products match your active filters.</p>
