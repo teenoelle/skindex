@@ -57,6 +57,7 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
+    fetch("/api/notifications/seen", { method: "PATCH" }).catch(() => {});
     fetch("/api/notifications")
       .then((r) => r.json())
       .then((d) => {

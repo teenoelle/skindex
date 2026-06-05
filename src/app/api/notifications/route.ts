@@ -15,7 +15,7 @@ export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [submissionsRes, flagsRes, productNotifsRes] = await Promise.all([
+  const [submissionsRes, flagsRes, productNotifsRes, userPrefRes] = await Promise.all([
     supabaseAdmin
       .from("products")
       .select("id, name, brand, is_pending, ingredients_ready, submitted_at, reviewed_at")
@@ -37,6 +37,12 @@ export async function GET() {
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(50),
+
+    supabaseAdmin
+      .from("app_users")
+      .select("notifications_last_seen_at")
+      .eq("clerk_id", userId)
+      .maybeSingle(),
   ]);
 
   const submissions = (submissionsRes.data ?? []).map((p) => {
@@ -108,12 +114,14 @@ export async function GET() {
     createdAt: n.created_at,
   }));
 
-  // Badge count: resolved items from the last 30 days
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  // Badge count: items that arrived after the user last viewed their activity
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const lastSeen = userPrefRes.data?.notifications_last_seen_at ?? null;
+  const seenCutoff = lastSeen ?? thirtyDaysAgo;
   const newCount =
-    submissions.filter((s) => s.status === "approved" && s.submittedAt && s.submittedAt > cutoff).length +
-    flags.filter((f) => f.status !== "pending" && f.reviewedAt && f.reviewedAt > cutoff).length +
-    productUpdates.filter((n) => n.createdAt > cutoff).length;
+    submissions.filter((s) => s.status === "approved" && s.submittedAt && s.submittedAt > seenCutoff).length +
+    flags.filter((f) => f.status !== "pending" && f.reviewedAt && f.reviewedAt > seenCutoff).length +
+    productUpdates.filter((n) => n.createdAt > seenCutoff).length;
 
   return NextResponse.json({ submissions, flags, productUpdates, newCount });
 }

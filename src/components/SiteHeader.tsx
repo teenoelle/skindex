@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
@@ -14,6 +14,7 @@ export default function SiteHeader() {
   const [recentCount, setRecentCount] = useState(0);
   const [notifCount, setNotifCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const prevPathnameRef = useRef(pathname);
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -34,6 +35,19 @@ export default function SiteHeader() {
       })
       .catch(() => {});
   }, [isSignedIn]);
+
+  useEffect(() => {
+    const prev = prevPathnameRef.current;
+    prevPathnameRef.current = pathname;
+    if (pathname === "/notifications") {
+      setNotifCount(0);
+    } else if (prev === "/notifications" && isSignedIn) {
+      fetch("/api/notifications")
+        .then((r) => r.json())
+        .then((n) => setNotifCount(n.newCount ?? 0))
+        .catch(() => {});
+    }
+  }, [pathname, isSignedIn]);
 
   function handleLogoClick() {
     window.dispatchEvent(new CustomEvent("skindex:reset"));
@@ -89,7 +103,7 @@ export default function SiteHeader() {
                 >
                   Activity
                   {notifCount > 0 && (
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-[#ac83b4] shrink-0" />
                   )}
                 </Link>
                 <Link
@@ -135,7 +149,7 @@ export default function SiteHeader() {
                   >
                     Activity
                     {notifCount > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-[#ac83b4] shrink-0" />
                     )}
                   </Link>
                   <Link
