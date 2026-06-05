@@ -16,7 +16,6 @@ type UserList = {
 type IngredientList = {
   id: string;
   name: string;
-  type?: "avoid" | "want";
   items: string[];
 };
 
@@ -243,7 +242,7 @@ export default function ListsPage() {
                   fetch("/api/user-ingredient-lists", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name: l.name, type: l.type, items: l.items }),
+                    body: JSON.stringify({ name: l.name, items: l.items }),
                   }).then((r) => r.json()).then((j) => j.list as IngredientList)
                 )
               );
@@ -686,11 +685,6 @@ export default function ListsPage() {
                     <div key={list.id} className="border border-gray-200 rounded-xl p-3 space-y-2">
                       {/* List header */}
                       <div className="flex items-center gap-2 min-w-0">
-                        {list.type && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${list.type === "avoid" ? "bg-rose-50 text-rose-700" : "bg-teal-50 text-teal-700"}`}>
-                            {list.type === "avoid" ? "Avoid" : "Want"}
-                          </span>
-                        )}
                         {editingListId === list.id ? (
                           <form
                             onSubmit={(e) => { e.preventDefault(); saveEditListName(list); }}

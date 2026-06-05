@@ -245,7 +245,7 @@ type UserList = { id: string; name: string; is_public: boolean; itemCount: numbe
 
 type BrowseType = { name: string; count: number };
 type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; ingredient_list: string | null; flaggedCount: number; sensoryCount: number; photoCount: number; universalConcernCount?: number; profileFlaggedCount?: number; profileSensoryCount?: number };
-type IngredientList = { id: string; name: string; type?: "avoid" | "want"; items: string[] };
+type IngredientList = { id: string; name: string; items: string[] };
 
 const CATEGORY_LABELS: Record<string, string> = {
   // kebab-case (newer workflow)
@@ -1128,6 +1128,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [browseNoUniversal, setBrowseNoUniversal] = useState(false);
   const [browseCleanOnly, setBrowseCleanOnly] = useState(false);
   const [listModes, setListModes] = useState<Record<string, "include" | "exclude" | "off">>({});
+  const [listsPanelOpen, setListsPanelOpen] = useState(false);
   const [ingredientLists, setIngredientLists] = useState<IngredientList[]>([]);
   const [addToListMenu, setAddToListMenu] = useState<string | null>(null);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
@@ -1312,7 +1313,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   fetch("/api/user-ingredient-lists", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name: l.name, type: l.type, items: l.items }),
+                    body: JSON.stringify({ name: l.name, items: l.items }),
                   }).then((r) => r.json()).then((j) => j.list as IngredientList)
                 )
               );
@@ -3420,9 +3421,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               {/* Browse search + filter chips */}
               {!browseLoading && browseProducts.length > 0 && (() => {
                 const ingText = (p: BrowseProduct) => (p.ingredient_list ?? "").toLowerCase();
-                const avoidLists = ingredientLists.filter(l => (l.type === "avoid" || listModes[l.id] === "exclude") && l.items.length > 0);
-                const wantLists = ingredientLists.filter(l => (l.type === "want" || listModes[l.id] === "include") && l.items.length > 0);
-                const newLists = ingredientLists.filter(l => !l.type && l.items.length > 0);
+                const excludeLists = ingredientLists.filter(l => listModes[l.id] === "exclude" && l.items.length > 0);
+                const includeLists = ingredientLists.filter(l => listModes[l.id] === "include" && l.items.length > 0);
                 const profileCats = profileMatchedCategories(activeSkinTypes, activeClimates);
                 const searchCandidates = browseSearch.trim()
                   ? tokenFuzzyFilter(browseProducts, browseSearch, ["name", "brand"])
@@ -3433,12 +3433,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   if (browseNoUniversal && (p.universalConcernCount ?? 0) > 0) return false;
                   if (browseCleanOnly && (p.flaggedCount > 0 || p.sensoryCount > 0)) return false;
                   const txt = ingText(p);
-                  if (avoidLists.some(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
-                  if (wantLists.length > 0 && !wantLists.every(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
+                  if (excludeLists.some(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
+                  if (includeLists.length > 0 && !includeLists.every(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
                   return true;
                 });
-                const activeModes = newLists.filter(l => listModes[l.id] && listModes[l.id] !== "off").length;
-                const activeFilterCount = (browseSearch.trim() ? 1 : 0) + (browsePhotosafe ? 1 : 0) + (browseProfileLinked ? 1 : 0) + (browseNoUniversal ? 1 : 0) + (browseCleanOnly ? 1 : 0) + avoidLists.filter(l => l.type === "avoid").length + wantLists.filter(l => l.type === "want").length + activeModes;
+                const activeListCount = ingredientLists.filter(l => listModes[l.id] && listModes[l.id] !== "off").length;
+                const activeFilterCount = (browseSearch.trim() ? 1 : 0) + (browsePhotosafe ? 1 : 0) + (browseProfileLinked ? 1 : 0) + (browseNoUniversal ? 1 : 0) + (browseCleanOnly ? 1 : 0) + activeListCount;
                 return (
                   <>
                     <input
@@ -3455,30 +3455,50 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       )}
                       <button type="button" onClick={() => setBrowseCleanOnly(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browseCleanOnly ? "bg-green-700 text-white border-green-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>✓ Neutral &amp; Beneficial</button>
                       <button type="button" onClick={() => setBrowsePhotosafe(v => !v)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${browsePhotosafe ? "bg-yellow-600 text-white border-yellow-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>Sun-safe</button>
-                      {avoidLists.filter(l => l.type === "avoid").map(l => (
-                        <span key={l.id} className="text-xs px-2 py-0.5 rounded-full border bg-rose-50 text-rose-700 border-rose-200">✗ {l.name}</span>
-                      ))}
-                      {wantLists.filter(l => l.type === "want").map(l => (
-                        <span key={l.id} className="text-xs px-2 py-0.5 rounded-full border bg-teal-50 text-teal-700 border-teal-100">✓ {l.name}</span>
-                      ))}
-                      {newLists.map(l => {
-                        const mode = listModes[l.id] ?? "off";
-                        return (
+                      {ingredientLists.length > 0 && (
+                        <div className="relative">
+                          {listsPanelOpen && (
+                            <div className="fixed inset-0 z-40" onClick={() => setListsPanelOpen(false)} />
+                          )}
                           <button
-                            key={l.id}
                             type="button"
-                            onClick={() => setListModes(prev => ({ ...prev, [l.id]: mode === "off" ? "include" : mode === "include" ? "exclude" : "off" }))}
-                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                              mode === "include" ? "bg-teal-50 text-teal-700 border-teal-100" :
-                              mode === "exclude" ? "bg-rose-50 text-rose-700 border-rose-200" :
-                              "text-gray-500 border-gray-200 hover:border-gray-400"
-                            }`}
-                            title={`Click to cycle: off → include → exclude`}
+                            onClick={() => setListsPanelOpen(v => !v)}
+                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeListCount > 0 ? "bg-violet-600 text-white border-violet-600" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}
                           >
-                            {mode === "include" ? "✓" : mode === "exclude" ? "✗" : "○"} {l.name}
+                            My Lists{activeListCount > 0 ? ` (${activeListCount})` : ""}
                           </button>
-                        );
-                      })}
+                          {listsPanelOpen && (
+                            <div className="absolute left-0 top-7 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-3 min-w-[240px] space-y-2">
+                              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest pb-1">Filter by ingredient list</p>
+                              {ingredientLists.map(l => {
+                                const mode = listModes[l.id] ?? "off";
+                                return (
+                                  <div key={l.id} className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-700 flex-1 truncate min-w-0">{l.name}</span>
+                                    <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0 text-[10px]">
+                                      <button
+                                        type="button"
+                                        onClick={() => setListModes(prev => ({ ...prev, [l.id]: "exclude" }))}
+                                        className={`px-1.5 py-0.5 transition-colors ${mode === "exclude" ? "bg-rose-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+                                      >✗ Excl</button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setListModes(prev => ({ ...prev, [l.id]: "off" }))}
+                                        className={`px-1.5 py-0.5 border-x border-gray-200 transition-colors ${mode === "off" ? "bg-gray-100 text-gray-600" : "text-gray-400 hover:bg-gray-50"}`}
+                                      >Off</button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setListModes(prev => ({ ...prev, [l.id]: "include" }))}
+                                        className={`px-1.5 py-0.5 transition-colors ${mode === "include" ? "bg-teal-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+                                      >✓ Incl</button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {activeFilterCount > 0 && filtered.length !== browseProducts.length && (
                         <span className="text-xs text-gray-400 self-center">{filtered.length} of {browseProducts.length}</span>
                       )}
@@ -4322,18 +4342,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           })()}
 
           {/* Bulk add flagged to list */}
-          {result.flagged.length > 0 && ingredientLists.filter(l => l.type === "avoid").length > 0 && (
+          {result.flagged.length > 0 && ingredientLists.length > 0 && (
             <div>
               {!bulkAddOpen ? (
                 <button type="button" className="text-xs text-gray-400 hover:text-rose-700 hover:underline underline-offset-2"
                   onClick={() => setBulkAddOpen(true)}>
-                  Save {result.flagged.length} flagged to avoid list →
+                  Save {result.flagged.length} flagged to a list →
                 </button>
               ) : (
                 <div className="text-xs border border-rose-100 rounded-xl p-2.5 bg-rose-50/50 space-y-2">
                   <p className="text-rose-700 font-medium">Save {result.flagged.length} flagged ingredients to:</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {ingredientLists.filter(l => l.type === "avoid").map(lst => (
+                    {ingredientLists.map(lst => (
                       <button key={lst.id} type="button"
                         className={`text-xs px-2 py-1 rounded-lg border transition-colors ${bulkAddListId === lst.id ? "bg-rose-600 text-white border-rose-600" : "bg-white border-rose-200 text-rose-700 hover:border-rose-400"}`}
                         onClick={() => setBulkAddListId(bulkAddListId === lst.id ? null : lst.id)}>
@@ -4705,7 +4725,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                     (s) => normalizeForMatch(s.rawName) === normalizeForMatch(item)
                   ) ?? null;
                   const itemNorm = normalizeForMatch(item);
-                  const onAvoidList = ingredientLists.some(l => l.type === "avoid" && l.items.some(av => itemNorm.includes(av)));
+                  const onAvoidList = ingredientLists.some(l => listModes[l.id] === "exclude" && l.items.some(av => itemNorm.includes(av)));
                   const concernLevel = getIngredientConcernLevel(match, sensoryItem, photoItem, activeSkinTypes, activeClimates, isRinseOff);
                   const colorClass =
                     concernLevel === "skip"            ? "text-gray-400"
@@ -5024,7 +5044,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                               setAddToListMenu(null);
                             }}
                           >
-                            <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${lst.type === "avoid" ? "bg-rose-400" : "bg-teal-500"}`} />
+                            <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0 bg-gray-300" />
                             <span className="flex-1 truncate">{lst.name}</span>
                             {already && <span className="text-teal-600 shrink-0">✓</span>}
                           </button>

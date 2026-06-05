@@ -22,13 +22,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.name !== undefined) updates.name = body.name;
   if (body.items !== undefined) updates.items = body.items;
-  if ("type" in body) updates.type = body.type;
 
   const { data, error } = await supabaseAdmin
     .from("user_ingredient_lists")
     .update(updates)
     .eq("id", id)
-    .select("id, name, type, items")
+    .select("id, name, items")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
