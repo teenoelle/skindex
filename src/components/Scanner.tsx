@@ -566,7 +566,9 @@ function toTitleCase(str: string): string {
 // Broader set used for the "By concern" grouped view — concerns that apply regardless of skin profile
 const CONCERN_UNIVERSAL_CATEGORIES = new Set([
   "fragrance-allergen",
+  "Fragrance",           // legacy Title-case alias
   "preservative-allergen",
+  "Preservative",        // legacy Title-case alias
   "formaldehyde releaser",
   "sensitizing preservative",
   "biocide",
@@ -675,7 +677,20 @@ function isFcProfileMatch(fc: string, activeSkinTypes: Set<SkinType>, activeClim
     (fc === "iodine-heavy" && activeClimates.has("thyroid_condition")) ||
     ((fc === "sensitizer" || fc === "fragrance-allergen") && activeClimates.has("smoking")) ||
     (fc === "vasodilator" && (activeSkinTypes.has("rosacea") || activeSkinTypes.has("lupus_rash"))) ||
-    (fc === "fungal-feed" && (activeSkinTypes.has("fungal_acne") || activeSkinTypes.has("seborrheic")))
+    (fc === "fungal-feed" && (activeSkinTypes.has("fungal_acne") || activeSkinTypes.has("seborrheic"))) ||
+    (fc === "Barrier-disrupting" && (
+      activeSkinTypes.has("dry") || activeSkinTypes.has("damaged_barrier") ||
+      activeSkinTypes.has("eczema") || activeSkinTypes.has("psoriasis") || activeSkinTypes.has("rosacea"))) ||
+    (fc === "Irritant" && (
+      activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") ||
+      activeSkinTypes.has("eczema") || activeSkinTypes.has("rosacea"))) ||
+    (fc === "Synthetic Musk" && (
+      activeSkinTypes.has("reactive") || activeSkinTypes.has("eczema") ||
+      activeSkinTypes.has("rosacea") || activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt"))) ||
+    (["AHA Exfoliant", "BHA Exfoliant"].includes(fc) && (
+      activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv") ||
+      activeSkinTypes.has("lupus_rash") || activeSkinTypes.has("fast_shedding") ||
+      activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier")))
   );
 }
 
