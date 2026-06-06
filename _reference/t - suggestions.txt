@@ -46621,6 +46621,863 @@ clearing all ingredients - let's go with 2 combined replace button.
 
 
 
+for unreviewedingredients in a product page, edit the informational text from "Queued for next /generate-explanations run" to "Queued for generation" - users don't need to know the command as much as the process. what ideas do you have for users to select if they want to check back on a product once the unreviewed ingredients are generated and live? would they get a notification once live with a link to the product they were looking at when selecting it?
+
+
+
+
+
+
+● Good. The text edit is simple. Now for the
+  notification idea — here's my thinking:
+
+  Text fix — straightforward, ready to make.
+
+  Ideas for "notify me when ready":
+
+  Option A — Simple "Notify me" button next to the
+  queued label
+  User taps it, saves {userId, productId} to a
+  product_watch table. When generation runs and all
+  unreviewed ingredients for that product get
+  explanations, a notification fires with a link
+  back to the exact product page. Uses the existing
+  product_notifications system you already have.
+
+  Option B — Auto-subscribe on page view (implicit)
+  Anyone who lands on a product with unreviewed
+  ingredients is automatically subscribed to a
+  one-time notification when it becomes fully
+  reviewed. No button click needed — lower
+  friction, but less user control.
+
+  Option C — "Save & notify" via existing My Lists
+  Saving a product to a list implicitly registers
+  interest. When generation completes, notify all
+  users who have that product in any list. No new
+  UI, but conflates "want to scan" with "waiting
+  for results."
+
+  My recommendation: Option A. A small "Notify me
+  when ready" button next to "Queued for
+  generation" is honest with the user about what
+  they're opting into, uses the existing
+  notification infrastructure, and ties cleanly to
+  the specific product. The notification would say
+  something like: "X new ingredients on [Product
+  Name] are now analyzed — check your results."
+
+  Want me to make the text change now and then plan
+  out Option A's implementation?
+
+✻ Worked for 18s
+
+───────────────────────────────────────────────────
+> make the text change and go with option A
+
+
+
+
+
+
+
+
+
+
+
+
+> make the text change and go with option A  
+
+
+
+
+● No MCP access to that project — you'll need to
+  apply the migration manually. Run this in the
+  Supabase SQL editor:
+
+  CREATE TABLE product_watch (
+    id               uuid        PRIMARY KEY
+  DEFAULT gen_random_uuid(),
+    user_id          text        NOT NULL,
+    product_id       uuid        NOT NULL
+  REFERENCES products(id) ON DELETE CASCADE,
+    unreviewed_names text[]      NOT NULL DEFAULT
+  '{}',
+    created_at       timestamptz DEFAULT now(),
+    UNIQUE(user_id, product_id)
+  );
+
+  CREATE INDEX ON product_watch (product_id);
+
+  Here's a summary of everything that was built:
+
+  Text change — "Queued for generation" is live.
+
+  "Notify me when ready" (Option A):
+
+  - supabase/migrations/20260605_product_watch.sql
+  — new product_watch table storing the user,
+  product, and the exact unreviewed ingredient
+  names (used later to check if they've cleared the
+  queue)
+  - src/app/api/product-watch/route.ts — GET to
+  check watch status, POST to subscribe, DELETE to
+  unsubscribe
+  - src/components/Scanner.tsx — button appears in
+  the unreviewed section for signed-in users on
+  DB-backed products; shows "Notify me when ready"
+  → "Notified when ready ✓" (click again to
+  cancel); falls back to the static "Queued for
+  generation" text for guests
+  - scripts/generate-explanations.ts — after each
+  Queue 0 pass, notifyWatchers() checks each
+  watched product's ingredient names against
+  ingredient_queue; when none remain, it inserts an
+  ingredients_ready notification and removes the
+  watch
+  - src/app/notifications/page.tsx +
+  src/app/api/notifications/route.ts — new
+  "Ingredients analyzed" section with an indigo
+  "Ready" badge and "See full ingredient analysis
+  ↗" link, distinct from the existing "Products you
+  flagged" section
+
+✻ Brewed for 7m 25s
+
+───────────────────────────────────────────────────> commit this
+
+
+
+
+
+
+
+
+
+
+
+
+does the activity page not have the site header?
+
+● Done. The activity page was missing SiteHeader —
+  it's per-page (not in the layout), so I added it
+  alongside the pt-24 that was already accounting
+  for it.
+
+
+
+
+
+
+
+what ideas do you have for the site header to be in all pages as vs per page?
+
+
+
+
+
+● The SidePanel is already in the layout —
+  SiteHeader could live there too. Three realistic
+  options:
+
+  Option A — Add to root layout directly
+  One line in layout.tsx. Works perfectly unless a
+  page needs no header (there aren't any now). The
+  only wrinkle: the admin page renders SiteHeader
+  conditionally in three places — you'd need to
+  remove those and accept it always shows. Easiest
+  if admin's conditional logic isn't meaningful.
+
+  Option B — Route group layout
+  Create src/app/(site)/layout.tsx with SiteHeader,
+  move all non-admin pages into that group folder.
+  Admin stays outside and manages its own header.
+  Clean separation, zero per-page imports, but it's
+  a folder restructure — every page moves.
+
+  Option C — Status quo with a pattern fix
+  Keep it per-page but check SiteHeader to see if
+  it's a server component — if so it can just be in
+  the layout today with minimal disruption. Remove
+  it from all individual pages in one pass. Same
+  end result as A, less restructuring than B.
+
+  My recommendation: Option A, but first check the
+  admin conditional logic. If the three admin
+  instances are just guard renders (e.g., show
+  header on loading/error/main states), they
+  collapse to one unconditional render in the
+  layout and the admin conditionals become
+  irrelevant. If admin genuinely needs a different
+  header, do B. Want me to check the admin header
+  usage and then decide?
+
+✻ Churned for 19s
+
+───────────────────────────────────────────────────> check the admin header usage and then decide
+
+
+
+option a
+
+
+
+
+
+
+
+
+
+
+
+
+
+what ideas do you have for admins to be able to view all users in the admin management section of the admin panel? would the section name need to change? what ideas do you have for a status column in the display so the admin can see if the user is a regular user or an admin? what ideas do you have of the type of information the admin can see when clicking on a user? do you think we should add a search and filter so that admins can use the section more functionally to help users? 
+
+
+
+
+
+● Good — now I have full context. Here's my
+  thinking across all four questions:
+
+  ---
+  Section name
+
+  "Admin Management" is a fine sub-section title,
+  but it's too narrow if it's going to list
+  everyone. The cleanest move: rename the section
+  "Users" and keep a sub-label or tab for "Admins"
+  within it. Alternatively split the section in two
+  — "Users" on top, "Admin Access" below — so the
+  admin grant/revoke workflow stays clearly
+  separated from general user browsing. I'd lean
+  toward the split since they serve different
+  intents.
+
+  ---
+  Status column
+
+  Three options:
+  - Pill badge — small indigo "Admin" chip next to
+  the name; nothing for regular users (absence
+  reads as "user"). Clean, low noise.
+  - Role label in the meta row — same line as
+  "joined X" in gray text, like "Admin · Joined May
+  12". Compact.
+  - Icon — a shield icon for admins. Clear at a
+  glance, takes no text space.
+
+  Recommendation: indigo "Admin" pill. It reads
+  instantly and matches the existing badge language
+  in the panel.
+
+  ---
+  User detail on click
+
+  A slide-out or inline expand would show:
+  - Identity — name, email, Clerk ID, joined date,
+  last active
+  - Contributions — submission count (with status
+  breakdown: pending / approved), ingredient flags
+  filed, lists created, product watches active
+  - Admin history — if ever granted/revoked admin,
+  by whom and when
+  - Quick links — "View their submissions in All
+  Products", "View their flags in Ingredient
+  Review", "Filter activity log to this user"
+  - Actions — grant/revoke admin (replaces the
+  current lookup flow), optionally a way to send
+  them a notification manually
+
+  This turns the lookup-then-grant flow into a
+  natural discovery pattern: find the user, see
+  what they've done, then decide whether to promote
+  them.
+
+  ---
+  Search and filter
+
+  Yes — essential once you're showing all users
+  instead of just 5–10 admins. Suggested controls:
+  - Search — by email or name, live-filtered
+  - Filter: Role — All / Admins only / Regular
+  users only
+  - Filter: Activity — "Has submissions", "Has
+  flags", "Has lists" (useful for finding power
+  users or troubleshooting)
+  - Sort — by joined date (newest first default),
+  last active, submission count
+
+  The search and role filter are the two you'd use
+  most. The activity filters are useful when a user
+  reports an issue and you want to pull up their
+  account quickly.
+
+  ---
+  Want me to build this? If so, the main decision
+  upfront: do you want it to pull users from the
+  app_users table (users who've visited the site),
+  from Clerk's API (all accounts including those
+  who never came back), or both? The app_users
+  table is faster and already available; Clerk's
+  API would catch users who signed up but never
+  triggered a DB write.
+
+✻ Cooked for 40s
+
+───────────────────────────────────────────────────
+> build it, pull from app_users
+
+
+
+
+
+
+
+
+section name - let's rename the section to users and integrate the admin access into it.
+
+status column -  let's go with a pill badge
+
+user detail on click - let's do all of these ideas they're great.
+
+search and filter - let's do all of these ideas they're great.
+
+pull users - i'm thinking to do both ideas. what would be the benefit of pulling from the app users table as well as from clerk api?
+
+
+
+
+
+
+● Here's the distinction — the two sources each
+  know something the other doesn't:
+
+  app_users table is the authority on app-specific   metadata:
+  - Role (admin / user)
+  - When admin was granted and by whom
+  - It only has rows for users who've been
+  explicitly tracked (admins, users who were looked
+  up)
+
+  Clerk API is the authority on identity and
+  existence:
+  - Email, name, profile image
+  - Joined date (created_at), last sign-in date
+  - Every account that exists — including users who
+  signed up but never did anything that created a
+  row in your DB
+
+  The gap is the important part: a user who signed
+  up, scanned a few products as a guest (no account
+  action), and never submitted anything would be
+  invisible in app_users but visible in Clerk.
+  Without Clerk you'd have a blind spot for passive
+  or early-churn users.
+
+  Combined approach:
+  1. Fetch all users from Clerk (paginated,
+  batched)
+  2. Fetch all app_users rows for role data
+  3. Fetch activity counts from Supabase per Clerk
+  ID — submissions, flags, lists, product watches
+  4. Merge: Clerk user + role from app_users +
+  counts from activity tables
+
+  This means every account shows up, the role pill
+  is always accurate, and the activity data
+  reflects what they've actually done in the app.
+
+  The one practical note: Clerk paginates at 500
+  per call. For now your user base is small enough
+  that one or two calls covers everyone, but worth
+  knowing for later. Ready for me to build this?
+
+✻ Cogitated for 34s
+
+───────────────────────────────────────────────────
+> yes, build it
+
+
+
+
+
+
+
+
+how should we build this in order to take care of the practical note now? if clerk paginates at 500 per call, what ideas do you have? save memory
+
+
+                        
+● Three realistic options:
+
+  Option A — Loop all Clerk pages on load
+  When the section opens, call Clerk's API in a
+  loop (offset 0, offset 500, etc.) until a page
+  comes back with fewer than 500 results. For 1,000  users that's 2 calls; for 2,000 it's 4. No
+  infrastructure, always fresh, but gets slow as
+  the app grows. Fine right now.
+
+  Option B — Clerk webhook → sync to Supabase
+  Set up a Clerk user.created / user.updated
+  webhook that writes email, name, clerk_id,
+  created_at, last_sign_in_at into a users table in
+  Supabase whenever a new account is made or
+  updated. The admin panel then queries Supabase
+  directly — fast SQL, filterable, searchable, no
+  Clerk rate limits. This is the architecturally
+  correct long-term answer. Requires a webhook
+  endpoint and a one-time backfill of existing
+  users.
+
+  Option C — Nightly cron sync
+  A scheduled job pulls all Clerk pages once a day
+  and caches them in Supabase. Fast to query, but
+  stale by up to 24 hours. Less effort than
+  webhooks but less accurate.
+
+  My recommendation: build with Option A now, wire
+  Option B alongside it. Option A is a 5-minute
+  implementation inside the existing API route.
+  Option B is the right foundation — Clerk's
+  webhook setup is straightforward, and adding it
+  now means you never hit the scaling wall. The
+  frontend never changes; only the API route
+  internals swap from "loop Clerk pages" to "query
+  Supabase users table." Option C is the worst of
+  both — extra infrastructure with worse accuracy
+  than B.
+
+  Want me to build both A and B together — Option A
+  as the immediate user list fetch, and Option B's
+  webhook + users table wired up at the same time
+  so the sync starts immediately?
+
+  Recalled 1 memory, wrote 2 memories (ctrl+o to
+  expand)
+
+● Memory saved. And yes — building A and B together  is the right call. Here's what that looks like
+  in practice:
+
+  - A goes live immediately: the API loops Clerk
+  pages, merges with Supabase activity data, and
+  the UI works fully
+  - B starts filling the users table from day one
+  via webhook, so by the time you hit a few hundred
+  users the data is already there
+  - When you're ready to flip, the API route just
+  changes its internals from "loop Clerk" to "query
+  Supabase users" — the UI, search, filters, and
+  detail panel are completely unaffected
+
+  One thing you'll need to do in the Clerk
+  dashboard before we can finish B: add a webhook
+  pointing to [your-domain]/api/webhooks/clerk for
+  user.created, user.updated, and user.deleted
+  events. Clerk generates a signing secret
+  (CLERK_WEBHOOK_SECRET) that you add as an env
+  var. Want to start building?
+
+✻ Brewed for 58s
+
+───────────────────────────────────────────────────
+> yes, let's build it
+──────────────────────────────
+
+
+
+
+
+
+let's go with your recommendation of options a and b. save memory.
+tell me more about how to add a webhook in clerk?
+
+
+
+● Memory is already current from the last save —
+  nothing new to add yet.
+
+  Here's how to add the webhook in Clerk:
+
+  In the Clerk Dashboard:
+  1. Go to Configure → Webhooks in the left sidebar
+  2. Click Add Endpoint
+  3. Enter your endpoint URL: https://skindex-beaut
+  y.vercel.app/api/webhooks/clerk
+  4. Under Events to listen to, select:
+    - user.created
+    - user.updated
+    - user.deleted
+  5. Click Create
+  6. Clerk shows you a Signing Secret — copy it, it
+  starts with whsec_...
+
+  Then add the secret as an env var:
+
+  You can do it in the Vercel dashboard under
+  Settings → Environment Variables, or type this in
+  the terminal:
+  ! vercel env add CLERK_WEBHOOK_SECRET
+  Paste the whsec_... value when prompted. Apply it
+  to all environments (Production, Preview,
+  Development).
+
+  One package to install:
+  Clerk uses svix to sign and verify webhook
+  payloads — it's how your endpoint proves the
+  request actually came from Clerk and not someone
+  spoofing it.
+  npm install svix
+
+  For local testing (optional but useful): Clerk
+  has a way to forward webhooks to localhost via
+  the Clerk dashboard's "Test" button, or you can
+  use the Svix CLI or ngrok to tunnel. Not required
+  to build — you can test against the deployed
+  preview URL.
+
+  Once you've added the webhook in Clerk and have
+  the signing secret ready, tell me and I'll build
+  the endpoint and everything else. Or I can build
+  it now and you add the secret when ready — the
+  endpoint will just return 400 until the secret is
+  wired up, which is fine.
+
+✻ Cooked for 16s
+
+───────────────────────────────────────────────────
+> build it now and i'll add the secret when ready
+
+
+
+
+
+
+
+https://skindex-beauty.vercel.app/api/webhooks/clerk
+whsec_nolCIPMxgU6Dkn0ipCTIaMI1SKv1OCEn
+CLERK_WEBHOOK_SECRET
+
+
+i added the secret to vercel environment variables
+
+
+
+● Pushed 42b1b29. Here's what's live and what still  needs your attention:
+
+  Done:
+  - GET /api/admin/users — loops all Clerk pages,
+  merges roles + submission/flag/watch/admin counts  - POST /api/webhooks/clerk — verified with svix,
+  syncs user.created/updated/deleted to the new
+  users table (Option B building up from now)
+  - Admin panel "Users" section — search, role
+  filter, activity filters, sort, click-to-expand
+  detail with grant/revoke inline, invites as a
+  sub-section
+
+  Two things you need to do manually:
+
+  1. Apply both migrations in Supabase SQL editor:
+    - 20260605_users_table.sql (the new users sync
+  table)
+    - 20260605_product_watch.sql (from the earlier
+  session — notify-me feature)
+  2. Verify the webhook URL in the Clerk dashboard
+  points to https://skindex-beauty.vercel.app/api/w
+  ebhooks/clerk — once a Vercel deploy is live with
+  the CLERK_WEBHOOK_SECRET, the sync starts
+  automatically for all new sign-ups and profile
+  changes.
+
+✻ Cooked for 9m 31s
+
+───────────────────────────────────────────────────
+> apply the migrations
+
+
+
+
+
+
+● The tables are live. The webhook will now sync
+  every new sign-up and profile update into the
+  users table going forward.
+
+  One thing still missing: existing users aren't in  the users table yet — the webhook only catches
+  events from this point on. You'll want a one-time
+  backfill to populate it with everyone who
+  already has an account.
+
+  Want me to build a backfill endpoint (e.g. POST
+  /api/admin/users/backfill) that loops all Clerk
+  pages and upserts them into users? It would be a
+  one-button trigger from the admin panel — run it
+  once and you're done.
+
+✻ Worked for 13s
+
+───────────────────────────────────────────────────
+> yes, build the backfill
+
+
+
+
+
+
+● Done — 1 user synced (just you so far). The users  table is now populated, and the webhook will
+  keep it current for everyone who signs up from
+  here on.
+
+  The script is committed-safe to leave in scripts/  in case you ever need to re-run it, but it won't
+  need to be touched again under normal operation.
+
+✻ Sautéed for 32s
+
+───────────────────────────────────────────────────
+> commit and push
+
+
+
+
+
+
+● Memory saved. Everything is complete and
+  documented — the Users section, webhook sync,
+  backfill, and SiteHeader consolidation are all
+  captured for future sessions.
+
+✻ Sautéed for 31s
+
+───────────────────────────────────────────────────
+> what does the users section look like now
+───────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+there was an error in the last two builds. 
+
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 16.3s
+  Running TypeScript ...
+Failed to type check.
+./src/app/admin/page.tsx:3726:36
+Type error: Cannot find name 'adminInitials'.
+  3724 |                                   className="w-6 h-6 rounded-full bg-indigo-100 text-ind...
+  3725 |                                 >
+> 3726 |                                   {adminInitials({ email: entry.admin_email, name: entry...
+       |                                    ^
+  3727 |                                 </button>
+  3728 |                                 <span className={`text-sm ${actionColor(entry.action)} f...
+  3729 |                                   {describeAction(entry)}
+Next.js build worker exited with code: 1 and signal: null
+Error: Command "npm run build" exited with 1
+
+
+
+● Pushed. The audit log section was using
+  adminInitials in a second spot I missed during
+  the rename — fixed.
+
+✻ Brewed for 27s
+
+───────────────────────────────────────────────────
+> check the build passed
+
+
+
+
+
+
+
+
+
+
+
+
+
+what ideas do you have to remove the notification dot from activity in the header panel when the user has seen all activity?
+
+
+
+
+● The dot is driven by newCount from the API —
+  currently it counts recent events in the last 30
+  days with no concept of "seen." Three options:
+
+  Option A — Clear when on the page
+  When pathname === "/notifications", don't show
+  the dot. Zero backend. But the dot reappears as
+  soon as you navigate away, because the next
+  header mount re-fetches and newCount is still >
+  0.
+
+  Option B — localStorage timestamp (recommended)
+  When the user visits /notifications, write
+  notifSeenAt = Date.now() to localStorage. Have
+  the API also return a newestAt timestamp (the
+  most recent notification's date). In the header:
+  show the dot only if newestAt > notifSeenAt. No
+  backend changes beyond one extra field in the API
+  response. Persists across page navigations on
+  the same device, resets naturally when new
+  notifications arrive.
+
+  Option C — seen_at in the database
+  The product_notifications table already has a
+  seen_at column — use it. When the user visits
+  /notifications, call a PATCH endpoint that stamps
+  seen_at on all their unseen rows. The API's
+  newCount only counts rows where seen_at IS NULL.
+  Persists across devices and browsers. Requires
+  also handling submissions and flags (which don't
+  have seen tracking yet) — most complete but most
+  work.
+
+  My recommendation: Option B. It's the right
+  trade-off for a notification dot — seen state is
+  inherently device-local UX, localStorage is zero
+  infrastructure, and it works correctly: the dot
+  disappears after you visit the page and reappears
+  only when something genuinely new arrives.
+  Option C is the right answer if you ever want
+  cross-device sync (e.g. "seen on phone, clears on
+  desktop"), but that's a bigger investment for a
+  small dot. Want me to build B?
+
+✻ Worked for 42s
+
+───────────────────────────────────────────────────
+> go with option b
+────────────────────────────────────
+
+
+
+
+
+
+
+
+let's do option c. save memory. do you have questions?
+
+
+
+● No blocking questions — the single
+  notifications_last_seen_at timestamp on app_users  cleanly covers all three notification types
+  (submissions, flags, product notifications)
+  without new columns on each table.
+
+  Let me read the current files before writing
+  anything.
+
+
+
+● Now let me check the app_users table structure
+  and the notifications page.
+
+● Now let me check the existing migrations for
+  app_users structure and product_notifications.
+
+● Let me check the original app_users table
+  definition.
+
+
+
+
+
+
+
+
+can the activity dot color change to the purple from incidecoder theme (#ac83b4) (rgb(172, 131, 180) hsl(290, 25%, 61%) hsv(290, 27%, 71%)? 
+
+
+● Got it — I'll incorporate the purple dot color
+  (#ac83b4) as well. Let me build everything now.
+
+  Plan:
+  1. Migration: add notifications_last_seen_at
+  timestamptz to app_users
+  2. PATCH /api/notifications/seen — stamps both
+  app_users and product_notifications
+  3. Update GET /api/notifications — newCount uses
+  lastSeen as cutoff
+  4. notifications/page.tsx — fire PATCH on mount
+  5. SiteHeader.tsx — optimistic dot clear on
+  pathname change + purple color
+
+
+
+
+
+
+
+● One migration to apply manually in the Supabase
+  SQL editor:
+
+  ALTER TABLE app_users
+    ADD COLUMN IF NOT EXISTS
+  notifications_last_seen_at timestamptz;
+
+  What's live after that migration:
+  - Visiting the Activity page fires PATCH
+  /api/notifications/seen → stamps
+  app_users.notifications_last_seen_at = now() and
+  marks all product notifications as seen
+  - The dot in the header hides immediately when
+  you land on /notifications (optimistic), then
+  re-confirms the count from the API when you
+  navigate away
+  - Any new notification that arrives after your
+  last visit restores the dot
+  - The dot is now the Incidecoder purple (#ac83b4)
+  instead of indigo
+
+✻ Worked for 6m 11s
+
+───────────────────────────────────────────────────
+> apply the migration
+──────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+> how many of the unreviewed ingredients      are queued for generation?    
+
+
+● 133 ingredients are queued for generation
+  (new/unreviewed, waiting for AI
+  classification + explanation).
+
+  There are also 22 ingredients with weak
+  explanations queued for upgrade (Queue 1),
+  but those are already reviewed — they
+  just need better explanations written.
+
+
+
+
+
+
+will all queues be reviewed when running generate-explanations?
+
+> run the generate-explanations script   
 
 
 
@@ -46644,30 +47501,13 @@ clearing all ingredients - let's go with 2 combined replace button.
 
 
 
+does the "high uv" profile have informational text that mentions the global UV Index Scale? 
 
+currently, incidecoder scans show fuzzy product images - but when i add an image url directly the image is sharper. why is this? what ideas do you have to fix this?
 
+if "inactive ingredients: " shows up in the ingredients list it should be cut out. i'll share an example where the ingredient "Zinc Oxide (14.5%)" is listed incorrectly as "Zinc Oxide (14.5%) Inactive Ingredients: Bentonite". another example: the ingredient "Zinc Oxide (12%)" is incorrectly listed as "Zinc Oxide (12%) Inactive Ingredients: Aloe Barbadensis Leaf Juice". what ideas do you have to fix this? once fixed these ingredients and those like it should be queued for a regeneration.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-for unreviewedingredients in a product page, edit the informational text from "Queued for next /generate-explanations run" to "Queued for generation"
+what ideas do you have for a recently viewed products section or products list?
 
 Protein diet 
 Carnivore diet
@@ -46681,9 +47521,7 @@ Autoimmune
 
 Lio says look up hydrosol from hadas - Hadas hydrosol (Myrtle or Myrtus communis floral water) 
 
-currently, incidecoder scans show fuzzy product images but when i add an image url directly the image is sharper. why is this? what ideas do you have to fix this?
 
-if "inactive ingredients: " shows up in the ingredients list it should be cut out. i'll share an example where the ingredient "Zinc Oxide (14.5%)" is listed incorrectly as "Zinc Oxide (14.5%) Inactive Ingredients: Bentonite". another example: the ingredient "Zinc Oxide (12%)" is incorrectly listed as "Zinc Oxide (12%) Inactive Ingredients: Aloe Barbadensis Leaf Juice". what ideas do you have to fix this? once fixed these ingredients should be queued for a regeneration.
 
 why are some ingredients still unreviewed even after i ran the generate-explanations command? "Decolorized Aloe Barbadensis Leaf Juice*" "Lonicera Caprifolium Flower Extract" "Lavandula Angustifolia Flower Oil*" Aloe Barbadensis Leaf Juice*" "Urtica Dioica Leaf Extract*" "Macrocystis Pyrifera Extract *" "Salix Alba Bark Extract*" "Potassium Cocoate" "Potassium Olivate" "Potassium Hempate" "Melaleuca Alternifolia Leaf Oil" "Pinus Succinifera Extract" "Rosmarinus Officinalis Extract" "Butyrospermum Parkii ¹" "Deionized Water" "Glyceryl Undecylenate" "Bank Extract" "Salicylic Acid" "Camellia Oleifera Extract" "Citrus Medica Limonum Extract" "Pyrus Malus Fruit Extract" Polybutene" "Butyrospermum Parkii Butter" "Isopropyl Stearate" "Butyrospermum Parkii Butter" "Polyglyceryl-4 Diisostearate/Polyhydroxystearate/Sebacate" "Mannitol" "Citrulline" "Glycogen" "1, 2-Hexanediol" "Diammonium Citrate" "Sodium Acetate" "Sodium Salicylate" "Isopropyl Palmitate" "Cocos Nucifera Fruit Extract" "saponified olive oil" "potassium oleate" "Cetyl Ethylhexanoate" "Carthamus Tinctorius Flower Extract" "Phaseolus Radiatus Seed Extract" "Phaseolus Radiatus Sprout Extract" "Phaseolus Radiatus Seed Extract" and probably others. also, "Butyrospermum Parkii ¹" "Cholesterol" "Trisodium EDTA" should be "Butyrospermum Parkii" can you help me think of a fix? why does the ingredient "bentonite" only have a concern category but not function or benefit categories? does this happen for other ingredients?
 
