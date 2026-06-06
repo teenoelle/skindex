@@ -566,9 +566,7 @@ function toTitleCase(str: string): string {
 // Broader set used for the "By concern" grouped view — concerns that apply regardless of skin profile
 const CONCERN_UNIVERSAL_CATEGORIES = new Set([
   "fragrance-allergen",
-  "Fragrance",           // legacy Title-case alias
   "preservative-allergen",
-  "Preservative",        // legacy Title-case alias
   "formaldehyde releaser",
   "sensitizing preservative",
   "biocide",
@@ -690,7 +688,12 @@ function isFcProfileMatch(fc: string, activeSkinTypes: Set<SkinType>, activeClim
     (["AHA Exfoliant", "BHA Exfoliant"].includes(fc) && (
       activeSkinTypes.has("hyperpigmentation_prone") || activeClimates.has("high_uv") ||
       activeSkinTypes.has("lupus_rash") || activeSkinTypes.has("fast_shedding") ||
-      activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier")))
+      activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier"))) ||
+    (fc === "Fragrance" && (
+      activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") ||
+      activeSkinTypes.has("eczema") || activeSkinTypes.has("fast_shedding") || activeClimates.has("smoking"))) ||
+    (fc === "Preservative" && (
+      activeSkinTypes.has("reactive") || activeSkinTypes.has("damaged_barrier") || activeSkinTypes.has("eczema")))
   );
 }
 
