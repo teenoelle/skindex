@@ -47486,6 +47486,351 @@ will all queues be reviewed when running generate-explanations?
 
 
 
+why are there still unreviewed ingredients in product pages after running generate-explanations? what ideas do you have for all unreviewed ingredients to automatically go to the queue? how could this impact products that already exist in the db as well as new products imported or added to the site? 
+
+
+
+
+● Now I have the full picture. Here's the
+  breakdown:
+
+  ---
+  Why ingredients are still unreviewed after  generate-explanations
+
+  The queue only processes what's IN
+  ingredient_queue. An ingredient only gets
+  there if it was encountered through an
+  active ingestion path. The issue is that
+  not all products have ever been through
+  those paths:
+
+  - add-product, bulk-import,
+  approve-submission, retry-import,
+  requeue-product — all call
+  queueIngredients() correctly
+  - update-product — calls
+  rescanIngredients() inline, equivalent,
+  but only when the ingredient_list actually
+  changes
+  - scan/route.ts — queues names into
+  ingredient_queue inline, but only when a
+  user actively scans that product
+
+  The gap: any product added before the
+  queue system existed, or added in bulk
+  before these paths were wired up, had its
+  ingredient list stored in the DB but never
+  had its unknowns pushed to
+  ingredient_queue. generate-explanations
+  has nothing to process for them. They'll
+  show as unreviewed forever unless
+  something triggers re-queuing.
+
+  ---
+  Ideas for automatic coverage
+
+  Option A — One-time batch backfill script
+  (fastest fix, affects all existing
+  products)
+  A script that pages through all products
+  with an ingredient_list, calls
+  queueIngredients() on each one, then run
+  generate-explanations after. Would clear
+  the backlog for all historical products at
+  once. Cheap to write, runs once.
+
+  Option B — Admin "Requeue all" button
+  (manual trigger, same effect)
+  A button in the admin panel that triggers
+  the same batch. More controlled than a
+  script — you run it on demand. Good if you
+  want to re-sweep after junk-detection
+  improvements or classification changes
+  too.
+
+  Option C — Lazy queue on product page load
+  (fully automatic going forward)
+  When /product/[slug] loads and the scan
+  returns unreviewed ingredients, silently
+  fire a queue request for any not already
+  in ingredient_queue. No batch needed —
+  products self-heal the first time anyone
+  visits. Downside: only covers products
+  that get visited, and adds a DB write on
+  every product page load with unknowns.
+
+  Option D — Queue on product_ingredients
+  gap detection (most precise, most complex)
+  On each scan, check if the product has a
+  product_ingredients row for all known
+  ingredients. If not, re-run
+  queueIngredients() for that product.
+  Catches products where classification
+  happened after they were added but linking
+  was missed.
+
+  ---
+  My recommendation: A + C combined. Run the
+  one-time batch script now to clear the
+  existing backlog (it's maybe 20 lines,
+  re-uses queueIngredients() directly). Then
+  add lazy queuing on the product page load
+  as a lightweight ongoing safety net —
+  costs almost nothing per request since
+  ingredient_queue upsert is idempotent, and
+  means no product can stay stale forever.
+  Want me to build either or both?
+
+✻ Cooked for 1m 56s
+
+────────────────────────────────────────────
+> let's do both, start with the batch script
+───────────────────────────────────
+
+
+
+
+
+
+
+
+what about a batch script that only queues unreviewed ingredients from all products?
+
+
+● That's the cleanest approach — skip the
+  product_ingredients re-linking entirely,
+  just find unknowns and push them. Let me
+  look at the existing scripts for the
+  pattern before writing it.
+
+
+
+● 394 unreviewed ingredients across 255
+  products — these have been sitting
+  unqueued. Some highlights in there:
+  petrolatum, retinoids, sunscreen actives
+  (homosalate, benzophenone-3, octinoxate),
+  probiotic ferments, collagen types, a ton
+  of plant extracts. Also a handful of label
+  noise ("l 100% vegan", "gmo-free") that
+  the junk detector missed but
+  generate-explanations will handle.
+
+  A few have formatting artifacts worth
+  noting: aqua eau) and serica soie) have
+  stray closing parens from malformed
+  ingredient lists, and fruit stem cells
+  (malus domestica fruit cell culture
+  extract has an unclosed paren. Those will
+  end up in the DB as-is unless we clean
+  them — but they'll at least get
+  classified.
+
+  Want me to run it for real? It'll push all
+  394 to ingredient_queue, then you can run
+  generate-explanations to process them.
+
+
+
+
+run it
+
+
+
+
+
+
+
+
+
+
+
+
+can you check why sometimes some ingredients show up in "other concerns" section with concerns for my profile? which way do you prefer to show other concerns: in its own "other concerns" ingredients list or within the profile concerns ingredients list in gray? 
+
+
+
+
+
+● Now I have the full picture. Here's what's  happening:
+
+  Why ingredients appear in "Other Concerns"  with profile concerns
+
+  getIngredientConcernLevel() assigns
+  non-matching (→ "Other Concerns") when an
+  ingredient IS flagged but its
+  flagged_category doesn't match your skin
+  types/climates via isFcProfileMatch(). The
+  most common reasons this produces a
+  surprise:
+
+  1. Category gap in isFcProfileMatch — the
+  ingredient's flagged_category exists in
+  the DB but isn't wired up in
+  isFcProfileMatch() at all. It has a real
+  concern, but the profile-matching logic
+  doesn't know how to evaluate it against
+  your skin types, so it falls through to
+  non-matching by default.
+  2. Sensory mismatch — e.g. a Pilling
+  trigger when you don't have hot/humid in
+  your climate, or a Stripping trigger
+  without dry/damaged_barrier skin. The
+  concern is real, just not specifically for
+  your profile combination.
+  3. Photosensitizer without matching skin
+  types — AHAs, retinoids, brightening
+  agents land as non-matching if you don't
+  have hyperpigmentation_prone or high_uv in
+  your profile, even though most people
+  with any skin type should hear about them.
+
+  ---
+  On how to display them
+
+  My preference is keeping them in their own
+  section rather than merging into profile
+  concerns in gray. The distinction is
+  meaningful — amber = "this is a concern
+  specifically for your skin," yellow =
+  "this is flagged but not your specific
+  issue." Collapsing them in gray risks
+  diluting the amber section and making
+  users unsure why some rows look different.
+
+  The stronger fix is actually upstream:
+  audit isFcProfileMatch() for any flagged
+  categories that have no profile mapping at
+  all — those ingredients will always land
+  in "Other Concerns" regardless of the
+  user's profile, which is the surprising
+  case. Want me to check which categories
+  are missing from isFcProfileMatch()?
+
+
+
+
+
+
+
+
+
+yes
+
+
+
+
+● Now I have everything. Let me map the gaps  clearly.
+
+  Categories in isFcProfileMatch
+  (profile-aware):
+  pore-clogger, occlusive, bacteria-trap,
+  sensitizer, fragrance-allergen, chemical
+  sunscreen, drying solvent, sulfate
+  surfactant, photo-retinoid/AHA/BHA/brighte  ning/botanical, endocrine disruptor,
+  phytoestrogen, teratogen, iodine-heavy,
+  vasodilator, fungal-feed
+
+  Categories in CONCERN_UNIVERSAL_CATEGORIES
+  (always shown):
+  fragrance-allergen, preservative-allergen,
+  formaldehyde releaser, sensitizing
+  preservative, biocide
+
+  Gaps — flagged categories in the DB/AI
+  prompt that have no mapping:
+
+  Category: Barrier-disrupting
+  In DB?: Yes (older data + AI prompt)
+  Should match...: dry, damaged_barrier,
+    eczema, psoriasis, rosacea
+  Fix: Add to isFcProfileMatch
+  ────────────────────────────────────────
+  Category: Irritant
+  In DB?: Yes (older data + AI prompt)
+  Should match...: reactive, rosacea,
+  eczema,
+    damaged_barrier
+  Fix: Add to isFcProfileMatch
+  ────────────────────────────────────────
+  Category: Synthetic Musk
+  In DB?: Yes (AI prompt)
+  Should match...: reactive, eczema, rosacea
+
+    — or just add to UNIVERSAL since they're
+
+    broadly sensitizing
+  Fix: Add to isFcProfileMatch or UNIVERSAL
+  ────────────────────────────────────────
+  Category: AHA Exfoliant / BHA Exfoliant
+  In DB?: Yes (AI prompt, older data)
+  Should match...: When used as
+    flagged_category rather than through the
+
+    photo path — should match same profiles
+    as photo-AHA/photo-BHA
+  Fix: Add to isFcProfileMatch alongside the
+
+    photo variants
+  ────────────────────────────────────────
+  Category: Fragrance
+  In DB?: Yes (legacy Title-case)
+  Should match...: Same as
+  fragrance-allergen
+  Fix: Add to UNIVERSAL or alias in
+    isFcProfileMatch
+  ────────────────────────────────────────
+  Category: Preservative
+  In DB?: Yes (legacy Title-case)
+  Should match...: Same as
+    preservative-allergen
+  Fix: Add to UNIVERSAL
+
+  The most impactful are Barrier-disrupting
+  and Irritant — those affect a lot of skin
+  types and are almost certainly landing in
+  "Other Concerns" for people with reactive,
+  dry, or eczema-prone skin who'd most want
+  to know. Want me to patch all of these in
+  isFcProfileMatch?
+
+✻ Brewed for 1m 32s
+
+
+
+
+
+
+
+yes
+
+
+
+● Done. 7495cab — pushed. Here's what
+  changed:
+
+  - Barrier-disrupting → now profile-matches  for dry, damaged barrier, eczema,
+  psoriasis, rosacea
+  - Irritant → now profile-matches for
+  reactive, damaged barrier, eczema, rosacea  - Synthetic Musk → now profile-matches for  reactive, eczema, rosacea,
+  hormone-sensitive, HRT
+  - AHA Exfoliant / BHA Exfoliant → now
+  profile-matches same as the photo-AHA/BHA
+  path (hyperpigmentation, high UV, lupus,
+  fast-shedding, reactive, damaged barrier)
+  - Fragrance / Preservative (legacy
+  Title-case) → now treated as universal
+  concerns, same as fragrance-allergen /
+  preservative-allergen
+
+
+
+
+
+
+
+
+are there some preservatives that aren't allergens? 
 
 
 
@@ -47500,6 +47845,26 @@ will all queues be reviewed when running generate-explanations?
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+what ideas do you have to add a duplicates filter in the products section of the admin panel for any products that seem like they overlap? how would the site determine which products enter this filter? 
 
 does the "high uv" profile have informational text that mentions the global UV Index Scale? 
 
