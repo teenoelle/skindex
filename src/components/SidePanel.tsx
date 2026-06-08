@@ -37,6 +37,7 @@ export default function SidePanel() {
   const [open, setOpen] = useState(false);
   const [profileExpanded, setProfileExpanded] = useState(true);
   const [modifiersExpanded, setModifiersExpanded] = useState(false);
+  const [modifierHint, setModifierHint] = useState<ClimateType | null>(null);
   const [userLists, setUserLists] = useState<UserList[]>([]);
   const [ingredientLists, setIngredientLists] = useState<IngredientList[]>([]);
   const [listsLoaded, setListsLoaded] = useState(false);
@@ -216,28 +217,34 @@ export default function SidePanel() {
                     <div className="flex flex-wrap gap-1">
                       {group.items.map((item) => {
                         const active = activeClimates.has(item.value);
+                        const hinted = modifierHint === item.value;
                         return (
-                          <button
-                            key={item.value}
-                            type="button"
-                            onClick={() => toggleClimate(item.value)}
-                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${active ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
-                          >
-                            {item.label}
-                          </button>
+                          <span key={item.value} className="inline-flex items-center gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() => toggleClimate(item.value)}
+                              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${active ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
+                            >
+                              {item.label}
+                            </button>
+                            {CLIMATE_NOTES[item.value as ClimateType] && (
+                              <button
+                                type="button"
+                                onClick={() => setModifierHint(h => h === item.value ? null : item.value as ClimateType)}
+                                className={`text-[10px] leading-none transition-colors ${hinted ? "text-gray-500" : "text-gray-300 hover:text-gray-500"}`}
+                                aria-label={`About ${item.label}`}
+                              >ⓘ</button>
+                            )}
+                          </span>
                         );
                       })}
                     </div>
-                    {(() => {
-                      const activeItem = group.items.find(item => activeClimates.has(item.value));
-                      const note = activeItem ? CLIMATE_NOTES[activeItem.value as ClimateType] : undefined;
-                      return note ? (
-                        <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                          <span className="font-medium text-gray-700">{activeItem!.label} — </span>
-                          {note}
-                        </div>
-                      ) : null;
-                    })()}
+                    {modifierHint && CLIMATE_NOTES[modifierHint] && group.items.some(i => i.value === modifierHint) && (
+                      <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                        <span className="font-medium text-gray-700">{group.items.find(i => i.value === modifierHint)!.label} — </span>
+                        {CLIMATE_NOTES[modifierHint]}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
