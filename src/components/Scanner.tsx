@@ -244,7 +244,7 @@ type ImportResult = {
 type UserList = { id: string; name: string; is_public: boolean; itemCount: number; containsProduct?: boolean };
 
 type BrowseType = { name: string; count: number };
-type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; ingredient_list: string | null; flaggedCount: number; sensoryCount: number; photoCount: number; universalConcernCount?: number; profileFlaggedCount?: number; profileSensoryCount?: number };
+type BrowseProduct = { id: string; name: string; brand: string | null; image_url: string | null; ingredient_list: string | null; type?: string | null; flaggedCount: number; sensoryCount: number; photoCount: number; universalConcernCount?: number; profileFlaggedCount?: number; profileSensoryCount?: number };
 type IngredientList = { id: string; name: string; items: string[] };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -1154,6 +1154,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [bulkAddListId, setBulkAddListId] = useState<string | null>(null);
   const [browseSearch, setBrowseSearch] = useState("");
+  const [browseSelectedArea, setBrowseSelectedArea] = useState<string | null>(null);
+  const [browseAreaTypeFilter, setBrowseAreaTypeFilter] = useState<string | null>(null);
   const [imageUploadOpen, setImageUploadOpen] = useState(false);
   const [imageUploadUrl, setImageUploadUrl] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
@@ -2281,6 +2283,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
   async function selectBrowseType(typeName: string) {
     setBrowseSelectedType(typeName);
+    setBrowseSelectedArea(null);
+    setBrowseAreaTypeFilter(null);
     setBrowseProducts([]);
     setBrowseLoading(true);
     const params = new URLSearchParams({ type: typeName });
@@ -2289,6 +2293,23 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     if (activeSkinTypes.size > 0) params.set("skinTypes", [...activeSkinTypes].join(","));
     if (activeClimates.size > 0) params.set("climates", [...activeClimates].join(","));
     if (rinseOffDefaults.has(typeName)) params.set("isRinseOff", "1");
+    const res = await fetch(`/api/browse?${params.toString()}`);
+    const data = await res.json();
+    setBrowseProducts(data.products ?? []);
+    setBrowseLoading(false);
+  }
+
+  async function selectBrowseArea(areaName: string) {
+    setBrowseSelectedArea(areaName);
+    setBrowseSelectedType(null);
+    setBrowseAreaTypeFilter(null);
+    setBrowseProducts([]);
+    setBrowseLoading(true);
+    const params = new URLSearchParams({ area: areaName });
+    const concerns = profileMatchedCategories(activeSkinTypes, activeClimates);
+    if (concerns.length) params.set("concerns", concerns.join(","));
+    if (activeSkinTypes.size > 0) params.set("skinTypes", [...activeSkinTypes].join(","));
+    if (activeClimates.size > 0) params.set("climates", [...activeClimates].join(","));
     const res = await fetch(`/api/browse?${params.toString()}`);
     const data = await res.json();
     setBrowseProducts(data.products ?? []);
@@ -3367,10 +3388,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             )}
           </section>
 
-          {browseLoading && !browseSelectedType && (
+          {browseLoading && !browseSelectedType && !browseSelectedArea && (
             <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
           )}
-          {!browseLoading && !browseSelectedType && browseTypes.length > 0 && (
+          {!browseLoading && !browseSelectedType && !browseSelectedArea && browseTypes.length > 0 && (
             <>
             <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
             <div className="space-y-5">
@@ -3411,12 +3432,25 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 };
                 const areaSection = (label: string, types: BrowseType[]) => {
                   const AreaIcon = BROWSE_AREA_ICON[label] ?? null;
+                  const hasProducts = types.some(t => t.count > 0);
                   return (
                     <div key={label}>
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        {AreaIcon && <AreaIcon size={12} />}
-                        {label}
-                      </p>
+                      {hasProducts ? (
+                        <button
+                          type="button"
+                          onClick={() => selectBrowseArea(label)}
+                          className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5 hover:text-gray-700 transition-colors group"
+                        >
+                          {AreaIcon && <AreaIcon size={12} />}
+                          {label}
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400">→</span>
+                        </button>
+                      ) : (
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                          {AreaIcon && <AreaIcon size={12} />}
+                          {label}
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-2">{types.map(typeButton)}</div>
                     </div>
                   );
@@ -3433,30 +3467,67 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </div>
             </>
           )}
-          {browseSelectedType && (
+          {(browseSelectedType || browseSelectedArea) && (
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <button
-                  onClick={() => { setBrowseSelectedType(null); setBrowseProducts([]); setBrowseSearch(""); }}
+                  onClick={() => { setBrowseSelectedType(null); setBrowseSelectedArea(null); setBrowseAreaTypeFilter(null); setBrowseProducts([]); setBrowseSearch(""); }}
                   className="text-xs text-gray-400 hover:text-gray-700"
                 >
                   ← All types
                 </button>
                 <span className="text-xs text-gray-300">·</span>
                 <span className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                  {(() => { const I = BROWSE_TYPE_ICON[browseSelectedType]; return I ? <I size={13} className="text-gray-500" /> : null; })()}
-                  {browseSelectedType}
+                  {browseSelectedType ? (
+                    <>
+                      {(() => { const I = BROWSE_TYPE_ICON[browseSelectedType]; return I ? <I size={13} className="text-gray-500" /> : null; })()}
+                      {browseSelectedType}
+                    </>
+                  ) : (
+                    <>
+                      {(() => { const I = BROWSE_AREA_ICON[browseSelectedArea!]; return I ? <I size={13} className="text-gray-500" /> : null; })()}
+                      {browseSelectedArea}
+                    </>
+                  )}
                 </span>
               </div>
+              {browseSelectedArea && !browseLoading && browseProducts.length > 0 && (() => {
+                const areaTypes = [...new Set(browseProducts.map(p => p.type).filter(Boolean) as string[])].sort();
+                if (areaTypes.length <= 1) return null;
+                return (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setBrowseAreaTypeFilter(null)}
+                      className={`text-xs rounded-full px-2.5 py-0.5 border transition-colors ${!browseAreaTypeFilter ? "bg-gray-900 text-white border-gray-900" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}
+                    >
+                      All
+                    </button>
+                    {areaTypes.map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setBrowseAreaTypeFilter(prev => prev === t ? null : t)}
+                        className={`text-xs rounded-full px-2.5 py-0.5 border transition-colors ${browseAreaTypeFilter === t ? "bg-gray-900 text-white border-gray-900" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
               {/* Browse search + filter chips */}
               {!browseLoading && browseProducts.length > 0 && (() => {
                 const ingText = (p: BrowseProduct) => (p.ingredient_list ?? "").toLowerCase();
                 const excludeLists = ingredientLists.filter(l => listModes[l.id] === "exclude" && l.items.length > 0);
                 const includeLists = ingredientLists.filter(l => listModes[l.id] === "include" && l.items.length > 0);
                 const profileCats = profileMatchedCategories(activeSkinTypes, activeClimates);
-                const searchCandidates = browseSearch.trim()
-                  ? tokenFuzzyFilter(browseProducts, browseSearch, ["name", "brand"])
+                const areaFiltered = browseAreaTypeFilter
+                  ? browseProducts.filter(p => p.type === browseAreaTypeFilter)
                   : browseProducts;
+                const searchCandidates = browseSearch.trim()
+                  ? tokenFuzzyFilter(areaFiltered, browseSearch, ["name", "brand"])
+                  : areaFiltered;
                 const filtered = searchCandidates.filter(p => {
                   if (browsePhotosafe && p.photoCount > 0) return false;
                   if (browseProfileLinked && ((p.profileFlaggedCount ?? 0) + (p.profileSensoryCount ?? 0)) > 0) return false;
@@ -3476,10 +3547,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         type="text"
                         value={browseSearch}
                         onChange={(e) => setBrowseSearch(e.target.value)}
-                        placeholder={`Search ${browseSelectedType ?? "products"}…`}
+                        placeholder={`Search ${browseAreaTypeFilter ?? browseSelectedType ?? browseSelectedArea ?? "products"}…`}
                         className="flex-1 min-w-0 text-sm border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:border-gray-400"
                       />
-                      {activeFilterCount > 0 && filtered.length !== browseProducts.length && (
+                      {(activeFilterCount > 0 || browseAreaTypeFilter) && filtered.length !== browseProducts.length && (
                         <span className="text-xs text-gray-400 shrink-0 tabular-nums">{filtered.length}/{browseProducts.length}</span>
                       )}
                       <div className="relative shrink-0">
