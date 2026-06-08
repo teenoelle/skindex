@@ -331,10 +331,6 @@ export default function BuiltInListPage() {
       .then(d => {
         const newItems: Item[] = d.items ?? [];
         setItems(newItems);
-        // Only neutral-beneficial starts expanded; concern lists start collapsed
-        if (slug === "neutral-beneficial") {
-          setExpandedGroups(new Set(newItems.map(i => i.category)));
-        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -354,6 +350,7 @@ export default function BuiltInListPage() {
 
   const filtered = q.trim() ? items.filter(i => i.name.toLowerCase().includes(q.trim().toLowerCase())) : items;
   const groups = buildGroups(filtered, slug, skinTypes, climates);
+  const effectiveExpandedGroups = q.trim() ? new Set(groups.map(g => g.cat)) : expandedGroups;
 
   return (
     <div className="min-h-screen bg-white">
@@ -490,7 +487,7 @@ export default function BuiltInListPage() {
             <p className="text-xs text-gray-400 mb-4">{filtered.length.toLocaleString()} ingredient{filtered.length !== 1 ? "s" : ""}{q ? " matching" : ""}</p>
             <div className="space-y-3">
               {groups.map(group => {
-                const isGroupExpanded = expandedGroups.has(group.cat);
+                const isGroupExpanded = effectiveExpandedGroups.has(group.cat);
                 const groupColor = slug === "universal-concerns" ? "text-rose-700"
                   : slug === "my-sensitivities" ? "text-amber-700"
                   : slug === "environmental-concerns" ? "text-emerald-700"
