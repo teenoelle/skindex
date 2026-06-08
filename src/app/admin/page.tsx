@@ -560,8 +560,12 @@ export default function AdminPage() {
   const [filterFlaggedByUser, setFilterFlaggedByUser] = useState(false);
   const [filterInReview, setFilterInReview] = useState(false);
   const [filterFailedImport, setFilterFailedImport] = useState(false);
+  const [filterDuplicates, setFilterDuplicates] = useState(false);
   const [reportedProductIds, setReportedProductIds] = useState<Set<string>>(new Set());
   const [inReviewProductIds, setInReviewProductIds] = useState<Set<string>>(new Set());
+  const [suspectedDuplicates, setSuspectedDuplicates] = useState<{ product_a_id: string; product_b_id: string; similarity: number }[]>([]);
+  const [duplicateProductIds, setDuplicateProductIds] = useState<Set<string>>(new Set());
+  const [dismissingDuplicate, setDismissingDuplicate] = useState<string | null>(null);
   const [requeueingProduct, setRequeuingProduct] = useState<string | null>(null);
   const [requeueResult, setRequeueResult] = useState<Record<string, "ok" | "failed">>({});
   const [reportDiffs, setReportDiffs] = useState<Record<string, ReportDiff>>({});
@@ -1065,6 +1069,7 @@ export default function AdminPage() {
       for (const p of products) initEdits[p.id] = initEdit(p, FALLBACK_TYPES_SET);
       setAllEdits(initEdits);
       loadProductReports();
+      loadDuplicates();
     } catch {
       // ignore
     }
@@ -1079,6 +1084,39 @@ export default function AdminPage() {
       setReportedProductIds(new Set(data.openProductIds ?? []));
       setInReviewProductIds(new Set(data.inReviewProductIds ?? []));
     } catch { }
+  }
+
+  async function loadDuplicates() {
+    try {
+      const res = await fetch("/api/admin/duplicates");
+      if (!res.ok) return;
+      const data = await res.json();
+      const pairs: { product_a_id: string; product_b_id: string; similarity: number }[] = data.pairs ?? [];
+      setSuspectedDuplicates(pairs);
+      const ids = new Set<string>();
+      for (const p of pairs) { ids.add(p.product_a_id); ids.add(p.product_b_id); }
+      setDuplicateProductIds(ids);
+    } catch { }
+  }
+
+  async function handleDismissDuplicate(productAId: string, productBId: string) {
+    const key = `${productAId}:${productBId}`;
+    setDismissingDuplicate(key);
+    try {
+      await fetch("/api/admin/duplicates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "dismiss", product_a_id: productAId, product_b_id: productBId }),
+      });
+      setSuspectedDuplicates((prev) => prev.filter((p) => !(p.product_a_id === productAId && p.product_b_id === productBId)));
+      setDuplicateProductIds((prev) => {
+        const remaining = suspectedDuplicates.filter((p) => !(p.product_a_id === productAId && p.product_b_id === productBId));
+        const ids = new Set<string>();
+        for (const p of remaining) { ids.add(p.product_a_id); ids.add(p.product_b_id); }
+        return ids;
+      });
+    } catch { }
+    setDismissingDuplicate(null);
   }
 
   async function handleRequeueProduct(p: AllProduct) {
@@ -1645,6 +1683,7 @@ export default function AdminPage() {
     flaggedByUser: allProducts.filter((p) => reportedProductIds.has(p.id)).length,
     inReview: allProducts.filter((p) => inReviewProductIds.has(p.id)).length,
     failedImport: allProducts.filter((p) => p.source === "failed-import").length,
+    duplicates: allProducts.filter((p) => duplicateProductIds.has(p.id)).length,
   };
 
   const sortedAllProducts = useMemo(() => [...allProducts].sort((a, b) => {
@@ -1672,8 +1711,9 @@ export default function AdminPage() {
     .filter((p) => !filterPending || p.is_pending)
     .filter((p) => !filterFlaggedByUser || reportedProductIds.has(p.id))
     .filter((p) => !filterInReview || inReviewProductIds.has(p.id))
-    .filter((p) => !filterFailedImport || p.source === "failed-import"),
-  [sortedAllProducts, allSearch, allBrandFilter, filterMissingSource, filterMissingIherb, filterMissingImage, filterMissingType, filterMissingIngredients, filterSuspicious, filterPending, filterFlaggedByUser, filterInReview, filterFailedImport, reportedProductIds, inReviewProductIds, activeTypesSet]);
+    .filter((p) => !filterFailedImport || p.source === "failed-import")
+    .filter((p) => !filterDuplicates || duplicateProductIds.has(p.id)),
+  [sortedAllProducts, allSearch, allBrandFilter, filterMissingSource, filterMissingIherb, filterMissingImage, filterMissingType, filterMissingIngredients, filterSuspicious, filterPending, filterFlaggedByUser, filterInReview, filterFailedImport, filterDuplicates, reportedProductIds, inReviewProductIds, duplicateProductIds, activeTypesSet]);
 
   const filteredAuditLog = useMemo(() => {
     const search = auditSearch.toLowerCase();
@@ -2374,6 +2414,7 @@ export default function AdminPage() {
                   ["No type", filterMissingType, setFilterMissingType, allStats.missingType],
                   ["No ingredients", filterMissingIngredients, setFilterMissingIngredients, allStats.missingIngredients],
                   ["Suspicious", filterSuspicious, setFilterSuspicious, allStats.suspicious],
+                  ["Duplicates", filterDuplicates, setFilterDuplicates, allStats.duplicates],
                 ] as [string, boolean, (v: (p: boolean) => boolean) => void, number][]).map(([label, value, set, count]) => (
                   <button
                     key={label}
@@ -2796,6 +2837,47 @@ export default function AdminPage() {
                               );
                             })}
                           </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Duplicate pairs panel */}
+                    {(() => {
+                      const pairs = suspectedDuplicates.filter(
+                        (pair) => pair.product_a_id === p.id || pair.product_b_id === p.id
+                      );
+                      if (pairs.length === 0) return null;
+                      return (
+                        <div className="mt-3 border border-orange-100 rounded-xl bg-orange-50/40 p-3 space-y-2">
+                          <p className="text-xs font-semibold text-orange-700">
+                            Possible duplicate{pairs.length > 1 ? "s" : ""} ({pairs.length})
+                          </p>
+                          {pairs.map((pair) => {
+                            const otherId = pair.product_a_id === p.id ? pair.product_b_id : pair.product_a_id;
+                            const other = allProducts.find((q) => q.id === otherId);
+                            const key = `${pair.product_a_id}:${pair.product_b_id}`;
+                            return (
+                              <div key={key} className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-xs text-orange-600 bg-orange-100 rounded-full px-1.5 py-0.5 shrink-0">
+                                    {Math.round(pair.similarity * 100)}% match
+                                  </span>
+                                  <span className="text-xs text-gray-700 truncate">
+                                    {other?.name ?? otherId}
+                                    {other?.brand && <span className="text-gray-400"> · {other.brand}</span>}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDismissDuplicate(pair.product_a_id, pair.product_b_id)}
+                                  disabled={dismissingDuplicate === key}
+                                  className="text-xs px-2 py-1 border border-gray-200 rounded-lg text-gray-400 hover:text-gray-600 hover:border-gray-400 disabled:opacity-40 shrink-0"
+                                >
+                                  {dismissingDuplicate === key ? "…" : "Dismiss"}
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     })()}

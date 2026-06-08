@@ -34,6 +34,15 @@ export async function queueIngredients(
       .upsert(rows, { onConflict: "product_id,ingredient_id" });
   }
 
+  // Recompute duplicate pairs: clear pending pairs first (keeps dismissed intact),
+  // then re-detect against all same-brand approved products.
+  await supabaseAdmin
+    .from("suspected_duplicates")
+    .delete()
+    .or(`product_a_id.eq.${productId},product_b_id.eq.${productId}`)
+    .eq("status", "pending");
+  await supabaseAdmin.rpc("find_duplicates_for_product", { target_id: productId });
+
   // Queue unrecognised ingredients for AI classification
   for (const name of unreviewed) {
     if (isLikelyJunk(name)) continue;
