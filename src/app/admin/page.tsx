@@ -698,50 +698,6 @@ function DuplicateClusterBucket({
         })}
       </div>
 
-      {/* Link comparison rows (C + D) */}
-      {(() => {
-        const linkTypes = [
-          { label: "iHerb",  urls: products.map((p) => p.iherb_url  ?? null) },
-          { label: "Source", urls: products.map((p) => p.source_url ?? null) },
-        ].filter(({ urls }) => urls.some(Boolean));
-        if (linkTypes.length === 0) return null;
-        return (
-          <div className="border-t border-orange-100 px-4 py-3 space-y-2">
-            {linkTypes.map(({ label, urls }) => {
-              const filled = urls.filter((u): u is string => !!u);
-              return (
-                <div key={label} className="flex items-center gap-3">
-                  <span className="text-[11px] font-medium text-gray-400 w-12 shrink-0">{label}</span>
-                  <div className={`flex-1 grid gap-2 min-w-0 ${products.length >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
-                    {urls.map((url, i) =>
-                      url ? (
-                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                          title={url}
-                          className="text-[11px] text-indigo-600 hover:text-indigo-800 hover:underline underline-offset-2 truncate"
-                        >
-                          {getDomain(url)} ↗
-                        </a>
-                      ) : (
-                        <span key={i} className="text-[11px] text-gray-300">—</span>
-                      )
-                    )}
-                  </div>
-                  {filled.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => filled.forEach((u) => window.open(u, "_blank", "noopener,noreferrer"))}
-                      className="text-[11px] text-indigo-500 hover:text-indigo-700 shrink-0 transition-colors"
-                    >
-                      Open {filled.length === 2 ? "both" : "all"} ↗
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
-
       {/* Exclusive ingredient chips + full diff */}
       {diff && (diff.onlyInA.length > 0 || diff.onlyInB.length > 0) && primaryPair && (
         <div className="px-4 py-3 border-t border-orange-100 space-y-2.5">
