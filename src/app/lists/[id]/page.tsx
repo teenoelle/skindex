@@ -122,9 +122,9 @@ export default function ListDetailPage() {
           cats.add("vasodilator");
         if (skinTypes.has("fungal_acne") || skinTypes.has("seborrheic"))
           cats.add("fungal-feed");
-        if (climates.has("pregnant") || climates.has("breastfeeding") || climates.has("hormone_sensitive") || climates.has("on_hrt"))
+        if (climates.has("pregnant") || climates.has("breastfeeding") || climates.has("hormone_sensitive") || climates.has("on_hrt") || climates.has("perimenopausal") || climates.has("menopausal") || climates.has("pcos") || climates.has("on_testosterone"))
           cats.add("endocrine disruptor");
-        if (climates.has("hormone_sensitive") || climates.has("on_hrt"))
+        if (climates.has("hormone_sensitive") || climates.has("on_hrt") || climates.has("perimenopausal") || climates.has("menopausal") || climates.has("pcos"))
           cats.add("phytoestrogen");
         if (climates.has("pregnant"))
           cats.add("teratogen");

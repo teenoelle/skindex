@@ -62,6 +62,10 @@ export const CLIMATE_LABEL: Record<string, string> = {
   hormone_sensitive: "Hormone-sensitive",
   thyroid_condition: "Thyroid condition",
   on_hrt: "On HRT",
+  perimenopausal: "Perimenopausal",
+  menopausal: "Menopausal",
+  pcos: "PCOS",
+  on_testosterone: "On testosterone",
   smoking: "Smoking / tobacco",
 };
 

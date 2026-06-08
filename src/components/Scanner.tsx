@@ -506,6 +506,10 @@ const CLIMATE_NOTES: Record<ClimateType, string> = {
   hormone_sensitive: "For hormone-sensitive conditions (estrogen receptor-positive cancer, endometriosis, PCOS, fibroids), phytoestrogens and estrogen-mimicking topical ingredients are a relevant concern. Key ingredients: parabens (methylparaben, propylparaben, butylparaben) — weak estrogen mimics; lavender oil and tea tree oil — associated with hormonal effects in studies; soy isoflavones and fermented extracts — phytoestrogenic botanicals. Oxybenzone also has documented endocrine-disrupting activity.",
   thyroid_condition: "For thyroid conditions (hypothyroidism, Hashimoto's, Graves'), iodine-containing topical ingredients are worth noting — povidone-iodine, kelp extract, sea algae, and certain marine extracts deliver iodine that is partially absorbed through skin and may affect thyroid function or interact with thyroid medication. Most relevant for leave-on products applied to large surface areas over time.",
   on_hrt: "For those on hormone replacement therapy or hormonal medications (oral contraceptives, bioidentical hormones), phytoestrogens and estrogen-mimicking topical ingredients can theoretically interact with hormone levels. Parabens, soy isoflavones, lavender oil, and licorice root (glycyrrhizic acid is mildly estrogenic) are the main topical ingredients with documented estrogenic activity. Clinical significance of topical exposure is lower than oral, but is most relevant at high-absorption sites (inner arms, chest, neck).",
+  perimenopausal: "During perimenopause, fluctuating estrogen creates an unpredictable hormonal environment — sebum spikes can cause adult acne while declining estrogen causes dryness and barrier thinning simultaneously. Phytoestrogens (soy isoflavones, fermented extracts) and estrogen-mimicking topicals (parabens, oxybenzone, lavender oil) are relevant considerations. Ingredients that address both oiliness and barrier support are particularly valuable in this phase.",
+  menopausal: "Post-menopausal estrogen loss causes sustained skin thinning, reduced collagen synthesis, increased dryness, and slower cell turnover. Phytoestrogens and estrogen-mimicking topical ingredients (parabens, soy, lavender oil) are a relevant consideration for those managing hormone-sensitive conditions. Ingredients that support barrier function, collagen synthesis, and moisture retention are core priorities.",
+  pcos: "PCOS elevates androgens — testosterone and DHT — driving excess sebum, acne along the jawline and chin, and sometimes hirsutism. Topical phytoestrogens and endocrine-disrupting ingredients (parabens, oxybenzone, lavender oil, tea tree oil) are relevant because they interact with the hormonal environment already dysregulated by PCOS. Anti-inflammatory and oil-controlling actives are particularly beneficial.",
+  on_testosterone: "Exogenous testosterone (prescribed TRT or gender-affirming HRT) significantly increases sebum production and acne risk through DHT conversion. Phytoestrogens and endocrine-disrupting topicals can theoretically interact with androgen levels. The skin response is similar to androgenic acne — oil-controlling, comedolytic, and anti-inflammatory actives are the most relevant categories.",
   smoking: "Tobacco smoke generates reactive oxygen species that deplete skin vitamins C and E, activate metalloproteinases that break down collagen and elastin, impair microcirculation, and increase transepidermal water loss by disrupting the lipid barrier. The clinical result is accelerated photoaging, impaired wound healing, dull complexion, and a lower threshold for contact sensitizer reactions. Key topical priorities: vitamin C and antioxidants (replenish what smoke depletes), peptides and retinoids (counter collagen breakdown), and ceramides with fatty acids (restore barrier function).",
 };
 
@@ -554,6 +558,8 @@ function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateT
   if (climates.has("hormone_sensitive")) cats.push("Phytoestrogens", "Endocrine disruptors", "Parabens");
   if (climates.has("thyroid_condition")) cats.push("Iodine-heavy ingredients");
   if (climates.has("on_hrt")) cats.push("Phytoestrogens", "Endocrine disruptors");
+  if (climates.has("perimenopausal") || climates.has("menopausal") || climates.has("pcos")) cats.push("Phytoestrogens", "Endocrine disruptors");
+  if (climates.has("on_testosterone")) cats.push("Endocrine disruptors");
   if (climates.has("smoking")) cats.push("Sensitizers", "Fragrance allergens");
   return [...new Set(cats)];
 }
@@ -669,8 +675,8 @@ function isFcProfileMatch(fc: string, activeSkinTypes: Set<SkinType>, activeClim
     (fc === "fragrance-allergen" && activeSkinTypes.has("fast_shedding")) ||
     (fc.toLowerCase() === "chemical sunscreen" && (activeClimates.has("pregnant") || activeClimates.has("breastfeeding"))) ||
     (fc === "photo-retinoid" && activeClimates.has("pregnant")) ||
-    (fc === "endocrine disruptor" && (activeClimates.has("pregnant") || activeClimates.has("breastfeeding") || activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt"))) ||
-    (fc === "phytoestrogen" && (activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt"))) ||
+    (fc === "endocrine disruptor" && (activeClimates.has("pregnant") || activeClimates.has("breastfeeding") || activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt") || activeClimates.has("perimenopausal") || activeClimates.has("menopausal") || activeClimates.has("pcos") || activeClimates.has("on_testosterone"))) ||
+    (fc === "phytoestrogen" && (activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt") || activeClimates.has("perimenopausal") || activeClimates.has("menopausal") || activeClimates.has("pcos"))) ||
     (fc === "teratogen" && activeClimates.has("pregnant")) ||
     (fc === "iodine-heavy" && activeClimates.has("thyroid_condition")) ||
     ((fc === "sensitizer" || fc === "fragrance-allergen") && activeClimates.has("smoking")) ||

@@ -14,6 +14,7 @@ export type ClimateType =
   | "spicy_foods" | "high_iodine_diet" | "sulfites_diet" | "benzoates_diet" | "nitrites_diet"
   | "bha_bht_diet" | "propionates_diet" | "carmine_diet"
   | "pregnant" | "breastfeeding" | "hormone_sensitive" | "thyroid_condition" | "on_hrt"
+  | "perimenopausal" | "menopausal" | "pcos" | "on_testosterone"
   | "smoking";
 
 export const SKIN_TYPES: { value: SkinType; label: string }[] = [
@@ -93,6 +94,10 @@ export const HORMONE_TYPES: { value: ClimateType; label: string }[] = [
   { value: "hormone_sensitive", label: "Hormone-sensitive" },
   { value: "thyroid_condition", label: "Thyroid condition" },
   { value: "on_hrt", label: "On HRT" },
+  { value: "perimenopausal", label: "Perimenopausal" },
+  { value: "menopausal", label: "Menopausal" },
+  { value: "pcos", label: "PCOS" },
+  { value: "on_testosterone", label: "On testosterone" },
 ];
 
 export const LIFESTYLE_TYPES: { value: ClimateType; label: string }[] = [
@@ -171,6 +176,10 @@ export const CLIMATE_NOTES: Record<ClimateType, string> = {
   hormone_sensitive: "For hormone-sensitive conditions, phytoestrogens and estrogen-mimicking topical ingredients are a relevant concern. Key: parabens, lavender oil, tea tree oil, soy isoflavones.",
   thyroid_condition: "For thyroid conditions, iodine-containing topical ingredients are worth noting — povidone-iodine, kelp extract, sea algae may affect thyroid function.",
   on_hrt: "For those on HRT, phytoestrogens and estrogen-mimicking topical ingredients can theoretically interact with hormone levels.",
+  perimenopausal: "During perimenopause, fluctuating estrogen causes alternating acne and dryness. Phytoestrogens and endocrine-disrupting topicals are relevant.",
+  menopausal: "Post-menopausal estrogen decline causes dryness and skin thinning. Phytoestrogens and endocrine-disrupting topicals are a relevant consideration.",
+  pcos: "PCOS elevates androgens, driving sebum, acne, and oiliness. Phytoestrogen and endocrine-disrupting topical ingredients are relevant considerations.",
+  on_testosterone: "Exogenous testosterone increases sebum and acne risk via DHT conversion. Phytoestrogen and endocrine-disrupting ingredients are relevant.",
   smoking: "Tobacco smoke depletes skin vitamins C and E, activates metalloproteinases that break down collagen, and impairs microcirculation. Key priorities: antioxidants, peptides, ceramides.",
 };
 
