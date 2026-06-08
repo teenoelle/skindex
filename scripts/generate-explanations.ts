@@ -27,6 +27,8 @@ import { getOilCategories, generateFattyAcidNotes } from "../src/lib/fatty-acid-
 import { getBioactiveProfile } from "../src/lib/bioactive-ai.js";
 import { getBioactiveCategories, generateBioactiveNotes } from "../src/lib/bioactive-concerns.js";
 import { profilesFromNotes, mergeProfileLabels } from "../src/lib/profile-labels.js";
+import { generateProfileBenefitNote } from "../src/lib/profile-benefit-ai.js";
+import { PROFILE_BENEFIT_CATS, PROFILE_NOTE_FIELD, getAllBenefitDbKeys, getCategoryDisplayLabel } from "../src/lib/profile-benefit-cats.js";
 import type { ExplanationStructured, SkinClimateNote } from "../src/types/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -386,6 +388,95 @@ async function runPass(passNum: number): Promise<{ upgraded: number; remaining: 
   return { upgraded, remaining: counts.weak + counts.needsProfile };
 }
 
+// ── queue 5: profile benefit notes ───────────────────────────────────────────
+// For each profile in PROFILE_BENEFIT_CATS, find ingredients whose category is
+// in that profile's benefit list but are missing a benefit note for that profile.
+// Generates and appends a profile-specific note via AI.
+
+async function runProfileBenefitPass(passNum: number): Promise<{ written: number; found: number }> {
+  const allDbKeys = getAllBenefitDbKeys();
+
+  const { data: ingredients, error } = await supabase
+    .from("ingredients")
+    .select("id, name, category, skin_climate_notes")
+    .in("category", allDbKeys)
+    .order("name")
+    .limit(BATCH * 10);
+
+  if (error) throw new Error(`Profile benefit fetch: ${error.message}`);
+  if (!ingredients?.length) return { written: 0, found: 0 };
+
+  type WorkItem = { id: string; name: string; profileKey: string; categoryLabel: string };
+  const toProcess: WorkItem[] = [];
+
+  for (const ing of ingredients) {
+    const categoryLabel = getCategoryDisplayLabel(ing.category ?? "");
+    const existingNotes = Array.isArray(ing.skin_climate_notes) ? ing.skin_climate_notes as SkinClimateNote[] : [];
+
+    for (const [profileKey, benefitLabels] of Object.entries(PROFILE_BENEFIT_CATS)) {
+      if (!benefitLabels?.includes(categoryLabel)) continue;
+      const field = PROFILE_NOTE_FIELD[profileKey];
+      if (!field) continue;
+      const alreadyHas = existingNotes.some((n) =>
+        n.sentiment === "benefit" &&
+        (field === "climate"
+          ? (n.climate ?? []).includes(profileKey)
+          : (n.dimensions ?? []).includes(profileKey)),
+      );
+      if (!alreadyHas) toProcess.push({ id: ing.id, name: ing.name, profileKey, categoryLabel });
+    }
+
+    if (toProcess.length >= BATCH * 3) break;
+  }
+
+  if (!toProcess.length) return { written: 0, found: 0 };
+
+  if (DRY_RUN) {
+    console.log(`\nProfile benefit pass ${passNum} — ${toProcess.length} note(s) would be generated:\n`);
+    for (const { name, profileKey, categoryLabel } of toProcess.slice(0, BATCH)) {
+      console.log(`  ${name} [${categoryLabel}] → ${profileKey}`);
+    }
+    return { written: 0, found: toProcess.length };
+  }
+
+  let written = 0;
+  for (const { id, name, profileKey, categoryLabel } of toProcess.slice(0, BATCH)) {
+    const label = name.length > 45 ? name.slice(0, 42) + "…" : name;
+    process.stdout.write(`  [benefit] ${label} → ${profileKey} … `);
+
+    const note = await generateProfileBenefitNote(name, categoryLabel, profileKey);
+    if (!note) {
+      console.log("✗ (AI unavailable — will retry)");
+      continue;
+    }
+
+    // Re-fetch to avoid clobbering concurrent writes
+    const { data: fresh } = await supabase
+      .from("ingredients")
+      .select("skin_climate_notes")
+      .eq("id", id)
+      .single();
+
+    const currentNotes = Array.isArray(fresh?.skin_climate_notes)
+      ? fresh.skin_climate_notes as SkinClimateNote[]
+      : [];
+
+    const { error: updateError } = await supabase
+      .from("ingredients")
+      .update({ skin_climate_notes: [...currentNotes, note] })
+      .eq("id", id);
+
+    if (updateError) {
+      console.log(`✗ (${updateError.message})`);
+    } else {
+      console.log("✓");
+      written++;
+    }
+  }
+
+  return { written, found: toProcess.length };
+}
+
 // ── product watch notifications ───────────────────────────────────────────────
 
 async function notifyWatchers(): Promise<void> {
@@ -432,12 +523,13 @@ async function main() {
   const initial = await getCounts();
   const initialQueue = await getQueueCount();
   console.log(`\nGenerate Explanations`);
-  console.log(`  Queue (new)       : ${initialQueue}`);
-  console.log(`  Weak explanations : ${initial.weak}`);
-  console.log(`  Needs profile     : ${initial.needsProfile}`);
-  console.log(`  Batch size        : ${BATCH}`);
-  if (DRY_RUN) console.log(`  Mode              : DRY RUN`);
-  if (LOOP) console.log(`  Mode              : LOOP until empty`);
+  console.log(`  Queue (new)          : ${initialQueue}`);
+  console.log(`  Weak explanations    : ${initial.weak}`);
+  console.log(`  Needs profile        : ${initial.needsProfile}`);
+  console.log(`  Profile benefit notes: (checked per pass)`);
+  console.log(`  Batch size           : ${BATCH}`);
+  if (DRY_RUN) console.log(`  Mode                 : DRY RUN`);
+  if (LOOP) console.log(`  Mode                 : LOOP until empty`);
   console.log("");
 
   if (initialQueue + initial.weak + initial.needsProfile === 0) {
@@ -462,7 +554,12 @@ async function main() {
       console.log(`\n  Pass ${pass}: ${upgraded} processed, ${explRemaining} remaining\n`);
     }
 
-    if (!LOOP || (queueRemaining === 0 && explRemaining === 0) || DRY_RUN) break;
+    const { written: benefitWritten, found: benefitFound } = await runProfileBenefitPass(pass);
+    if (!DRY_RUN && benefitFound > 0) {
+      console.log(`\n  Benefit pass ${pass}: ${benefitWritten} written, ${benefitFound - benefitWritten} remaining\n`);
+    }
+
+    if (!LOOP || (queueRemaining === 0 && explRemaining === 0 && benefitFound === 0) || DRY_RUN) break;
     pass++;
     await new Promise(r => setTimeout(r, 2000));
   }

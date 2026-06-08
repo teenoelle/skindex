@@ -8,6 +8,7 @@ import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, B
 import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, Routine, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 import { SENSORY_PROFILE_MAP, CONCERN_PROFILE_TYPES } from "@/lib/sensory";
+import { PROFILE_BENEFIT_CATS } from "@/lib/profile-benefit-cats";
 import { tokenFuzzyFilter } from "@/lib/search";
 import { splitIngredientList } from "@/lib/scanner";
 import ConcernChips from "@/components/ConcernChips";
@@ -520,34 +521,6 @@ function noteLabel(n: SkinClimateNote): string {
 }
 
 // climateNoteStyle imported from @/lib/skin-profile
-
-// Maps profile keys to the safe ingredient category display labels that are
-// specifically beneficial for that profile (not just generically good for skin).
-// Values must match the display labels produced by CATEGORY_LABELS.
-const PROFILE_BENEFIT_CATS: Partial<Record<string, string[]>> = {
-  // Skin types
-  acne_prone:              ["Sebum-regulating", "BHA Exfoliant", "Anti-inflammatory"],
-  mature:                  ["Retinoid", "Firming", "Cell-communicating", "Humectant"],
-  hyperpigmentation_prone: ["Photo-protective", "Brightening", "Antioxidant"],
-  damaged_barrier:         ["Barrier-repairing", "Barrier support", "Prebiotic"],
-  eczema:                  ["Barrier-repairing", "Soothing", "Anti-inflammatory", "Prebiotic"],
-  rosacea:                 ["Soothing", "Anti-inflammatory"],
-  fungal_acne:             ["Antifungal"],
-  seborrheic:              ["Antifungal", "Sebum-regulating"],
-  // Hormonal / health
-  menopausal:       ["Humectant", "Emollient", "Barrier-repairing", "Retinoid", "Firming", "Cell-communicating", "Antioxidant", "Skin-replenishing"],
-  perimenopausal:   ["Barrier-repairing", "Humectant", "Antioxidant", "Soothing"],
-  pcos:             ["Sebum-regulating", "BHA Exfoliant", "Anti-inflammatory", "Antioxidant"],
-  on_testosterone:  ["Sebum-regulating", "BHA Exfoliant", "Anti-inflammatory"],
-  thyroid_condition:["Humectant", "Emollient", "Barrier-repairing"],
-  // Diet / lifestyle
-  smoking:       ["Antioxidant", "Cell-communicating"],
-  high_glycemic: ["Sebum-regulating", "Anti-inflammatory"],
-  dairy_regular: ["Sebum-regulating"],
-  // Environmental
-  chlorinated_water: ["Antioxidant"],
-  iron_water:        ["Chelating", "Antioxidant"],
-};
 
 function profileBenefitCategorySet(skinTypes: Set<SkinType>, climates: Set<ClimateType>): Set<string> {
   const result = new Set<string>();
