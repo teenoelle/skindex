@@ -7,9 +7,7 @@ import { useSkinProfile } from "@/context/SkinProfileContext";
 import {
   SKIN_TYPES, CLIMATE_TYPES, WATER_TYPES, DEVICE_TYPES,
   SUPPLEMENT_TYPES, DIET_TYPES, HORMONE_TYPES, LIFESTYLE_TYPES,
-  climateNoteStyle,
 } from "@/lib/skin-profile";
-import type { ClimateType } from "@/lib/skin-profile";
 
 const SMART_LISTS = [
   { id: "universal-concerns", name: "Universal Concerns", color: "text-rose-700" },
@@ -162,7 +160,12 @@ export default function SidePanel() {
               onClick={() => setProfileExpanded((v) => !v)}
               className="flex items-center justify-between w-full mb-2 group"
             >
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Skin type</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                Skin type
+                {activeSkinTypes.size > 0 && (
+                  <span className="ml-1.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-1.5 py-0">{activeSkinTypes.size}</span>
+                )}
+              </span>
               <svg className={`w-3.5 h-3.5 text-gray-300 transition-transform ${profileExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
@@ -211,13 +214,12 @@ export default function SidePanel() {
                     <div className="flex flex-wrap gap-1">
                       {group.items.map((item) => {
                         const active = activeClimates.has(item.value);
-                        const style = climateNoteStyle(item.value as ClimateType);
                         return (
                           <button
                             key={item.value}
                             type="button"
                             onClick={() => toggleClimate(item.value)}
-                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${active ? `${style} font-medium` : "border-gray-100 text-gray-500 hover:border-gray-300"}`}
+                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${active ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
                           >
                             {item.label}
                           </button>
@@ -229,18 +231,6 @@ export default function SidePanel() {
               </div>
             )}
 
-            {/* Active modifiers summary when collapsed */}
-            {!modifiersExpanded && activeClimates.size > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {[...activeClimates].map((c) => {
-                  const label = MODIFIER_GROUPS.flatMap(g => g.items).find(i => i.value === c)?.label ?? c;
-                  const style = climateNoteStyle(c as ClimateType);
-                  return (
-                    <span key={c} className={`text-xs px-2 py-0.5 rounded-full border ${style}`}>{label}</span>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
           {!hasProfile && (
@@ -249,9 +239,9 @@ export default function SidePanel() {
 
           <div className="border-t border-gray-100 mx-4" />
 
-          {/* Built-in lists */}
+          {/* Ingredient Lists — built-in + user's saved */}
           <div className="px-4 pt-3 pb-2">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Lists</p>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Ingredient Lists</p>
             <div className="space-y-1">
               {SMART_LISTS.map((sl) => (
                 <Link
@@ -267,6 +257,20 @@ export default function SidePanel() {
                 </Link>
               ))}
             </div>
+            {isLoaded && isSignedIn && ingredientLists.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
+                {ingredientLists.slice(0, 4).map((l) => (
+                  <Link
+                    key={l.id}
+                    href={`/lists?tab=ingredients`}
+                    onClick={toggleOpen}
+                    className="block py-1.5 text-sm text-gray-700 hover:text-gray-900 hover:underline underline-offset-2 truncate"
+                  >
+                    {l.name}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Saved product lists — only for signed-in users */}
@@ -275,7 +279,7 @@ export default function SidePanel() {
               <div className="border-t border-gray-100 mx-4" />
               <div className="px-4 pt-3 pb-2">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">My product lists</p>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Product lists</p>
                   <Link href="/lists" onClick={toggleOpen} className="text-xs text-gray-400 hover:text-gray-700">View all →</Link>
                 </div>
                 {userLists.length === 0 ? (
@@ -300,29 +304,6 @@ export default function SidePanel() {
                 )}
               </div>
 
-              {/* Saved ingredient lists */}
-              {ingredientLists.length > 0 && (
-                <>
-                  <div className="border-t border-gray-100 mx-4" />
-                  <div className="px-4 pt-3 pb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">My ingredient lists</p>
-                    </div>
-                    <div className="space-y-1">
-                      {ingredientLists.slice(0, 4).map((l) => (
-                        <Link
-                          key={l.id}
-                          href={`/lists?tab=ingredients`}
-                          onClick={toggleOpen}
-                          className="block py-1.5 text-sm text-gray-700 hover:text-gray-900 hover:underline underline-offset-2 truncate"
-                        >
-                          {l.name}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
             </>
           )}
 
