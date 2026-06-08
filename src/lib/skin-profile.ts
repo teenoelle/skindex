@@ -177,7 +177,7 @@ export const CLIMATE_NOTES: Record<ClimateType, string> = {
   thyroid_condition: "For thyroid conditions, iodine-containing topical ingredients are worth noting — povidone-iodine, kelp extract, sea algae may affect thyroid function.",
   on_hrt: "For those on HRT, phytoestrogens and estrogen-mimicking topical ingredients can theoretically interact with hormone levels.",
   perimenopausal: "During perimenopause, fluctuating estrogen causes alternating acne and dryness. Phytoestrogens and endocrine-disrupting topicals are relevant.",
-  menopausal: "Post-menopausal estrogen decline causes dryness and skin thinning. Phytoestrogens and endocrine-disrupting topicals are a relevant consideration.",
+  menopausal: "Post-menopausal estrogen decline causes dryness and skin thinning. Topical phytoestrogens are studied as beneficial for this phase — endocrine-disrupting ingredients (parabens, oxybenzone) remain a consideration.",
   pcos: "PCOS elevates androgens, driving sebum, acne, and oiliness. Phytoestrogen and endocrine-disrupting topical ingredients are relevant considerations.",
   on_testosterone: "Exogenous testosterone increases sebum and acne risk via DHT conversion. Phytoestrogen and endocrine-disrupting ingredients are relevant.",
   smoking: "Tobacco smoke depletes skin vitamins C and E, activates metalloproteinases that break down collagen, and impairs microcirculation. Key priorities: antioxidants, peptides, ceramides.",

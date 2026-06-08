@@ -507,7 +507,7 @@ const CLIMATE_NOTES: Record<ClimateType, string> = {
   thyroid_condition: "For thyroid conditions (hypothyroidism, Hashimoto's, Graves'), iodine-containing topical ingredients are worth noting — povidone-iodine, kelp extract, sea algae, and certain marine extracts deliver iodine that is partially absorbed through skin and may affect thyroid function or interact with thyroid medication. Most relevant for leave-on products applied to large surface areas over time.",
   on_hrt: "For those on hormone replacement therapy or hormonal medications (oral contraceptives, bioidentical hormones), phytoestrogens and estrogen-mimicking topical ingredients can theoretically interact with hormone levels. Parabens, soy isoflavones, lavender oil, and licorice root (glycyrrhizic acid is mildly estrogenic) are the main topical ingredients with documented estrogenic activity. Clinical significance of topical exposure is lower than oral, but is most relevant at high-absorption sites (inner arms, chest, neck).",
   perimenopausal: "During perimenopause, fluctuating estrogen creates an unpredictable hormonal environment — sebum spikes can cause adult acne while declining estrogen causes dryness and barrier thinning simultaneously. Phytoestrogens (soy isoflavones, fermented extracts) and estrogen-mimicking topicals (parabens, oxybenzone, lavender oil) are relevant considerations. Ingredients that address both oiliness and barrier support are particularly valuable in this phase.",
-  menopausal: "Post-menopausal estrogen loss causes sustained skin thinning, reduced collagen synthesis, increased dryness, and slower cell turnover. Phytoestrogens and estrogen-mimicking topical ingredients (parabens, soy, lavender oil) are a relevant consideration for those managing hormone-sensitive conditions. Ingredients that support barrier function, collagen synthesis, and moisture retention are core priorities.",
+  menopausal: "Post-menopausal estrogen loss causes sustained skin thinning, reduced collagen synthesis, increased dryness, and slower cell turnover. Topical phytoestrogens (soy isoflavones, genistein, fermented extracts) are studied specifically for post-menopausal skin benefit — they are not flagged as a concern here, unlike in hormone-sensitive or perimenopausal profiles. Endocrine-disrupting ingredients (parabens, oxybenzone) remain a consideration. Retinoids, peptides, humectants, and ceramides are the highest-value categories.",
   pcos: "PCOS elevates androgens — testosterone and DHT — driving excess sebum, acne along the jawline and chin, and sometimes hirsutism. Topical phytoestrogens and endocrine-disrupting ingredients (parabens, oxybenzone, lavender oil, tea tree oil) are relevant because they interact with the hormonal environment already dysregulated by PCOS. Anti-inflammatory and oil-controlling actives are particularly beneficial.",
   on_testosterone: "Exogenous testosterone (prescribed TRT or gender-affirming HRT) significantly increases sebum production and acne risk through DHT conversion. Phytoestrogens and endocrine-disrupting topicals can theoretically interact with androgen levels. The skin response is similar to androgenic acne — oil-controlling, comedolytic, and anti-inflammatory actives are the most relevant categories.",
   smoking: "Tobacco smoke generates reactive oxygen species that deplete skin vitamins C and E, activate metalloproteinases that break down collagen and elastin, impair microcirculation, and increase transepidermal water loss by disrupting the lipid barrier. The clinical result is accelerated photoaging, impaired wound healing, dull complexion, and a lower threshold for contact sensitizer reactions. Key topical priorities: vitamin C and antioxidants (replenish what smoke depletes), peptides and retinoids (counter collagen breakdown), and ceramides with fatty acids (restore barrier function).",
@@ -520,6 +520,42 @@ function noteLabel(n: SkinClimateNote): string {
 }
 
 // climateNoteStyle imported from @/lib/skin-profile
+
+// Maps profile keys to the safe ingredient category display labels that are
+// specifically beneficial for that profile (not just generically good for skin).
+// Values must match the display labels produced by CATEGORY_LABELS.
+const PROFILE_BENEFIT_CATS: Partial<Record<string, string[]>> = {
+  // Skin types
+  acne_prone:              ["Sebum-regulating", "BHA Exfoliant", "Anti-inflammatory"],
+  mature:                  ["Retinoid", "Firming", "Cell-communicating", "Humectant"],
+  hyperpigmentation_prone: ["Photo-protective", "Brightening", "Antioxidant"],
+  damaged_barrier:         ["Barrier-repairing", "Barrier support", "Prebiotic"],
+  eczema:                  ["Barrier-repairing", "Soothing", "Anti-inflammatory", "Prebiotic"],
+  rosacea:                 ["Soothing", "Anti-inflammatory"],
+  fungal_acne:             ["Antifungal"],
+  seborrheic:              ["Antifungal", "Sebum-regulating"],
+  // Hormonal / health
+  menopausal:       ["Humectant", "Emollient", "Barrier-repairing", "Retinoid", "Firming", "Cell-communicating", "Antioxidant", "Skin-replenishing"],
+  perimenopausal:   ["Barrier-repairing", "Humectant", "Antioxidant", "Soothing"],
+  pcos:             ["Sebum-regulating", "BHA Exfoliant", "Anti-inflammatory", "Antioxidant"],
+  on_testosterone:  ["Sebum-regulating", "BHA Exfoliant", "Anti-inflammatory"],
+  thyroid_condition:["Humectant", "Emollient", "Barrier-repairing"],
+  // Diet / lifestyle
+  smoking:       ["Antioxidant", "Cell-communicating"],
+  high_glycemic: ["Sebum-regulating", "Anti-inflammatory"],
+  dairy_regular: ["Sebum-regulating"],
+  // Environmental
+  chlorinated_water: ["Antioxidant"],
+  iron_water:        ["Chelating", "Antioxidant"],
+};
+
+function profileBenefitCategorySet(skinTypes: Set<SkinType>, climates: Set<ClimateType>): Set<string> {
+  const result = new Set<string>();
+  for (const key of [...skinTypes, ...climates] as string[]) {
+    for (const cat of PROFILE_BENEFIT_CATS[key] ?? []) result.add(cat);
+  }
+  return result;
+}
 
 function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateType>): string[] {
   const cats: string[] = [];
@@ -558,8 +594,8 @@ function profileWatchCategories(skinTypes: Set<SkinType>, climates: Set<ClimateT
   if (climates.has("hormone_sensitive")) cats.push("Phytoestrogens", "Endocrine disruptors", "Parabens");
   if (climates.has("thyroid_condition")) cats.push("Iodine-heavy ingredients");
   if (climates.has("on_hrt")) cats.push("Phytoestrogens", "Endocrine disruptors");
-  if (climates.has("perimenopausal") || climates.has("menopausal") || climates.has("pcos")) cats.push("Phytoestrogens", "Endocrine disruptors");
-  if (climates.has("on_testosterone")) cats.push("Endocrine disruptors");
+  if (climates.has("perimenopausal") || climates.has("pcos")) cats.push("Phytoestrogens", "Endocrine disruptors");
+  if (climates.has("menopausal") || climates.has("on_testosterone")) cats.push("Endocrine disruptors");
   if (climates.has("smoking")) cats.push("Sensitizers", "Fragrance allergens");
   return [...new Set(cats)];
 }
@@ -676,7 +712,7 @@ function isFcProfileMatch(fc: string, activeSkinTypes: Set<SkinType>, activeClim
     (fc.toLowerCase() === "chemical sunscreen" && (activeClimates.has("pregnant") || activeClimates.has("breastfeeding"))) ||
     (fc === "photo-retinoid" && activeClimates.has("pregnant")) ||
     (fc === "endocrine disruptor" && (activeClimates.has("pregnant") || activeClimates.has("breastfeeding") || activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt") || activeClimates.has("perimenopausal") || activeClimates.has("menopausal") || activeClimates.has("pcos") || activeClimates.has("on_testosterone"))) ||
-    (fc === "phytoestrogen" && (activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt") || activeClimates.has("perimenopausal") || activeClimates.has("menopausal") || activeClimates.has("pcos"))) ||
+    (fc === "phytoestrogen" && (activeClimates.has("hormone_sensitive") || activeClimates.has("on_hrt") || activeClimates.has("perimenopausal") || activeClimates.has("pcos"))) ||
     (fc === "teratogen" && activeClimates.has("pregnant")) ||
     (fc === "iodine-heavy" && activeClimates.has("thyroid_condition")) ||
     ((fc === "sensitizer" || fc === "fragrance-allergen") && activeClimates.has("smoking")) ||
@@ -5033,6 +5069,10 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               const secondaryBenefitLabels = (match?.ingredient.secondary_benefit_categories ?? [])
                 .map(c => CATEGORY_LABELS[c] ?? c)
                 .filter((l, i, arr) => l !== benefitLabel && arr.indexOf(l) === i);
+              const benefitProfileCats = activeSkinTypes.size > 0 || activeClimates.size > 0
+                ? profileBenefitCategorySet(activeSkinTypes, activeClimates)
+                : null;
+              const isProfileBenefitCat = benefitLabel != null && (benefitProfileCats?.has(benefitLabel) ?? false);
 
               const rawClimateNotes = match?.ingredient.skin_climate_notes;
               const rawNotes: SkinClimateNote[] = Array.isArray(rawClimateNotes) ? rawClimateNotes : [];
@@ -5108,9 +5148,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                         </>
                       ) : (benefitLabel || secondaryBenefitLabels.length > 0) ? (
                         <>
-                          {benefitLabel && <span className="text-xs text-teal-700 rounded-full px-2 py-0.5 shrink-0">{benefitLabel}</span>}
+                          {benefitLabel && (
+                            <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${isProfileBenefitCat ? "bg-teal-100 text-teal-700" : "text-teal-700"}`}>
+                              {benefitLabel}
+                            </span>
+                          )}
                           {secondaryBenefitLabels.map(sl => (
-                            <span key={sl} className="text-xs text-teal-700 rounded-full px-2 py-0.5 shrink-0">{sl}</span>
+                            <span key={sl} className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${benefitProfileCats?.has(sl) ? "bg-teal-100 text-teal-700" : "text-teal-700"}`}>
+                              {sl}
+                            </span>
                           ))}
                         </>
                       ) : null}
