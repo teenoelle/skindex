@@ -527,6 +527,239 @@ function initEdit(p: AllProduct, validTypes: Set<string>): AllEditState {
   };
 }
 
+type DuplicateCluster = {
+  key: string;
+  ids: string[];
+  pairs: { product_a_id: string; product_b_id: string; similarity: number }[];
+};
+
+function buildClusters(
+  pairs: { product_a_id: string; product_b_id: string; similarity: number }[]
+): DuplicateCluster[] {
+  const adj = new Map<string, Set<string>>();
+  for (const { product_a_id, product_b_id } of pairs) {
+    if (!adj.has(product_a_id)) adj.set(product_a_id, new Set());
+    if (!adj.has(product_b_id)) adj.set(product_b_id, new Set());
+    adj.get(product_a_id)!.add(product_b_id);
+    adj.get(product_b_id)!.add(product_a_id);
+  }
+  const visited = new Set<string>();
+  const clusters: DuplicateCluster[] = [];
+  for (const id of adj.keys()) {
+    if (visited.has(id)) continue;
+    const ids: string[] = [];
+    const queue = [id];
+    while (queue.length > 0) {
+      const node = queue.shift()!;
+      if (visited.has(node)) continue;
+      visited.add(node);
+      ids.push(node);
+      for (const neighbor of adj.get(node) ?? []) {
+        if (!visited.has(neighbor)) queue.push(neighbor);
+      }
+    }
+    ids.sort();
+    const clusterPairs = pairs.filter(
+      (p) => ids.includes(p.product_a_id) && ids.includes(p.product_b_id)
+    );
+    clusters.push({ key: ids[0], ids, pairs: clusterPairs });
+  }
+  clusters.sort(
+    (a, b) =>
+      Math.max(...b.pairs.map((p) => p.similarity)) -
+      Math.max(...a.pairs.map((p) => p.similarity))
+  );
+  return clusters;
+}
+
+function computeIngredientDiff(listA: string | null, listB: string | null) {
+  const a = splitIngredientList(listA ?? "").map((s) => s.toLowerCase().trim());
+  const b = splitIngredientList(listB ?? "").map((s) => s.toLowerCase().trim());
+  const setA = new Set(a);
+  const setB = new Set(b);
+  const onlyInA = a.map((name, i) => ({ name, position: i + 1 })).filter(({ name }) => !setB.has(name));
+  const onlyInB = b.map((name, i) => ({ name, position: i + 1 })).filter(({ name }) => !setA.has(name));
+  return { onlyInA, onlyInB, aList: a, bList: b };
+}
+
+function DuplicateClusterBucket({
+  cluster,
+  products,
+  expandedDiff,
+  onToggleDiff,
+  onKeepProduct,
+  onDismissCluster,
+  keepingId,
+  dismissing,
+}: {
+  cluster: DuplicateCluster;
+  products: AllProduct[];
+  expandedDiff: boolean;
+  onToggleDiff: () => void;
+  onKeepProduct: (keepId: string) => void;
+  onDismissCluster: () => void;
+  keepingId: string | null;
+  dismissing: boolean;
+}) {
+  const maxSimilarity = Math.max(...cluster.pairs.map((p) => p.similarity));
+  const primaryPair = [...cluster.pairs].sort((a, b) => b.similarity - a.similarity)[0];
+  const diff = primaryPair
+    ? computeIngredientDiff(
+        products.find((p) => p.id === primaryPair.product_a_id)?.ingredient_list ?? null,
+        products.find((p) => p.id === primaryPair.product_b_id)?.ingredient_list ?? null,
+      )
+    : null;
+
+  function sourceLabel(source: string | null) {
+    if (source === "url-import") return "Import";
+    if (source === "failed-import") return "Failed import";
+    return "Manual";
+  }
+
+  const diffCols = diff && primaryPair ? [
+    { list: diff.aList, exclusive: new Set(diff.onlyInA.map((x) => x.name)), product: products.find((p) => p.id === primaryPair.product_a_id) },
+    { list: diff.bList, exclusive: new Set(diff.onlyInB.map((x) => x.name)), product: products.find((p) => p.id === primaryPair.product_b_id) },
+  ] : [];
+
+  return (
+    <div className="border border-orange-200 rounded-xl bg-white overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-orange-50/60 border-b border-orange-100">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-orange-700">
+            {products.length} product{products.length !== 1 ? "s" : ""}
+          </span>
+          <span className="text-xs text-orange-300">·</span>
+          <span className="text-xs text-orange-600 bg-orange-100 rounded-full px-1.5 py-0.5">
+            {Math.round(maxSimilarity * 100)}% match
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onDismissCluster}
+          disabled={dismissing || keepingId !== null}
+          className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-40 transition-colors"
+        >
+          {dismissing ? "Dismissing…" : "Not duplicates"}
+        </button>
+      </div>
+
+      {/* Product cards */}
+      <div className={`grid divide-x divide-orange-100 ${products.length >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+        {products.map((p) => {
+          const ingredientCount = splitIngredientList(p.ingredient_list ?? "").length;
+          return (
+            <div key={p.id} className="p-4 space-y-3">
+              <div className="flex gap-3">
+                {p.image_url && (
+                  <img src={p.image_url} alt={p.name} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-100" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 leading-snug">{p.name}</p>
+                  {p.brand && <p className="text-xs text-gray-400 truncate">{p.brand}</p>}
+                  {p.type && (
+                    <span className="text-[11px] bg-gray-100 text-gray-500 rounded-full px-2 py-0.5 inline-block mt-0.5">{p.type}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1 text-xs text-gray-500">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>{ingredientCount} ingredient{ingredientCount !== 1 ? "s" : ""}</span>
+                  <span className="text-gray-300">·</span>
+                  <span>{sourceLabel(p.source)}</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className={p.image_url ? "text-teal-600" : "text-gray-300"}>{p.image_url ? "✓" : "✗"} image</span>
+                  <span className={p.iherb_url ? "text-teal-600" : "text-gray-300"}>{p.iherb_url ? "✓" : "✗"} iHerb</span>
+                  <span className={p.source_url ? "text-teal-600" : "text-gray-300"}>{p.source_url ? "✓" : "✗"} source</span>
+                </div>
+                {p.created_at && <span className="text-gray-400">{relativeTime(p.created_at)}</span>}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onKeepProduct(p.id)}
+                disabled={keepingId !== null}
+                className="w-full text-xs px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40 transition-colors"
+              >
+                {keepingId === p.id ? "Archiving others…" : "Keep this one"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Exclusive ingredient chips + full diff */}
+      {diff && (diff.onlyInA.length > 0 || diff.onlyInB.length > 0) && primaryPair && (
+        <div className="px-4 py-3 border-t border-orange-100 space-y-2.5">
+          <div className="grid grid-cols-2 gap-4">
+            {([
+              { items: diff.onlyInA, label: products.find((p) => p.id === primaryPair.product_a_id)?.name },
+              { items: diff.onlyInB, label: products.find((p) => p.id === primaryPair.product_b_id)?.name },
+            ] as { items: { name: string; position: number }[]; label: string | undefined }[]).map(({ items, label }, colIdx) => (
+              <div key={colIdx}>
+                {items.length > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide truncate">
+                      Only in {label?.split(" ").slice(0, 3).join(" ") ?? (colIdx === 0 ? "A" : "B")}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {items.slice(0, 5).map(({ name, position }) => (
+                        <span key={name} className="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded-full px-2 py-0.5">
+                          #{position} {name.length > 22 ? name.slice(0, 22) + "…" : name}
+                        </span>
+                      ))}
+                      {items.length > 5 && (
+                        <span className="text-[11px] text-gray-400 self-center">+{items.length - 5} more</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-gray-400 italic">No exclusive ingredients</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={onToggleDiff}
+            className="text-[11px] text-indigo-500 hover:text-indigo-700 transition-colors"
+          >
+            {expandedDiff ? "Hide full diff ↑" : "Show full diff ↓"}
+          </button>
+
+          {expandedDiff && (
+            <div className="grid grid-cols-2 gap-2">
+              {diffCols.map(({ list, exclusive, product }) => (
+                <div key={product?.id ?? Math.random()} className="border border-gray-100 rounded-lg overflow-hidden">
+                  <div className="px-2 py-1.5 bg-gray-50 border-b border-gray-100">
+                    <p className="text-[11px] font-medium text-gray-600 truncate">{product?.name}</p>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto">
+                    {list.map((name, i) => (
+                      <div
+                        key={i}
+                        className={`flex gap-1.5 px-2 py-0.5 text-[11px] border-b border-gray-50 last:border-0 ${
+                          exclusive.has(name) ? "bg-amber-50 text-amber-800" : "text-gray-600"
+                        }`}
+                      >
+                        <span className="text-gray-300 shrink-0 w-5 text-right">{i + 1}.</span>
+                        <span>{name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { isSignedIn, isLoaded } = useUser();
 
@@ -564,8 +797,10 @@ export default function AdminPage() {
   const [reportedProductIds, setReportedProductIds] = useState<Set<string>>(new Set());
   const [inReviewProductIds, setInReviewProductIds] = useState<Set<string>>(new Set());
   const [suspectedDuplicates, setSuspectedDuplicates] = useState<{ product_a_id: string; product_b_id: string; similarity: number }[]>([]);
-  const [duplicateProductIds, setDuplicateProductIds] = useState<Set<string>>(new Set());
   const [dismissingDuplicate, setDismissingDuplicate] = useState<string | null>(null);
+  const [expandedDiffs, setExpandedDiffs] = useState<Set<string>>(new Set());
+  const [keepingProduct, setKeepingProduct] = useState<string | null>(null);
+  const [dismissingCluster, setDismissingCluster] = useState<string | null>(null);
   const [requeueingProduct, setRequeuingProduct] = useState<string | null>(null);
   const [requeueResult, setRequeueResult] = useState<Record<string, "ok" | "failed">>({});
   const [reportDiffs, setReportDiffs] = useState<Record<string, ReportDiff>>({});
@@ -1091,11 +1326,7 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/duplicates");
       if (!res.ok) return;
       const data = await res.json();
-      const pairs: { product_a_id: string; product_b_id: string; similarity: number }[] = data.pairs ?? [];
-      setSuspectedDuplicates(pairs);
-      const ids = new Set<string>();
-      for (const p of pairs) { ids.add(p.product_a_id); ids.add(p.product_b_id); }
-      setDuplicateProductIds(ids);
+      setSuspectedDuplicates(data.pairs ?? []);
     } catch { }
   }
 
@@ -1109,14 +1340,50 @@ export default function AdminPage() {
         body: JSON.stringify({ action: "dismiss", product_a_id: productAId, product_b_id: productBId }),
       });
       setSuspectedDuplicates((prev) => prev.filter((p) => !(p.product_a_id === productAId && p.product_b_id === productBId)));
-      setDuplicateProductIds((prev) => {
-        const remaining = suspectedDuplicates.filter((p) => !(p.product_a_id === productAId && p.product_b_id === productBId));
-        const ids = new Set<string>();
-        for (const p of remaining) { ids.add(p.product_a_id); ids.add(p.product_b_id); }
-        return ids;
-      });
     } catch { }
     setDismissingDuplicate(null);
+  }
+
+  async function handleKeepProduct(keepId: string, clusterIds: string[]) {
+    setKeepingProduct(keepId);
+    const toArchive = clusterIds.filter((id) => id !== keepId);
+    try {
+      await Promise.all(
+        toArchive.map((id) =>
+          fetch("/api/admin/archive-product", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId: id }),
+          })
+        )
+      );
+      setAllProducts((prev) => prev.filter((p) => !toArchive.includes(p.id)));
+      const archivedSet = new Set(toArchive);
+      setSuspectedDuplicates((prev) =>
+        prev.filter((p) => !archivedSet.has(p.product_a_id) && !archivedSet.has(p.product_b_id))
+      );
+    } catch { }
+    setKeepingProduct(null);
+  }
+
+  async function handleDismissCluster(clusterKey: string, pairs: { product_a_id: string; product_b_id: string; similarity: number }[]) {
+    setDismissingCluster(clusterKey);
+    try {
+      await Promise.all(
+        pairs.map(({ product_a_id, product_b_id }) =>
+          fetch("/api/admin/duplicates", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "dismiss", product_a_id, product_b_id }),
+          })
+        )
+      );
+      const clusterIdSet = new Set(pairs.flatMap((p) => [p.product_a_id, p.product_b_id]));
+      setSuspectedDuplicates((prev) =>
+        prev.filter((p) => !(clusterIdSet.has(p.product_a_id) && clusterIdSet.has(p.product_b_id)))
+      );
+    } catch { }
+    setDismissingCluster(null);
   }
 
   async function handleRequeueProduct(p: AllProduct) {
@@ -1670,6 +1937,22 @@ export default function AdminPage() {
   }
 
   const PAGE_SIZE = 100;
+
+  const duplicateProductIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of suspectedDuplicates) { ids.add(p.product_a_id); ids.add(p.product_b_id); }
+    return ids;
+  }, [suspectedDuplicates]);
+
+  const duplicateClusters = useMemo(() => {
+    if (!filterDuplicates || suspectedDuplicates.length === 0) return [];
+    return buildClusters(suspectedDuplicates).map((cluster) => ({
+      ...cluster,
+      products: cluster.ids
+        .map((id) => allProducts.find((p) => p.id === id))
+        .filter((p): p is AllProduct => p !== undefined),
+    }));
+  }, [filterDuplicates, suspectedDuplicates, allProducts]);
 
   const allStats = {
     total: allProducts.length,
@@ -2441,11 +2724,38 @@ export default function AdminPage() {
 
           {allProductsLoading && <p className="text-sm text-gray-400">Loading…</p>}
           {!allProductsLoading && allStats.total === 0 && <p className="text-sm text-gray-400">No products yet.</p>}
-          {!allProductsLoading && allStats.total > 0 && filteredAllProducts.length === 0 && (
+          {!allProductsLoading && !filterDuplicates && allStats.total > 0 && filteredAllProducts.length === 0 && (
             <p className="text-sm text-gray-400">No products match.</p>
           )}
 
-          {!allProductsLoading && displayedAllProducts.length > 0 && (
+          {/* Duplicate cluster view */}
+          {!allProductsLoading && filterDuplicates && (
+            duplicateClusters.length === 0
+              ? <p className="text-sm text-gray-400">No suspected duplicates found.</p>
+              : (
+                <div className="space-y-4">
+                  {duplicateClusters.map((cluster) => (
+                    <DuplicateClusterBucket
+                      key={cluster.key}
+                      cluster={cluster}
+                      products={cluster.products}
+                      expandedDiff={expandedDiffs.has(cluster.key)}
+                      onToggleDiff={() => setExpandedDiffs((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(cluster.key)) next.delete(cluster.key); else next.add(cluster.key);
+                        return next;
+                      })}
+                      onKeepProduct={(keepId) => handleKeepProduct(keepId, cluster.ids)}
+                      onDismissCluster={() => handleDismissCluster(cluster.key, cluster.pairs)}
+                      keepingId={keepingProduct}
+                      dismissing={dismissingCluster === cluster.key}
+                    />
+                  ))}
+                </div>
+              )
+          )}
+
+          {!allProductsLoading && !filterDuplicates && displayedAllProducts.length > 0 && (
             <div className="space-y-2">
               {displayedAllProducts.map((p) => {
                 const edit = allEdits[p.id] ?? initEdit(p, activeTypesSet);
@@ -2888,7 +3198,7 @@ export default function AdminPage() {
           )}
 
           {/* Pagination */}
-          {!allProductsLoading && totalPages > 1 && (
+          {!allProductsLoading && !filterDuplicates && totalPages > 1 && (
             <div className="flex items-center gap-3 mt-4">
               <button
                 type="button"

@@ -22,6 +22,11 @@ export async function POST(req: NextRequest) {
     .from("products").update({ is_archived: true }).eq("id", productId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  await supabaseAdmin
+    .from("suspected_duplicates")
+    .delete()
+    .or(`product_a_id.eq.${productId},product_b_id.eq.${productId}`);
+
   await writeAuditLog(userId, "archive_product", "product", productId, {
     name: existing?.name ?? productId,
   });
