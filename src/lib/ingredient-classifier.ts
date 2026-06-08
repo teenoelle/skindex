@@ -81,7 +81,7 @@ export function classifyIngredient(rawName: string): Classification {
 
   // Chemical UV filters
   if (CHEMICAL_UV_FILTERS.has(name))
-    return { status: "flagged", structural_category: "UV Filter", category: null, flagged_category: "Chemical Sunscreen" };
+    return { status: "flagged", structural_category: "Chemical UV Filter", category: null, flagged_category: "Chemical Sunscreen" };
 
   // Generic fragrance — structural tells you what it IS; "sensitizer" tells you why it's flagged
   if (["parfum","fragrance","aroma","perfume","fragrance (parfum)","parfum/fragrance"].includes(name))
@@ -223,8 +223,10 @@ function detectStructural(name: string): string | null {
     return "Thickener";
   if (["phenoxyethanol","potassium sorbate","ethylhexylglycerin","1,2-hexanediol","caprylyl glycol","chlorphenesin","sorbic acid","sodium benzoate","o-cymen-5-ol","1,10-decanediol","10-decanediol","hydroxyacetophenone","bht","bha","sodium metabisulfite","undecylenoyl glycine","capryloyl glycine"].includes(name))
     return "Preservative";
-  if (["zinc oxide","titanium dioxide","zinc oxide (nano)","titanium dioxide (nano)"].includes(name) || name.includes("titanium dioxide") || name.includes("zinc oxide") || ["bis-ethylhexyloxyphenol methoxyphenyl triazine","ethylhexyl triazone","terephthalylidene dicamphor sulfonic acid"].includes(name))
-    return "UV Filter";
+  if (["zinc oxide","titanium dioxide","zinc oxide (nano)","titanium dioxide (nano)"].includes(name) || name.includes("titanium dioxide") || name.includes("zinc oxide"))
+    return "Mineral UV Filter";
+  if (["bis-ethylhexyloxyphenol methoxyphenyl triazine","ethylhexyl triazone","terephthalylidene dicamphor sulfonic acid"].includes(name))
+    return "Chemical UV Filter";
   if (["colloidal oatmeal","avena sativa","oat kernel"].includes(name) || name.startsWith("avena sativa") || name.includes("colloidal oatmeal"))
     return "Plant Extract";
   if (name.includes("extract") || name.includes("leaf water") || name.includes("flower water") || name.includes("bark water") || name.includes("aloe") || ["eucalyptus globulus","chondrus crispus","propolis","centella asiatica"].includes(name))
@@ -273,7 +275,7 @@ function detectCategory(name: string, sc: string | null): string | null {
   if (sc === "Conditioning Agent") return "Conditioning";
   if (sc === "Emollient") return "Moisturizing";
   if (sc === "Chelating Agent") return "chelating";
-  if (sc && ["UV Filter","pH Adjuster","Emulsifier","Thickener","Fragrance"].includes(sc))
+  if (sc && ["Mineral UV Filter","Chemical UV Filter","pH Adjuster","Emulsifier","Thickener","Fragrance"].includes(sc))
     return null;
 
   if (sc === "Ceramide") return "barrier-repairing";

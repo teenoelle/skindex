@@ -128,7 +128,7 @@ export async function generateCuratedExplanation(ingredient: IngredientInfo): Pr
 
 const SAFE_STRUCTURAL = [
   "Humectant","Emollient","Fatty Acid","Fatty Alcohol","Ceramide","Peptide",
-  "Silicone","Surfactant","Emulsifier","Thickener","Preservative","UV Filter",
+  "Silicone","Surfactant","Emulsifier","Thickener","Preservative","Mineral UV Filter","Chemical UV Filter",
   "Plant Extract","Chelating Agent","pH Adjuster","Solvent","Conditioning Agent",
   "Protein","Amino Acid","Active","Colorant","Clay","Exfoliant","Fragrance",
 ].join(", ");

@@ -237,7 +237,8 @@ const STRUCTURAL_ROLE: Record<string, string> = {
   "Preservative Booster": "enhances the effectiveness of preservatives to extend shelf life",
   "Emollient": "softens and smooths skin by filling gaps in the lipid barrier",
   "Humectant": "draws moisture from the air into the upper layers of skin",
-  "UV Filter": "absorbs or reflects UV radiation to protect skin from sun damage",
+  "Mineral UV Filter": "physically reflects and scatters UV radiation on the skin surface",
+  "Chemical UV Filter": "absorbs UV radiation and converts it to heat within the skin",
   "Plant Extract": "delivers concentrated plant-derived actives",
   "Solvent": "dissolves other ingredients and helps the formula spread on skin",
   "Chelating Agent": "binds trace metals in water to prevent formula degradation",
@@ -308,7 +309,7 @@ function richTemplate(
       return `${name} is a fragrance ingredient that adds scent to the formula. It is flagged as a sensitizer that can cause contact dermatitis with repeated exposure, especially on reactive or compromised skin.`;
     if (sc === "Fragrance" && concern === "Synthetic Musk")
       return `${name} is a synthetic musk that adds a lingering scent to the formula. Synthetic musks are flagged due to their potential to cause skin sensitization and their tendency to bioaccumulate in the environment.`;
-    if (sc === "UV Filter" && concern === "Chemical Sunscreen")
+    if (sc === "Chemical UV Filter" && concern === "Chemical Sunscreen")
       return `${name} is a chemical UV filter that absorbs UV radiation to protect skin from sun damage. It is flagged due to concerns about skin sensitization, potential hormonal disruption, and environmental impact on marine ecosystems.`;
     if (sc === "Surfactant" && concern === "Sulfate Surfactant")
       return `${name} is a sulfate surfactant used for cleansing and lather. It is flagged because sulfates aggressively strip the skin's natural oils, disrupting the barrier and causing dryness and irritation, particularly with frequent use.`;
@@ -360,7 +361,7 @@ function richTemplate(
     return `${name} is a firming active that supports collagen production and skin elasticity to improve firmness and reduce the appearance of fine lines over time.`;
   if (sc === "Active" && cat === "barrier-repairing")
     return `${name} is an active that supports the skin barrier by replenishing lipids and reducing moisture loss, improving resilience in sensitive or compromised skin.`;
-  if (sc === "UV Filter")
+  if (sc === "Mineral UV Filter")
     return `${name} is a mineral UV filter that physically reflects and absorbs UV radiation to protect the skin from sun damage. It is non-sensitizing and gentle, suitable for reactive and sensitive skin.`;
   if (sc === "Preservative")
     return `${name} is a preservative that prevents microbial growth in the formula to extend shelf life and maintain safety. It is considered well-tolerated at typical use concentrations.`;

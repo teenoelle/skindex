@@ -264,12 +264,12 @@ export function generateNotes(ing: {
     });
   }
 
-  if (sc === "UV Filter") {
+  if (sc === "Mineral UV Filter") {
     notes.push({
       dimensions: [],
       climate: ["high_uv"],
       sentiment: "benefit",
-      text: "UV filters provide essential protection in high-UV environments — mineral filters (zinc oxide, titanium dioxide) are preferred for reactive skin due to their low sensitization profile.",
+      text: "Mineral UV filters provide essential protection in high-UV environments and are preferred for reactive skin due to their low sensitization profile.",
     });
   }
 
@@ -655,7 +655,7 @@ export function generateNotes(ing: {
     });
   }
 
-  if (sc === "UV Filter") {
+  if (sc === "Mineral UV Filter") {
     notes.push({
       dimensions: ["lupus_rash", "rosacea"],
       climate: [],
@@ -815,7 +815,7 @@ export function generateNotes(ing: {
     });
   }
 
-  if (sc === "UV Filter") {
+  if (sc === "Mineral UV Filter") {
     notes.push({
       dimensions: ["hyperpigmentation_prone"],
       climate: ["phytoestrogen_load"],
