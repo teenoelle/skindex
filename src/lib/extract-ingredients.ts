@@ -429,15 +429,37 @@ function extractOgImage(html: string): string | null {
 }
 
 function inciDecoderGcsToOriginal(url: string): string {
-  // Convert a sized thumbnail (e.g. _300x300@1x.webp) to the full-res JPEG original
-  return url.replace(/_([\d]+x[\d]+@[\dx]+|[\d]+x[\d]+)\.[a-z]+$/i, "_original.jpeg");
+  // Covers: _300x300@1x.webp  _300x300.webp  .300x300.webp  _thumb.webp  _small.jpeg  etc.
+  return url
+    .replace(/[_.](\d+x\d+(?:@[\dx]+)?)\.[a-z]+$/i, "_original.jpeg")  // sized variants
+    .replace(/[_.](thumb|small|medium|large|full)\.[a-z]+$/i, "_original.jpeg"); // named sizes
+}
+
+function bestSrcsetUrl(srcset: string): string {
+  // Parse "url descriptor, url descriptor, ..." and return the URL with the highest descriptor.
+  // Descriptors are either "Nw" (width) or "Nx" (density) — higher wins.
+  let bestUrl = "";
+  let bestValue = -1;
+  for (const entry of srcset.split(",")) {
+    const parts = entry.trim().split(/\s+/);
+    const url = parts[0];
+    if (!url) continue;
+    const descriptor = parts[1] ?? "1x";
+    const m = descriptor.match(/^(\d+(?:\.\d+)?)(w|x)$/);
+    const value = m ? parseFloat(m[1]) : 1;
+    if (value > bestValue) { bestValue = value; bestUrl = url; }
+  }
+  return bestUrl;
 }
 
 function extractINCIDecoderImage(html: string): string | null {
   // INCIDecoder renders images in a <picture><source srcset="..."> element on the GCS bucket.
   // og:image is absent in server-rendered HTML; the srcset URL is the reliable source.
   const m1 = html.match(/srcset="(https:\/\/incidecoder-content\.storage\.googleapis\.com\/[^"]+)"/i);
-  if (m1?.[1]) return inciDecoderGcsToOriginal(m1[1].replace(/&amp;/g, "&").split(" ")[0]);
+  if (m1?.[1]) {
+    const url = bestSrcsetUrl(m1[1].replace(/&amp;/g, "&"));
+    if (url) return inciDecoderGcsToOriginal(url);
+  }
   // Fallback: plain src attribute (older page format)
   const m2 = html.match(/src="(https:\/\/incidecoder-content\.storage\.googleapis\.com\/[^"]+)"/i);
   if (m2) return inciDecoderGcsToOriginal(m2[1].replace(/&amp;/g, "&"));

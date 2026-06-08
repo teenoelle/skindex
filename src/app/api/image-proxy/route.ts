@@ -35,13 +35,30 @@ export async function GET(req: NextRequest) {
       .replace(/\/s\/(\d+\.\w+)$/, "/l/$1");
   }
 
-  try {
-    const upstream = await fetch(fetchUrl, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-      signal: AbortSignal.timeout(8000),
-    });
+  // For INCIDecoder GCS URLs that were converted to _original.jpeg, build fallback candidates
+  // in case the original doesn't exist for that product.
+  const gcsOriginalFallbacks: string[] =
+    parsed.hostname === "incidecoder-content.storage.googleapis.com" &&
+    fetchUrl.endsWith("_original.jpeg")
+      ? [
+          fetchUrl.replace(/_original\.jpeg$/, "_600x600@2x.webp"),
+          fetchUrl.replace(/_original\.jpeg$/, "_300x300@1x.webp"),
+        ]
+      : [];
 
-    if (!upstream.ok) {
+  const urlsToTry = [fetchUrl, ...gcsOriginalFallbacks];
+
+  try {
+    let upstream: Response | null = null;
+    for (const candidate of urlsToTry) {
+      const res = await fetch(candidate, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) { upstream = res; break; }
+    }
+
+    if (!upstream) {
       return new NextResponse("Upstream error", { status: 502 });
     }
 
