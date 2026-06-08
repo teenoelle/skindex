@@ -7,7 +7,9 @@ import { useSkinProfile } from "@/context/SkinProfileContext";
 import {
   SKIN_TYPES, CLIMATE_TYPES, WATER_TYPES, DEVICE_TYPES,
   SUPPLEMENT_TYPES, DIET_TYPES, HORMONE_TYPES, LIFESTYLE_TYPES,
+  CLIMATE_NOTES,
 } from "@/lib/skin-profile";
+import type { ClimateType } from "@/lib/skin-profile";
 
 const SMART_LISTS = [
   { id: "universal-concerns", name: "Universal Concerns", color: "text-rose-700" },
@@ -226,6 +228,16 @@ export default function SidePanel() {
                         );
                       })}
                     </div>
+                    {(() => {
+                      const activeItem = group.items.find(item => activeClimates.has(item.value));
+                      const note = activeItem ? CLIMATE_NOTES[activeItem.value as ClimateType] : undefined;
+                      return note ? (
+                        <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                          <span className="font-medium text-gray-700">{activeItem!.label} — </span>
+                          {note}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 ))}
               </div>

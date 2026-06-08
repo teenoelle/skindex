@@ -133,7 +133,7 @@ export const CLIMATE_NOTES: Record<ClimateType, string> = {
   dry_climate: "In dry climates, humectants need to be sealed in with an emollient or occlusive — without one, they can pull moisture from deeper skin layers instead of the air.",
   cold: "Cold air depletes skin lipids fastest — barrier-repairing ingredients (ceramides, fatty acids, emollients) are most effective and most needed in this climate.",
   hot: "In hot weather, skin permeability increases, making sensitizers and chemical UV filters absorb more readily and triggering stronger reactions.",
-  high_uv: "In high-UV environments, daily broad-spectrum SPF is essential — AHAs, retinoids, and many brightening ingredients all increase UV sensitivity.",
+  high_uv: "In high-UV environments (UV Index 6+ on the WHO scale — 6–7 is High, 8–10 Very High, 11+ Extreme), daily broad-spectrum SPF is essential — AHAs, retinoids, and many brightening ingredients all increase UV sensitivity.",
   hard_water: "Hard (mineral-rich) water is alkaline (pH 7–9) and leaves a calcium/magnesium film on skin after rinsing. This disrupts the skin's natural acid mantle and is a documented eczema aggravator.",
   chlorinated_water: "Chlorinated tap water can oxidize skin barrier lipids on contact. A vitamin C toner applied immediately after washing neutralizes residual disinfectant before it can damage the barrier.",
   iron_water: "Iron-bearing water introduces ferrous ions that generate free radicals on contact with skin. Chelating agents and antioxidants counteract this.",
