@@ -7,9 +7,9 @@ import { useSkinProfile } from "@/context/SkinProfileContext";
 import {
   SKIN_TYPES, CLIMATE_TYPES, WATER_TYPES, DEVICE_TYPES,
   SUPPLEMENT_TYPES, DIET_TYPES, HORMONE_TYPES, LIFESTYLE_TYPES,
-  CLIMATE_NOTES,
+  CLIMATE_NOTES, SKIN_TYPE_NOTES,
 } from "@/lib/skin-profile";
-import type { ClimateType } from "@/lib/skin-profile";
+import type { ClimateType, SkinType } from "@/lib/skin-profile";
 
 const SMART_LISTS = [
   { id: "universal-concerns", name: "Universal Concerns", color: "text-rose-700" },
@@ -37,6 +37,7 @@ export default function SidePanel() {
   const [open, setOpen] = useState(false);
   const [profileExpanded, setProfileExpanded] = useState(true);
   const [modifiersExpanded, setModifiersExpanded] = useState(false);
+  const [skinTypeHint, setSkinTypeHint] = useState<SkinType | null>(null);
   const [modifierHint, setModifierHint] = useState<ClimateType | null>(null);
   const [userLists, setUserLists] = useState<UserList[]>([]);
   const [ingredientLists, setIngredientLists] = useState<IngredientList[]>([]);
@@ -177,17 +178,33 @@ export default function SidePanel() {
               <div className="flex flex-wrap gap-1.5">
                 {SKIN_TYPES.map((t) => {
                   const active = activeSkinTypes.has(t.value);
+                  const hinted = skinTypeHint === t.value;
                   return (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => toggleSkinType(t.value)}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${active ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
-                    >
-                      {t.label}
-                    </button>
+                    <span key={t.value} className="inline-flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleSkinType(t.value)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${active ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
+                      >
+                        {t.label}
+                      </button>
+                      {SKIN_TYPE_NOTES[t.value as SkinType] && (
+                        <button
+                          type="button"
+                          onClick={() => setSkinTypeHint(h => h === t.value ? null : t.value as SkinType)}
+                          className={`text-[10px] leading-none transition-colors ${hinted ? "text-gray-500" : "text-gray-300 hover:text-gray-500"}`}
+                          aria-label={`About ${t.label}`}
+                        >ⓘ</button>
+                      )}
+                    </span>
                   );
                 })}
+              </div>
+            )}
+            {skinTypeHint && SKIN_TYPE_NOTES[skinTypeHint] && (
+              <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
+                <span className="font-medium text-gray-700">{SKIN_TYPES.find(t => t.value === skinTypeHint)?.label} — </span>
+                {SKIN_TYPE_NOTES[skinTypeHint]}
               </div>
             )}
           </div>
