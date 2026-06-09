@@ -168,6 +168,13 @@ export default function ListsPage() {
   const [lookupFetching, setLookupFetching] = useState<Set<string>>(new Set());
   const lookupDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Compare state
+  const [comparePairs, setComparePairs] = useState<Map<string, string>>(new Map());
+  const [compareActiveFor, setCompareActiveFor] = useState<string | null>(null);
+  const [compareQuery, setCompareQuery] = useState<Record<string, string>>({});
+  const [compareSuggestions, setCompareSuggestions] = useState<Record<string, string[]>>({});
+  const compareDebounce = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   function toggleIngredientExpand(name: string) {
     setExpandedIngredients(prev => {
       const s = new Set(prev);
@@ -229,6 +236,135 @@ export default function ListsPage() {
       dbPatch(listId, { items: newItems });
       return { ...l, items: newItems };
     }));
+  }
+
+  function fetchCompareSuggestions(forIngredient: string, val: string) {
+    clearTimeout(compareDebounce.current[forIngredient]);
+    if (val.length < 2) { setCompareSuggestions(m => ({ ...m, [forIngredient]: [] })); return; }
+    compareDebounce.current[forIngredient] = setTimeout(async () => {
+      const res = await fetch(`/api/ingredients/search?q=${encodeURIComponent(val)}`);
+      if (res.ok) {
+        const d = await res.json();
+        setCompareSuggestions(m => ({ ...m, [forIngredient]: ((d.suggestions ?? []) as string[]).slice(0, 6) }));
+      }
+    }, 180);
+  }
+
+  function selectComparePair(ingredientA: string, ingredientB: string) {
+    if (!lookupItems.includes(ingredientB)) {
+      setLookupItems(prev => [...prev, ingredientB]);
+      if (!lookupCache.has(ingredientB) && !lookupFetching.has(ingredientB)) {
+        setLookupFetching(prev => new Set([...prev, ingredientB]));
+        fetch(`/api/ingredient-lists/items?list=lookup&name=${encodeURIComponent(ingredientB)}`)
+          .then(r => r.json())
+          .then(d => {
+            setLookupCache(prev => new Map([...prev, [ingredientB, d.item ?? null]]));
+            setLookupFetching(prev => { const s = new Set(prev); s.delete(ingredientB); return s; });
+          })
+          .catch(() => {
+            setLookupCache(prev => new Map([...prev, [ingredientB, null]]));
+            setLookupFetching(prev => { const s = new Set(prev); s.delete(ingredientB); return s; });
+          });
+      }
+    }
+    setComparePairs(prev => {
+      const next = new Map(prev);
+      next.set(ingredientA, ingredientB);
+      next.set(ingredientB, ingredientA);
+      return next;
+    });
+    setCompareActiveFor(null);
+    setCompareQuery(m => ({ ...m, [ingredientA]: "" }));
+    setCompareSuggestions(m => ({ ...m, [ingredientA]: [] }));
+  }
+
+  function breakComparePair(ingredient: string) {
+    setComparePairs(prev => {
+      const next = new Map(prev);
+      const partner = prev.get(ingredient);
+      next.delete(ingredient);
+      if (partner) next.delete(partner);
+      return next;
+    });
+  }
+
+  function renderLookupDetail(item: string) {
+    const detail = lookupCache.get(item);
+    const isFetching = lookupFetching.has(item);
+    const structured = detail?.explanation_structured ?? null;
+    const isFlagged = detail?.status === "flagged";
+    const isUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide"].includes(detail?.category ?? "");
+    const concernBorder = isUniversal ? "border-rose-500" : "border-amber-500";
+    const allCats = detail ? [detail.category, ...detail.secondary_categories].filter(Boolean) : [];
+    const profileMatchedCats = allCats.filter(cat => {
+      const skinTypeSet = new Set(skinTypes);
+      const climateSet = new Set(climates);
+      if (cat === "Drying Solvent" && (skinTypeSet.has("rosacea") || climateSet.has("heavy_metal_water"))) return true;
+      if (["photo-retinoid","photo-AHA","photo-BHA","photo-brightening","photo-botanical"].includes(cat) && climateSet.has("high_uv")) return true;
+      return (LOOKUP_PROFILE_MAP[cat] ?? []).some(st => skinTypeSet.has(st));
+    });
+    if (isFetching) return <p className="text-xs text-gray-400 italic">Loading…</p>;
+    if (detail === undefined) return null;
+    if (!detail) return <p className="text-xs text-gray-400 italic">Not found in database.</p>;
+    return (
+      <div className="space-y-2">
+        {structured?.formula_role && (
+          <div className="pl-3 border-l-2 border-gray-300">
+            <p className="text-xs text-gray-500 leading-relaxed">
+              {detail.structural_category && <span className="font-semibold text-gray-700">{detail.structural_category} — </span>}
+              {structured.formula_role}
+            </p>
+          </div>
+        )}
+        {structured?.benefit && (
+          <div className="pl-3 border-l-2 border-teal-500">
+            <p className="text-xs text-gray-600 leading-relaxed">
+              {!isFlagged && detail.category && <span className="font-semibold text-teal-700">{detail.category} — </span>}
+              {structured.benefit}
+            </p>
+          </div>
+        )}
+        {isFlagged && (structured?.concern_items?.length || structured?.concern || (!structured && detail.explanation)) && (
+          <div className={`pl-3 border-l-2 ${concernBorder} space-y-1`}>
+            {structured?.concern_items ? structured.concern_items.map(ci => {
+              const ciUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide"].includes(ci.category);
+              return (
+                <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
+                  <span className={`font-semibold ${ciUniversal ? "text-rose-700" : "text-amber-700"}`}>{ci.category} — </span>
+                  {ci.text}
+                </p>
+              );
+            }) : structured?.concern ? (
+              <p className="text-xs text-gray-600 leading-relaxed">
+                {detail.category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{detail.category} — </span>}
+                {structured.concern}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-600 leading-relaxed">
+                {detail.category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{detail.category} — </span>}
+                {detail.explanation}
+              </p>
+            )}
+          </div>
+        )}
+        {!isFlagged && !structured && detail.explanation && (
+          <div className="pl-3 border-l-2 border-gray-300">
+            <p className="text-xs text-gray-600 leading-relaxed">
+              {detail.structural_category && <span className="font-semibold text-gray-700">{detail.structural_category} — </span>}
+              {detail.explanation}
+            </p>
+          </div>
+        )}
+        {!structured && !detail.explanation && (
+          <p className="text-xs text-gray-400 italic">No explanation available yet.</p>
+        )}
+        {profileMatchedCats.length > 0 && (skinTypes.length > 0 || climates.length > 0) && (
+          <p className="text-[10px] text-amber-600 leading-snug">
+            Flagged for your profile — {profileMatchedCats.join(", ")}
+          </p>
+        )}
+      </div>
+    );
   }
 
   useEffect(() => {
@@ -1105,109 +1241,96 @@ export default function ListsPage() {
                       <div className="flex justify-end mb-1">
                         <button
                           type="button"
-                          onClick={() => setLookupItems([])}
+                          onClick={() => { setLookupItems([]); setComparePairs(new Map()); setCompareActiveFor(null); }}
                           className="text-[10px] text-gray-400 hover:text-gray-700"
                         >
                           Clear all
                         </button>
                       </div>
-                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
-                        {lookupItems.map((item) => {
-                          const detail = lookupCache.get(item);
-                          const isFetching = lookupFetching.has(item);
-                          const structured = detail?.explanation_structured ?? null;
-                          const isFlagged = detail?.status === "flagged";
-                          const isUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide"].includes(detail?.category ?? "");
-                          const concernBorder = isUniversal ? "border-rose-500" : "border-amber-500";
-                          const allCats = detail ? [detail.category, ...detail.secondary_categories].filter(Boolean) : [];
-                          const profileMatchedCats = allCats.filter(cat => {
-                            const skinTypeSet = new Set(skinTypes);
-                            const climateSet = new Set(climates);
-                            if (cat === "Drying Solvent" && (skinTypeSet.has("rosacea") || climateSet.has("heavy_metal_water"))) return true;
-                            if (["photo-retinoid","photo-AHA","photo-BHA","photo-brightening","photo-botanical"].includes(cat) && climateSet.has("high_uv")) return true;
-                            return (LOOKUP_PROFILE_MAP[cat] ?? []).some(st => skinTypeSet.has(st));
-                          });
-                          return (
-                            <div key={item} className="px-3 py-3 space-y-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-xs font-medium text-gray-800 flex-1 min-w-0 truncate">{item}</span>
-                                <IngredientListPicker
-                                  ingredientName={item}
-                                  lists={ingredientLists}
-                                  onAdd={(listId) => addToIngList(listId, item)}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setLookupItems(prev => prev.filter(i => i !== item))}
-                                  className="text-gray-300 hover:text-rose-400 text-sm leading-none shrink-0"
-                                >×</button>
-                              </div>
-                              {isFetching ? (
-                                <p className="text-xs text-gray-400 italic">Loading…</p>
-                              ) : detail === undefined ? null : !detail ? (
-                                <p className="text-xs text-gray-400 italic">Not found in database.</p>
-                              ) : (
-                                <div className="space-y-2">
-                                  {structured?.formula_role && (
-                                    <div className="pl-3 border-l-2 border-gray-300">
-                                      <p className="text-xs text-gray-500 leading-relaxed">
-                                        {detail.structural_category && <span className="font-semibold text-gray-700">{detail.structural_category} — </span>}
-                                        {structured.formula_role}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {structured?.benefit && (
-                                    <div className="pl-3 border-l-2 border-teal-500">
-                                      <p className="text-xs text-gray-600 leading-relaxed">
-                                        {!isFlagged && detail.category && <span className="font-semibold text-teal-700">{detail.category} — </span>}
-                                        {structured.benefit}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {isFlagged && (structured?.concern_items?.length || structured?.concern || (!structured && detail.explanation)) && (
-                                    <div className={`pl-3 border-l-2 ${concernBorder} space-y-1`}>
-                                      {structured?.concern_items ? structured.concern_items.map(ci => {
-                                        const ciUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide"].includes(ci.category);
-                                        return (
-                                          <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
-                                            <span className={`font-semibold ${ciUniversal ? "text-rose-700" : "text-amber-700"}`}>{ci.category} — </span>
-                                            {ci.text}
-                                          </p>
-                                        );
-                                      }) : structured?.concern ? (
-                                        <p className="text-xs text-gray-600 leading-relaxed">
-                                          {detail.category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{detail.category} — </span>}
-                                          {structured.concern}
-                                        </p>
-                                      ) : (
-                                        <p className="text-xs text-gray-600 leading-relaxed">
-                                          {detail.category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{detail.category} — </span>}
-                                          {detail.explanation}
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-                                  {!isFlagged && !structured && detail.explanation && (
-                                    <div className="pl-3 border-l-2 border-gray-300">
-                                      <p className="text-xs text-gray-600 leading-relaxed">
-                                        {detail.structural_category && <span className="font-semibold text-gray-700">{detail.structural_category} — </span>}
-                                        {detail.explanation}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {!structured && !detail.explanation && (
-                                    <p className="text-xs text-gray-400 italic">No explanation available yet.</p>
-                                  )}
-                                  {profileMatchedCats.length > 0 && (skinTypes.length > 0 || climates.length > 0) && (
-                                    <p className="text-[10px] text-amber-600 leading-snug">
-                                      Flagged for your profile — {profileMatchedCats.join(", ")}
-                                    </p>
-                                  )}
+                      <div className="space-y-2">
+                        {(() => {
+                          const rendered = new Set<string>();
+                          return lookupItems.map(item => {
+                            if (rendered.has(item)) return null;
+                            const partner = comparePairs.get(item);
+                            const showCompare = !!partner && lookupItems.includes(partner);
+                            if (showCompare) {
+                              rendered.add(item);
+                              rendered.add(partner!);
+                              return (
+                                <div key={`cmp::${item}`} className="border border-gray-200 rounded-xl overflow-hidden">
+                                  <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100">
+                                    <span className="text-[10px] text-gray-400 uppercase tracking-wider">Comparing</span>
+                                    <button type="button" onClick={() => breakComparePair(item)} className="text-[10px] text-gray-400 hover:text-gray-700">Split ↗</button>
+                                  </div>
+                                  <div className="grid grid-cols-2 divide-x divide-gray-100">
+                                    {[item, partner!].map(col => (
+                                      <div key={col} className="p-3 space-y-2 min-w-0">
+                                        <div className="flex items-start gap-1.5 min-w-0">
+                                          <span className="text-xs font-medium text-gray-800 flex-1 min-w-0 leading-snug break-words">{col}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => { breakComparePair(col); setLookupItems(prev => prev.filter(i => i !== col)); }}
+                                            className="text-gray-300 hover:text-rose-400 text-sm leading-none shrink-0"
+                                          >×</button>
+                                        </div>
+                                        {renderLookupDetail(col)}
+                                        <IngredientListPicker
+                                          ingredientName={col}
+                                          lists={ingredientLists}
+                                          onAdd={listId => addToIngList(listId, col)}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                              );
+                            }
+                            // Single card
+                            return (
+                              <div key={item} className="border border-gray-200 rounded-xl px-3 py-3 space-y-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-xs font-medium text-gray-800 flex-1 min-w-0 truncate">{item}</span>
+                                  {compareActiveFor === item ? (
+                                    <button type="button" onClick={() => setCompareActiveFor(null)} className="text-[10px] text-gray-400 hover:text-gray-700 whitespace-nowrap shrink-0">Cancel</button>
+                                  ) : (
+                                    <button type="button" onClick={() => { setCompareActiveFor(item); setCompareQuery(m => ({ ...m, [item]: "" })); setCompareSuggestions(m => ({ ...m, [item]: [] })); }} className="text-[10px] text-gray-400 hover:text-gray-700 whitespace-nowrap shrink-0">Compare →</button>
+                                  )}
+                                  <IngredientListPicker ingredientName={item} lists={ingredientLists} onAdd={listId => addToIngList(listId, item)} />
+                                  <button type="button" onClick={() => { if (compareActiveFor === item) setCompareActiveFor(null); setLookupItems(prev => prev.filter(i => i !== item)); }} className="text-gray-300 hover:text-rose-400 text-sm leading-none shrink-0">×</button>
+                                </div>
+                                {compareActiveFor === item && (
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      autoFocus
+                                      value={compareQuery[item] ?? ""}
+                                      onChange={e => { setCompareQuery(m => ({ ...m, [item]: e.target.value })); fetchCompareSuggestions(item, e.target.value); }}
+                                      onBlur={() => setTimeout(() => setCompareSuggestions(m => ({ ...m, [item]: [] })), 150)}
+                                      placeholder="Search ingredient to compare…"
+                                      className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-gray-400"
+                                    />
+                                    {(compareSuggestions[item] ?? []).length > 0 && (
+                                      <ul className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden text-xs">
+                                        {(compareSuggestions[item] ?? []).map(s => (
+                                          <li key={s}>
+                                            <button
+                                              type="button"
+                                              onMouseDown={e => e.preventDefault()}
+                                              onClick={() => selectComparePair(item, s)}
+                                              className="w-full text-left px-3 py-2 hover:bg-gray-50 truncate"
+                                            >{s}</button>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                )}
+                                {renderLookupDetail(item)}
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
                   )}
