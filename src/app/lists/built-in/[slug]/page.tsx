@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import IngredientListPicker from "@/components/IngredientListPicker";
 type ExplanationStructured = {
   formula_role: string | null;
   benefit: string | null;
@@ -297,6 +298,7 @@ export default function BuiltInListPage() {
   const [skinTypeHint, setSkinTypeHint] = useState<string | null>(null);
   const [climateHint, setClimateHint] = useState<string | null>(null);
   const [waterHint, setWaterHint] = useState<string | null>(null);
+  const [userLists, setUserLists] = useState<{ id: string; name: string; items: string[] }[]>([]);
 
   const hasProfile = skinTypes.length > 0 || climates.length > 0;
 
@@ -317,7 +319,31 @@ export default function BuiltInListPage() {
     setSkinTypes(st);
     setClimates(cl);
     setProfileReady(true);
+    try {
+      const il = localStorage.getItem("skindex:ingredientLists");
+      if (il) setUserLists(JSON.parse(il));
+    } catch {}
   }, []);
+
+  function addToUserList(listId: string, ingredientName: string) {
+    const val = ingredientName.toLowerCase();
+    setUserLists(prev => {
+      const updated = prev.map(l => {
+        if (l.id !== listId || l.items.includes(val)) return l;
+        return { ...l, items: [...l.items, val] };
+      });
+      try { localStorage.setItem("skindex:ingredientLists", JSON.stringify(updated)); } catch {}
+      const target = updated.find(l => l.id === listId);
+      if (target) {
+        fetch(`/api/user-ingredient-lists/${listId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: target.items }),
+        }).catch(() => {});
+      }
+      return updated;
+    });
+  }
 
   useEffect(() => {
     if (!meta || !profileReady || editingProfile) return;
@@ -614,6 +640,15 @@ export default function BuiltInListPage() {
 
                                   {!structured && !item.explanation && (
                                     <p className="text-xs text-gray-400 italic">No explanation available yet.</p>
+                                  )}
+                                  {userLists.length > 0 && (
+                                    <div className="pt-1">
+                                      <IngredientListPicker
+                                        ingredientName={item.name}
+                                        lists={userLists}
+                                        onAdd={(listId) => addToUserList(listId, item.name)}
+                                      />
+                                    </div>
                                   )}
                                 </div>
                               )}

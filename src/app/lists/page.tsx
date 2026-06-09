@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
+import IngredientListPicker from "@/components/IngredientListPicker";
 
 
 type UserList = {
@@ -87,6 +88,27 @@ const SMART_LIST_COLOR: Record<string, string> = {
   "neutral-beneficial": "text-teal-700",
 };
 
+const LOOKUP_PROFILE_MAP: Record<string, string[]> = {
+  "pore-clogger":            ["oily","acne_prone","fungal_acne","body_acne","keratosis_pilaris"],
+  "occlusive":               ["oily","acne_prone","fungal_acne","body_acne","keratosis_pilaris"],
+  "bacteria-trap":           ["oily","acne_prone","fungal_acne","body_acne"],
+  "sensitizer":              ["reactive","damaged_barrier","eczema","rosacea","psoriasis"],
+  "fragrance-allergen":      ["reactive","damaged_barrier","eczema"],
+  "preservative-allergen":   ["reactive","damaged_barrier","eczema","rosacea","psoriasis"],
+  "sensitizing preservative":["reactive","damaged_barrier","eczema","rosacea","psoriasis"],
+  "formaldehyde releaser":   ["reactive","damaged_barrier","eczema","rosacea","psoriasis"],
+  "biocide":                 ["reactive","damaged_barrier","eczema"],
+  "contact-allergen":        ["reactive","damaged_barrier","eczema"],
+  "Chemical Sunscreen":      ["rosacea","lupus_rash"],
+  "Drying Solvent":          ["dry","damaged_barrier","reactive","rosacea"],
+  "Sulfate Surfactant":      ["dry","damaged_barrier","eczema","psoriasis","rosacea","keratosis_pilaris"],
+  "photo-retinoid":          ["hyperpigmentation_prone","lupus_rash"],
+  "photo-AHA":               ["hyperpigmentation_prone","lupus_rash"],
+  "photo-BHA":               ["hyperpigmentation_prone","lupus_rash"],
+  "photo-brightening":       ["hyperpigmentation_prone","lupus_rash"],
+  "photo-botanical":         ["hyperpigmentation_prone","lupus_rash"],
+};
+
 export default function ListsPage() {
   const { isSignedIn, isLoaded } = useUser();
   const [tab, setTab] = useState<Tab>("products");
@@ -137,6 +159,15 @@ export default function ListsPage() {
   const [ingredientCache, setIngredientCache] = useState<Map<string, IngDetailItem | null>>(new Map());
   const [ingredientFetching, setIngredientFetching] = useState<Set<string>>(new Set());
 
+  // Ingredient Lookup section
+  const [lookupOpen, setLookupOpen] = useState(true);
+  const [lookupQuery, setLookupQuery] = useState("");
+  const [lookupSuggestions, setLookupSuggestions] = useState<string[]>([]);
+  const [lookupItems, setLookupItems] = useState<string[]>([]);
+  const [lookupCache, setLookupCache] = useState<Map<string, IngDetailItem | null>>(new Map());
+  const [lookupFetching, setLookupFetching] = useState<Set<string>>(new Set());
+  const lookupDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   function toggleIngredientExpand(name: string) {
     setExpandedIngredients(prev => {
       const s = new Set(prev);
@@ -156,6 +187,48 @@ export default function ListsPage() {
           setIngredientFetching(prev => { const s = new Set(prev); s.delete(name); return s; });
         });
     }
+  }
+
+  function fetchLookupSuggestions(val: string) {
+    if (lookupDebounce.current) clearTimeout(lookupDebounce.current);
+    if (val.length < 2) { setLookupSuggestions([]); return; }
+    lookupDebounce.current = setTimeout(async () => {
+      const res = await fetch(`/api/ingredients/search?q=${encodeURIComponent(val)}`);
+      if (res.ok) {
+        const d = await res.json();
+        setLookupSuggestions(((d.suggestions ?? []) as string[]).slice(0, 6));
+      }
+    }, 180);
+  }
+
+  function lookupIngredient(name: string) {
+    setLookupQuery("");
+    setLookupSuggestions([]);
+    if (lookupItems.includes(name)) return;
+    setLookupItems(prev => [name, ...prev]);
+    if (!lookupCache.has(name) && !lookupFetching.has(name)) {
+      setLookupFetching(prev => new Set([...prev, name]));
+      fetch(`/api/ingredient-lists/items?list=lookup&name=${encodeURIComponent(name)}`)
+        .then(r => r.json())
+        .then(d => {
+          setLookupCache(prev => new Map([...prev, [name, d.item ?? null]]));
+          setLookupFetching(prev => { const s = new Set(prev); s.delete(name); return s; });
+        })
+        .catch(() => {
+          setLookupCache(prev => new Map([...prev, [name, null]]));
+          setLookupFetching(prev => { const s = new Set(prev); s.delete(name); return s; });
+        });
+    }
+  }
+
+  function addToIngList(listId: string, ingredientName: string) {
+    const val = ingredientName.toLowerCase();
+    setIngredientLists(ls => ls.map(l => {
+      if (l.id !== listId || l.items.includes(val)) return l;
+      const newItems = [...l.items, val];
+      dbPatch(listId, { items: newItems });
+      return { ...l, items: newItems };
+    }));
   }
 
   useEffect(() => {
@@ -849,6 +922,15 @@ export default function ListsPage() {
                                         {!structured && !detail.explanation && (
                                           <p className="text-xs text-gray-400 italic">No explanation available yet.</p>
                                         )}
+                                        {ingredientLists.filter(l => l.id !== list.id).length > 0 && (
+                                          <div className="pt-1">
+                                            <IngredientListPicker
+                                              ingredientName={item}
+                                              lists={ingredientLists.filter(l => l.id !== list.id)}
+                                              onAdd={(listId) => addToIngList(listId, item)}
+                                            />
+                                          </div>
+                                        )}
                                       </>
                                     )}
                                   </div>
@@ -976,6 +1058,159 @@ export default function ListsPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* Ingredient Lookup */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setLookupOpen(v => !v)}
+                className="flex items-center gap-2 w-full mb-3"
+              >
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Ingredient Lookup</p>
+                <span className="text-xs text-gray-300 ml-auto">{lookupOpen ? "▲" : "▼"}</span>
+              </button>
+              {lookupOpen && (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={lookupQuery}
+                      onChange={(e) => { setLookupQuery(e.target.value); fetchLookupSuggestions(e.target.value); }}
+                      onBlur={() => setTimeout(() => setLookupSuggestions([]), 150)}
+                      placeholder="Search any ingredient…"
+                      className="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-gray-400"
+                    />
+                    {lookupSuggestions.length > 0 && (
+                      <ul className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden text-xs">
+                        {lookupSuggestions.map((s) => (
+                          <li key={s}>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => lookupIngredient(s)}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-50 truncate"
+                            >
+                              {s}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  {lookupItems.length > 0 && (
+                    <div>
+                      <div className="flex justify-end mb-1">
+                        <button
+                          type="button"
+                          onClick={() => setLookupItems([])}
+                          className="text-[10px] text-gray-400 hover:text-gray-700"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                        {lookupItems.map((item) => {
+                          const detail = lookupCache.get(item);
+                          const isFetching = lookupFetching.has(item);
+                          const structured = detail?.explanation_structured ?? null;
+                          const isFlagged = detail?.status === "flagged";
+                          const isUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide"].includes(detail?.category ?? "");
+                          const concernBorder = isUniversal ? "border-rose-500" : "border-amber-500";
+                          const allCats = detail ? [detail.category, ...detail.secondary_categories].filter(Boolean) : [];
+                          const profileMatchedCats = allCats.filter(cat => {
+                            const skinTypeSet = new Set(skinTypes);
+                            const climateSet = new Set(climates);
+                            if (cat === "Drying Solvent" && (skinTypeSet.has("rosacea") || climateSet.has("heavy_metal_water"))) return true;
+                            if (["photo-retinoid","photo-AHA","photo-BHA","photo-brightening","photo-botanical"].includes(cat) && climateSet.has("high_uv")) return true;
+                            return (LOOKUP_PROFILE_MAP[cat] ?? []).some(st => skinTypeSet.has(st));
+                          });
+                          return (
+                            <div key={item} className="px-3 py-3 space-y-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xs font-medium text-gray-800 flex-1 min-w-0 truncate">{item}</span>
+                                <IngredientListPicker
+                                  ingredientName={item}
+                                  lists={ingredientLists}
+                                  onAdd={(listId) => addToIngList(listId, item)}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setLookupItems(prev => prev.filter(i => i !== item))}
+                                  className="text-gray-300 hover:text-rose-400 text-sm leading-none shrink-0"
+                                >×</button>
+                              </div>
+                              {isFetching ? (
+                                <p className="text-xs text-gray-400 italic">Loading…</p>
+                              ) : detail === undefined ? null : !detail ? (
+                                <p className="text-xs text-gray-400 italic">Not found in database.</p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {structured?.formula_role && (
+                                    <div className="pl-3 border-l-2 border-gray-300">
+                                      <p className="text-xs text-gray-500 leading-relaxed">
+                                        {detail.structural_category && <span className="font-semibold text-gray-700">{detail.structural_category} — </span>}
+                                        {structured.formula_role}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {structured?.benefit && (
+                                    <div className="pl-3 border-l-2 border-teal-500">
+                                      <p className="text-xs text-gray-600 leading-relaxed">
+                                        {!isFlagged && detail.category && <span className="font-semibold text-teal-700">{detail.category} — </span>}
+                                        {structured.benefit}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {isFlagged && (structured?.concern_items?.length || structured?.concern || (!structured && detail.explanation)) && (
+                                    <div className={`pl-3 border-l-2 ${concernBorder} space-y-1`}>
+                                      {structured?.concern_items ? structured.concern_items.map(ci => {
+                                        const ciUniversal = ["fragrance-allergen","preservative-allergen","formaldehyde releaser","sensitizing preservative","biocide"].includes(ci.category);
+                                        return (
+                                          <p key={ci.category} className="text-xs text-gray-600 leading-relaxed">
+                                            <span className={`font-semibold ${ciUniversal ? "text-rose-700" : "text-amber-700"}`}>{ci.category} — </span>
+                                            {ci.text}
+                                          </p>
+                                        );
+                                      }) : structured?.concern ? (
+                                        <p className="text-xs text-gray-600 leading-relaxed">
+                                          {detail.category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{detail.category} — </span>}
+                                          {structured.concern}
+                                        </p>
+                                      ) : (
+                                        <p className="text-xs text-gray-600 leading-relaxed">
+                                          {detail.category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{detail.category} — </span>}
+                                          {detail.explanation}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                  {!isFlagged && !structured && detail.explanation && (
+                                    <div className="pl-3 border-l-2 border-gray-300">
+                                      <p className="text-xs text-gray-600 leading-relaxed">
+                                        {detail.structural_category && <span className="font-semibold text-gray-700">{detail.structural_category} — </span>}
+                                        {detail.explanation}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {!structured && !detail.explanation && (
+                                    <p className="text-xs text-gray-400 italic">No explanation available yet.</p>
+                                  )}
+                                  {profileMatchedCats.length > 0 && (skinTypes.length > 0 || climates.length > 0) && (
+                                    <p className="text-[10px] text-amber-600 leading-snug">
+                                      Flagged for your profile — {profileMatchedCats.join(", ")}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
