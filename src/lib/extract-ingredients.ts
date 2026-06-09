@@ -303,6 +303,12 @@ function extractIngredientBlock(text: string): string | null {
     .replace(/\s*(?:read more|show more|see (?:full|all|more)|expand|view all)[^,]*$/i, "")
     .trim();
 
+  // Replace inline section-header labels with a comma separator so they don't corrupt the preceding token.
+  // e.g. "Zinc Oxide (14.5%) Inactive Ingredients: Bentonite" → "Zinc Oxide (14.5%), Bentonite"
+  candidate = candidate
+    .replace(/\s*\b(?:active|inactive|other)\s+ingredients?\s*:\s*/gi, ", ")
+    .replace(/^,\s*/, "");
+
   const commaCount = (candidate.match(/,/g) ?? []).length;
   if (commaCount < 3 || candidate.length < 50) return null;
 
