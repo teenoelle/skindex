@@ -1253,6 +1253,15 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [routineStepHint, setRoutineStepHint] = useState<string | null>(null);
   const [whatNextHint, setWhatNextHint] = useState<string | null>(null);
   const [routineView, setRoutineView] = useState<"timeline" | "detail">("detail");
+  const [suggestions, setSuggestions] = useState<BrowseProduct[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [searchFiltersPanelOpen, setSearchFiltersPanelOpen] = useState(false);
+  const [searchNoUniversal, setSearchNoUniversal] = useState(false);
+  const [searchProfileLinked, setSearchProfileLinked] = useState(false);
+  const [searchCleanOnly, setSearchCleanOnly] = useState(false);
+  const [searchPhotosafe, setSearchPhotosafe] = useState(false);
+  const [searchListModes, setSearchListModes] = useState<Record<string, "include" | "exclude" | "off">>({});
 
   // Derived routine state — all reads of routineProducts work unchanged
   const activeRoutine = routines.find(r => r.id === activeRoutineId) ?? routines[0] ?? null;
@@ -1261,6 +1270,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const initialProductIdRef = useRef(initialProductId);
   const scrollToProductRef = useRef(false);
   const scrollToDymRef = useRef(false);
+  const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (initialProductIdRef.current) {
       scanVariant({ productId: initialProductIdRef.current });
@@ -1416,6 +1427,36 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (tab !== "search") { setSuggestionsOpen(false); return; }
+    if (!query.trim() || query.trim().length < 2) { setSuggestions([]); setSuggestionsOpen(false); return; }
+    if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    suggestDebounceRef.current = setTimeout(() => {
+      const profileConcerns = profileMatchedCategories(activeSkinTypes, activeClimates);
+      const params = new URLSearchParams({ q: query.trim() });
+      if (profileConcerns.length) params.set("concerns", profileConcerns.join(","));
+      if (activeSkinTypes.size > 0) params.set("skinTypes", [...activeSkinTypes].join(","));
+      if (activeClimates.size > 0) params.set("climates", [...activeClimates].join(","));
+      setSuggestionsLoading(true);
+      fetch(`/api/products/search?${params}`)
+        .then((r) => r.json())
+        .then((d) => { setSuggestions(d.products ?? []); setSuggestionsOpen(true); })
+        .catch(() => {})
+        .finally(() => setSuggestionsLoading(false));
+    }, 250);
+    return () => { if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current); };
+  }, [query, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+        setSuggestionsOpen(false);
+        setSearchFiltersPanelOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const handler = () => {
@@ -1499,7 +1540,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   }, [result]);
 
 
-  async function handleScan(override?: { tab?: Tab; query?: string }) {
+  async function handleScan(override?: { tab?: Tab; query?: string; productId?: string }) {
+    setSuggestionsOpen(false);
     setLoading(true);
     setNotFound(false); setIHerbBlocked(false);
     setResult(null);
@@ -1548,12 +1590,13 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
     const activeTab = override?.tab ?? tab;
     const activeQuery = override?.query ?? query;
+    const activeProductId = override?.productId;
     const profileConcerns = profileMatchedCategories(activeSkinTypes, activeClimates);
     const skinTypes = [...activeSkinTypes];
     const climates = [...activeClimates];
     const body =
       activeTab === "search"
-        ? { type: "search", query: activeQuery, profileConcerns, skinTypes, climates }
+        ? { type: "search", query: activeQuery, ...(activeProductId ? { productId: activeProductId } : {}), profileConcerns, skinTypes, climates }
         : activeTab === "paste"
         ? { type: "paste", ingredients, profileConcerns, skinTypes, climates }
         : { type: "url", url: importUrls.split("\n").map((l) => l.trim()).filter(Boolean)[0] ?? "", profileConcerns, skinTypes, climates };
@@ -2907,16 +2950,152 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       </div>
 
       {/* Inputs */}
-      {tab === "search" && (
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && canScan && handleScan()}
-          placeholder="e.g. CeraVe Moisturizing Cream"
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400 mb-3"
-        />
-      )}
+      {tab === "search" && (() => {
+        const ingText = (p: BrowseProduct) => (p.ingredient_list ?? "").toLowerCase();
+        const excludeLists = ingredientLists.filter(l => searchListModes[l.id] === "exclude" && l.items.length > 0);
+        const includeLists = ingredientLists.filter(l => searchListModes[l.id] === "include" && l.items.length > 0);
+        const profileCats = profileMatchedCategories(activeSkinTypes, activeClimates);
+        const filteredSuggestions = suggestions.filter(p => {
+          if (searchNoUniversal && (p.universalConcernCount ?? 0) > 0) return false;
+          if (searchProfileLinked && ((p.profileFlaggedCount ?? 0) + (p.profileSensoryCount ?? 0)) > 0) return false;
+          if (searchCleanOnly && (p.flaggedCount > 0 || p.sensoryCount > 0)) return false;
+          if (searchPhotosafe && p.photoCount > 0) return false;
+          const txt = ingText(p);
+          if (excludeLists.some(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
+          if (includeLists.length > 0 && !includeLists.every(l => l.items.some(item => txt.includes(item.toLowerCase())))) return false;
+          return true;
+        });
+        const activeSearchFilterCount =
+          (searchNoUniversal ? 1 : 0) + (searchProfileLinked ? 1 : 0) +
+          (searchCleanOnly ? 1 : 0) + (searchPhotosafe ? 1 : 0) +
+          ingredientLists.filter(l => searchListModes[l.id] && searchListModes[l.id] !== "off").length;
+        return (
+          <div className="relative mb-3" ref={searchWrapperRef}>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && canScan) { setSuggestionsOpen(false); handleScan(); }
+                  if (e.key === "Escape") setSuggestionsOpen(false);
+                }}
+                onFocus={() => { if (suggestions.length > 0) setSuggestionsOpen(true); }}
+                placeholder="e.g. CeraVe Moisturizing Cream"
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400"
+              />
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSearchFiltersPanelOpen(v => !v)}
+                  title="Filters"
+                  className={`relative flex items-center justify-center w-8 h-[46px] rounded-xl border transition-colors ${activeSearchFilterCount > 0 ? "bg-gray-900 text-white border-gray-900" : "text-gray-400 border-gray-200 hover:border-gray-400 hover:text-gray-600"}`}
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5v-2z"/></svg>
+                  {activeSearchFilterCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 text-[9px] leading-none bg-gray-700 text-white rounded-full w-4 h-4 flex items-center justify-center font-bold">{activeSearchFilterCount}</span>
+                  )}
+                </button>
+                {searchFiltersPanelOpen && (
+                  <div className="absolute right-0 top-12 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-64 space-y-1">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest pb-1">Exclude from results</p>
+                    <button type="button" onClick={() => setSearchNoUniversal(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${searchNoUniversal ? "bg-rose-50 text-rose-700" : "text-gray-600 hover:bg-gray-50"}`}>
+                      <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${searchNoUniversal ? "bg-rose-600 border-rose-600 text-white" : "border-gray-300"}`}>{searchNoUniversal ? "✓" : ""}</span>
+                      Universal Concerns
+                    </button>
+                    {profileCats.length > 0 && (
+                      <button type="button" onClick={() => setSearchProfileLinked(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${searchProfileLinked ? "bg-amber-50 text-amber-700" : "text-gray-600 hover:bg-gray-50"}`}>
+                        <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${searchProfileLinked ? "bg-amber-600 border-amber-600 text-white" : "border-gray-300"}`}>{searchProfileLinked ? "✓" : ""}</span>
+                        My Sensitivities
+                      </button>
+                    )}
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest pb-1 pt-2">Show only</p>
+                    <button type="button" onClick={() => setSearchCleanOnly(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${searchCleanOnly ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50"}`}>
+                      <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${searchCleanOnly ? "bg-green-700 border-green-700 text-white" : "border-gray-300"}`}>{searchCleanOnly ? "✓" : ""}</span>
+                      Neutral &amp; Beneficial
+                    </button>
+                    <button type="button" onClick={() => setSearchPhotosafe(v => !v)} className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors text-left ${searchPhotosafe ? "bg-yellow-50 text-yellow-700" : "text-gray-600 hover:bg-gray-50"}`}>
+                      <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center text-[10px] leading-none ${searchPhotosafe ? "bg-yellow-500 border-yellow-500 text-white" : "border-gray-300"}`}>{searchPhotosafe ? "✓" : ""}</span>
+                      Sun-safe only
+                    </button>
+                    {ingredientLists.length > 0 && (
+                      <div className="border-t border-gray-100 pt-2 mt-1 space-y-2">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest pb-1">My Ingredient Lists</p>
+                        {ingredientLists.map(l => {
+                          const mode = searchListModes[l.id] ?? "off";
+                          return (
+                            <div key={l.id} className="flex items-center gap-2">
+                              <span className="text-xs text-gray-700 flex-1 truncate min-w-0">{l.name}</span>
+                              <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0 text-[10px]">
+                                <button type="button" onClick={() => setSearchListModes(prev => ({ ...prev, [l.id]: "include" }))} className={`px-1.5 py-0.5 transition-colors ${mode === "include" ? "bg-teal-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>✓ Incl</button>
+                                <button type="button" onClick={() => setSearchListModes(prev => ({ ...prev, [l.id]: "exclude" }))} className={`px-1.5 py-0.5 border-x border-gray-200 transition-colors ${mode === "exclude" ? "bg-rose-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>✗ Excl</button>
+                                <button type="button" onClick={() => setSearchListModes(prev => ({ ...prev, [l.id]: "off" }))} className={`px-1.5 py-0.5 transition-colors ${mode === "off" ? "bg-gray-100 text-gray-600" : "text-gray-400 hover:bg-gray-50"}`}>Off</button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            {suggestionsOpen && query.trim().length >= 2 && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                {activeSearchFilterCount > 0 && (
+                  <div className="px-3 py-2 flex gap-1.5 flex-wrap border-b border-gray-100">
+                    {searchNoUniversal && <span className="text-[10px] px-1.5 py-0.5 bg-rose-50 text-rose-700 rounded-full border border-rose-200">No Universal Concerns</span>}
+                    {searchProfileLinked && <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded-full border border-amber-200">My Sensitivities</span>}
+                    {searchCleanOnly && <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-700 rounded-full border border-green-200">Clean Only</span>}
+                    {searchPhotosafe && <span className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-700 rounded-full border border-yellow-200">Sun-safe</span>}
+                    {ingredientLists.filter(l => searchListModes[l.id] === "exclude").map(l => (
+                      <span key={l.id} className="text-[10px] px-1.5 py-0.5 bg-rose-50 text-rose-700 rounded-full border border-rose-200">✗ {l.name}</span>
+                    ))}
+                    {ingredientLists.filter(l => searchListModes[l.id] === "include").map(l => (
+                      <span key={l.id} className="text-[10px] px-1.5 py-0.5 bg-teal-50 text-teal-700 rounded-full border border-teal-200">✓ {l.name}</span>
+                    ))}
+                  </div>
+                )}
+                {suggestionsLoading && suggestions.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-400">Searching…</div>
+                ) : filteredSuggestions.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-400">{suggestions.length > 0 ? "No products match your filters." : "No products found."}</div>
+                ) : (
+                  filteredSuggestions.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setQuery(p.name);
+                        setSuggestionsOpen(false);
+                        handleScan({ tab: "search", query: p.name, productId: p.id });
+                      }}
+                      className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors text-left border-b border-gray-100 last:border-0"
+                    >
+                      {p.image_url && (
+                        <img src={`/api/image-proxy?url=${encodeURIComponent(p.image_url)}`} alt={p.name} className="w-9 h-9 object-contain rounded-lg bg-gray-50 shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div>
+                          {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
+                          <p className="text-sm font-medium text-gray-800 leading-snug">{p.name}</p>
+                        </div>
+                        <ConcernChips
+                          total={p.flaggedCount + p.sensoryCount + p.photoCount}
+                          universalCount={p.universalConcernCount}
+                          profileMatchedCount={(p.profileFlaggedCount ?? 0) + (p.profileSensoryCount ?? 0)}
+                          hasProfile={activeSkinTypes.size > 0 || activeClimates.size > 0}
+                        />
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
       {tab === "paste" && (
         <textarea
           value={ingredients}
