@@ -277,7 +277,10 @@ export default function SidePanel() {
 
           {/* Ingredient Lists — built-in + user's saved */}
           <div className="px-4 pt-3 pb-2">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Ingredient Lists</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Ingredient Lists</p>
+              <Link href="/lists/ingredients" onClick={toggleOpen} className="text-xs text-gray-400 hover:text-gray-700">View all →</Link>
+            </div>
             <div className="space-y-1">
               {SMART_LISTS.map((sl) => (
                 <Link
@@ -298,7 +301,7 @@ export default function SidePanel() {
                 {ingredientLists.slice(0, 4).map((l) => (
                   <Link
                     key={l.id}
-                    href={`/lists?tab=ingredients`}
+                    href="/lists/ingredients"
                     onClick={toggleOpen}
                     className="block py-1.5 text-sm text-gray-700 hover:text-gray-900 hover:underline underline-offset-2 truncate"
                   >
