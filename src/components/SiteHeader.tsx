@@ -110,7 +110,13 @@ export default function SiteHeader() {
                   href="/lists"
                   className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
                 >
-                  My Lists
+                  Products
+                </Link>
+                <Link
+                  href="/lists/ingredients"
+                  className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
+                >
+                  Ingredients
                 </Link>
                 <UserButton />
               </>
@@ -157,7 +163,14 @@ export default function SiteHeader() {
                     onClick={() => setMenuOpen(false)}
                     className="block text-sm text-gray-700 hover:text-gray-900 py-1.5"
                   >
-                    My Lists
+                    Products
+                  </Link>
+                  <Link
+                    href="/lists/ingredients"
+                    onClick={() => setMenuOpen(false)}
+                    className="block text-sm text-gray-700 hover:text-gray-900 py-1.5"
+                  >
+                    Ingredients
                   </Link>
                   {isAdmin && (
                     <Link
