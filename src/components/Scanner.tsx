@@ -4641,7 +4641,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               ...result.flagged.map(m => m.ingredient),
             ] : [];
             const postWash = result ? getPostWashNote(activeSkinTypes, activeClimates, scanIngredients) : null;
-            const totalNotes = allWarns.length + (postWash ? 1 : 0);
+            const devWarns = result ? detectDeviceWarnings(result, activeClimates) : [];
+            const totalNotes = allWarns.length + (postWash ? 1 : 0) + devWarns.length;
             if (totalNotes === 0) return null;
             return (
               <section>
@@ -4660,6 +4661,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" || w.type === "caution" ? "border-amber-800" : "border-teal-800"}`}>
                         <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" || w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>
                           {w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}
+                        </p>
+                        <p className="text-xs leading-relaxed text-gray-600">{w.body}</p>
+                      </div>
+                    ))}
+                    {devWarns.map((w, i) => (
+                      <div key={`dev-${i}`} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800" : "border-teal-800"}`}>
+                        <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>
+                          {w.type === "danger" ? "⚡ " : "✦ "}{w.title}
                         </p>
                         <p className="text-xs leading-relaxed text-gray-600">{w.body}</p>
                       </div>
@@ -4757,23 +4766,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </section>
           )}
 
-          {/* Device interaction warnings */}
-          {(() => {
-            const devWarns = detectDeviceWarnings(result, activeClimates);
-            return devWarns.length > 0 ? (
-              <section className="mb-6">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Device interactions</p>
-                <div className="space-y-2">
-                  {devWarns.map((w, i) => (
-                    <div key={i} className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-amber-800" : "border-teal-800"}`}>
-                      <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚡ " : "✦ "}{w.title}</p>
-                      <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ) : null;
-          })()}
 
 
           {/* By concern — grouped ingredient view */}
@@ -4971,12 +4963,12 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                       ) : (benefitLabel || secondaryBenefitLabels.length > 0) ? (
                         <>
                           {benefitLabel && (
-                            <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${isProfileBenefitCat ? "bg-teal-100 text-teal-700" : "text-teal-700"}`}>
+                            <span className="text-xs rounded-full px-2 py-0.5 shrink-0 text-teal-700">
                               {benefitLabel}
                             </span>
                           )}
                           {secondaryBenefitLabels.map(sl => (
-                            <span key={sl} className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${benefitProfileCats?.has(sl) ? "bg-teal-100 text-teal-700" : "text-teal-700"}`}>
+                            <span key={sl} className="text-xs rounded-full px-2 py-0.5 shrink-0 text-teal-700">
                               {sl}
                             </span>
                           ))}

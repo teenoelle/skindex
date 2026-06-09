@@ -841,7 +841,14 @@ export default function AdminPage() {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [queueLoading, setQueueLoading] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [ingredientReviewTab, setIngredientReviewTab] = useState<"new" | "flagged">("new");
+  const [ingredientReviewTab, setIngredientReviewTab] = useState<"new" | "flagged" | "notes">("new");
+  const [notesStructural, setNotesStructural] = useState("");
+  const [notesCategory, setNotesCategory] = useState("");
+  const [notesFlagged, setNotesFlagged] = useState("");
+  const [notesEmptyOnly, setNotesEmptyOnly] = useState(false);
+  const [notesPreviewCount, setNotesPreviewCount] = useState<number | null>(null);
+  const [notesRefreshing, setNotesRefreshing] = useState(false);
+  const [notesResult, setNotesResult] = useState<string | null>(null);
   const [reviewSort, setReviewSort] = useState<"priority" | "date" | "name">("priority");
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
   const [searchMisses, setSearchMisses] = useState<SearchMiss[]>([]);
@@ -2140,6 +2147,11 @@ export default function AdminPage() {
                     <span className="ml-1.5 text-xs bg-rose-100 text-rose-700 rounded-full px-1.5 py-0.5">{flags.length}</span>
                   )}
                 </button>
+                <button type="button"
+                  onClick={() => { setIngredientReviewTab("notes"); setNotesResult(null); setNotesPreviewCount(null); }}
+                  className={`text-sm px-3 py-1.5 -mb-px border-b-2 transition-colors ${ingredientReviewTab === "notes" ? "border-gray-900 text-gray-900 font-medium" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
+                  Refresh Notes
+                </button>
               </div>
 
               {/* New tab — ingredient queue */}
@@ -2254,6 +2266,87 @@ export default function AdminPage() {
                   })()}
                 </div>
               )}
+
+              {/* Notes tab — batch refresh skin_climate_notes by category */}
+              {ingredientReviewTab === "notes" && (() => {
+                const hasFilter = !!(notesStructural || notesCategory || notesFlagged || notesEmptyOnly);
+                const selectClass = "text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 bg-white focus:outline-none focus:border-indigo-400";
+
+                async function previewCount() {
+                  setNotesPreviewCount(null);
+                  setNotesResult(null);
+                  const res = await fetch("/api/admin/refresh-notes", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ structural_category: notesStructural || undefined, category: notesCategory || undefined, flagged_category: notesFlagged || undefined, empty_only: notesEmptyOnly || undefined, preview: true }),
+                  });
+                  const data = await res.json();
+                  if (res.ok) setNotesPreviewCount(data.count);
+                }
+
+                async function runRefresh() {
+                  setNotesRefreshing(true);
+                  setNotesResult(null);
+                  const res = await fetch("/api/admin/refresh-notes", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ structural_category: notesStructural || undefined, category: notesCategory || undefined, flagged_category: notesFlagged || undefined, empty_only: notesEmptyOnly || undefined }),
+                  });
+                  const data = await res.json();
+                  setNotesRefreshing(false);
+                  if (res.ok) setNotesResult(`Updated ${data.updated} ingredient${data.updated !== 1 ? "s" : ""}.`);
+                  else setNotesResult(`Error: ${data.error}`);
+                  setNotesPreviewCount(null);
+                }
+
+                return (
+                  <div className="space-y-4">
+                    <p className="text-xs text-gray-400">Regenerates <code className="bg-gray-100 px-1 rounded">skin_climate_notes</code> from the current curated rules for any ingredients matching the filters below. Does not change classifications or explanations.</p>
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <select value={notesStructural} onChange={e => { setNotesStructural(e.target.value); setNotesPreviewCount(null); }} className={selectClass}>
+                          <option value="">Structural category…</option>
+                          {["Chelating Agent","Ceramide","Emollient","Humectant","Mineral UV Filter","Retinoid","Exfoliant","Peptide","Fatty Acid","Fatty Alcohol","Wax","Plant Extract","Silicone","Surfactant","Preservative","Fragrance","Solvent","Active"].map(v => (
+                            <option key={v} value={v}>{v}</option>
+                          ))}
+                        </select>
+                        <select value={notesCategory} onChange={e => { setNotesCategory(e.target.value); setNotesPreviewCount(null); }} className={selectClass}>
+                          <option value="">Benefit category…</option>
+                          {["water-protective","antioxidant","barrier-repairing","barrier support","soothing","anti-inflammatory","moisturizing","skin-repairing","sebum-regulating","prebiotic","photo-protective","firming","brightening","cell-communicating","skin-replenishing"].map(v => (
+                            <option key={v} value={v}>{v}</option>
+                          ))}
+                        </select>
+                        <select value={notesFlagged} onChange={e => { setNotesFlagged(e.target.value); setNotesPreviewCount(null); }} className={selectClass}>
+                          <option value="">Concern category…</option>
+                          {["occlusive","sensitizer","drying solvent","fragrance-allergen","AHA Exfoliant","BHA Exfoliant","Barrier-disrupting","Chemical Sunscreen","Sulfate Surfactant","Pore-clogger","Synthetic Musk","Irritant"].map(v => (
+                            <option key={v} value={v}>{v}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                        <input type="checkbox" checked={notesEmptyOnly} onChange={e => { setNotesEmptyOnly(e.target.checked); setNotesPreviewCount(null); }} className="rounded" />
+                        Empty notes only
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button type="button" onClick={previewCount} disabled={!hasFilter}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors">
+                        Preview count
+                      </button>
+                      {notesPreviewCount !== null && (
+                        <span className="text-xs text-gray-500">{notesPreviewCount} ingredient{notesPreviewCount !== 1 ? "s" : ""} match</span>
+                      )}
+                      <button type="button" onClick={runRefresh} disabled={!hasFilter || notesRefreshing}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50 disabled:opacity-40 transition-colors">
+                        {notesRefreshing ? "Refreshing…" : "Refresh notes"}
+                      </button>
+                      {notesResult && (
+                        <span className={`text-xs ${notesResult.startsWith("Error") ? "text-rose-600" : "text-green-700"}`}>{notesResult}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Flagged tab — user-reported ingredient explanations */}
               {ingredientReviewTab === "flagged" && (
