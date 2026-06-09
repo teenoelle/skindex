@@ -1231,6 +1231,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const { activeSkinTypes, activeClimates } = useSkinProfile();
   const [concernExpanded, setConcernExpanded] = useState<Set<string>>(new Set());
   const [neutralGroupOpen, setNeutralGroupOpen] = useState(false);
+  const [profileInteractionsOpen, setProfileInteractionsOpen] = useState(false);
   const [showStickyProduct, setShowStickyProduct] = useState(false);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [activeRoutineId, setActiveRoutineId] = useState<string | null>(null);
@@ -2395,8 +2396,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
 
     const waterLabel     = waterTypes.length > 1 ? "water quality" : waterTypes[0];
     const title          = waterLabel
-      ? `⚠ Post-wash conflict — ${waterLabel}`
-      : "⚠ Post-wash timing conflict";
+      ? `Post-wash conflict — ${waterLabel}`
+      : "Post-wash timing conflict";
 
     const parts: string[] = [];
     if (hasWater && hasChelating && hasExfoliant) {
@@ -4628,39 +4629,52 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               )}
               <span className="text-gray-300">→</span>
             </button>
-            {(activeSkinTypes.size + activeClimates.size) > 0 && (
-              <div className="space-y-1.5 mt-2">
-                {(() => {
-                  const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
-                  const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
-                  const allWarns = [...suppWarns, ...dietWarns];
-                  return allWarns.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {allWarns.map((w, i) => (
-                        <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800" : w.type === "caution" ? "border-amber-800" : "border-teal-800"}`}>
-                          <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : w.type === "caution" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
-                          <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null;
-                })()}
-                {(() => {
-                  const scanIngredients = [
-                    ...result.safe.map(m => m.ingredient),
-                    ...result.flagged.map(m => m.ingredient),
-                  ];
-                  const postWash = getPostWashNote(activeSkinTypes, activeClimates, scanIngredients);
-                  return postWash ? (
-                    <div className="rounded-xl border border-amber-800 px-3 py-2">
-                      <p className="text-xs font-semibold text-amber-900 mb-0.5">{postWash.title}</p>
-                      <p className="text-xs leading-relaxed text-amber-800">{postWash.body}</p>
-                    </div>
-                  ) : null;
-                })()}
-              </div>
-            )}
           </section>
+
+          {/* Profile interactions */}
+          {(activeSkinTypes.size + activeClimates.size) > 0 && (() => {
+            const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
+            const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
+            const allWarns = [...suppWarns, ...dietWarns];
+            const scanIngredients = result ? [
+              ...result.safe.map(m => m.ingredient),
+              ...result.flagged.map(m => m.ingredient),
+            ] : [];
+            const postWash = result ? getPostWashNote(activeSkinTypes, activeClimates, scanIngredients) : null;
+            const totalNotes = allWarns.length + (postWash ? 1 : 0);
+            if (totalNotes === 0) return null;
+            return (
+              <section>
+                <button
+                  type="button"
+                  onClick={() => setProfileInteractionsOpen(o => !o)}
+                  className="flex items-center gap-2 text-sm font-semibold text-gray-700 uppercase tracking-widest"
+                >
+                  Profile interactions
+                  <span className="text-amber-800 font-medium normal-case tracking-normal">{totalNotes}</span>
+                  <span className="text-gray-300">{profileInteractionsOpen ? "▲" : "▼"}</span>
+                </button>
+                {profileInteractionsOpen && (
+                  <div className="space-y-1.5 mt-2">
+                    {allWarns.map((w, i) => (
+                      <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" || w.type === "caution" ? "border-amber-800" : "border-teal-800"}`}>
+                        <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" || w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>
+                          {w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}
+                        </p>
+                        <p className="text-xs leading-relaxed text-gray-600">{w.body}</p>
+                      </div>
+                    ))}
+                    {postWash && (
+                      <div className="rounded-xl border border-amber-800 px-3 py-2">
+                        <p className="text-xs font-semibold text-amber-800 mb-0.5">⚠ {postWash.title}</p>
+                        <p className="text-xs leading-relaxed text-gray-600">{postWash.body}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            );
+          })()}
 
           {/* Ingredients parent section */}
           <section className="space-y-8 mt-4">
