@@ -1259,6 +1259,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [flagging, setFlagging] = useState<string | null>(null);
   const [flagPanelIngId, setFlagPanelIngId] = useState<string | null>(null);
   const [flagSelectedReasons, setFlagSelectedReasons] = useState<Set<string>>(new Set());
+  const [flagNote, setFlagNote] = useState("");
   const [stepTagHint, setStepTagHint] = useState<string | null>(null);
   const [routineStepHint, setRoutineStepHint] = useState<string | null>(null);
   const [whatNextHint, setWhatNextHint] = useState<string | null>(null);
@@ -1647,7 +1648,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     });
   }
 
-  async function flagIngredient(ingId: string, reasons: string[], productId: string | null) {
+  async function flagIngredient(ingId: string, reasons: string[], note: string, productId: string | null) {
     if (flagging || flaggedIngredients.has(ingId)) return;
     setFlagging(ingId);
     try {
@@ -1657,6 +1658,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
         body: JSON.stringify({
           ingredientId: ingId,
           reasons: reasons.length > 0 ? reasons : undefined,
+          note: note.trim() || undefined,
           productId: productId ?? undefined,
           userProfileSnapshot: {
             skinTypes: [...activeSkinTypes],
@@ -1667,6 +1669,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       setFlaggedIngredients((prev) => new Set([...prev, ingId]));
       setFlagPanelIngId(null);
       setFlagSelectedReasons(new Set());
+      setFlagNote("");
     } catch { }
     setFlagging(null);
   }
@@ -5472,18 +5475,26 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                                   );
                                 })}
                               </div>
+                              <textarea
+                                value={flagNote}
+                                onChange={(e) => setFlagNote(e.target.value)}
+                                placeholder="Add details (optional)"
+                                rows={2}
+                                maxLength={500}
+                                className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 placeholder-gray-300 resize-none focus:outline-none focus:border-gray-400"
+                              />
                               <div className="flex items-center gap-3">
                                 <button
                                   type="button"
                                   disabled={flagging === ingId}
-                                  onClick={() => flagIngredient(ingId, [...flagSelectedReasons], result?.product?.id ?? null)}
+                                  onClick={() => flagIngredient(ingId, [...flagSelectedReasons], flagNote, result?.product?.id ?? null)}
                                   className="text-xs px-3 py-1 bg-gray-800 text-white rounded-lg disabled:opacity-50 hover:bg-gray-700"
                                 >
                                   {flagging === ingId ? "Sending…" : "Send flag"}
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => { setFlagPanelIngId(null); setFlagSelectedReasons(new Set()); }}
+                                  onClick={() => { setFlagPanelIngId(null); setFlagSelectedReasons(new Set()); setFlagNote(""); }}
                                   className="text-xs text-gray-400 hover:text-gray-600"
                                 >
                                   Cancel

@@ -864,6 +864,7 @@ export default function AdminPage() {
     explanation_source: string | null;
     flag_count: number;
     reasons: string[];
+    notes: string[];
     product_ids: string[];
     profiles: { skinTypes?: string[]; climates?: string[] }[];
     latest_flag: string;
@@ -2275,6 +2276,13 @@ export default function AdminPage() {
                             <div className="mt-1 flex flex-wrap gap-1">
                               {[...new Set(f.reasons)].map((r, i) => (
                                 <span key={i} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{r}</span>
+                              ))}
+                            </div>
+                          )}
+                          {f.notes.length > 0 && (
+                            <div className="mt-1.5 space-y-1">
+                              {f.notes.map((n, i) => (
+                                <p key={i} className="text-xs text-gray-500 italic">&ldquo;{n}&rdquo;</p>
                               ))}
                             </div>
                           )}

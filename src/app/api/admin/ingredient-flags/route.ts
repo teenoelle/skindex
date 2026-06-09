@@ -16,6 +16,7 @@ type FlagRow = {
   ingredient_id: string;
   reason: string | null;
   reasons: string[] | null;
+  note: string | null;
   product_id: string | null;
   user_profile_snapshot: { skinTypes?: string[]; climates?: string[] } | null;
   created_at: string;
@@ -28,7 +29,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("ingredient_flags")
-    .select("id, ingredient_id, reason, reasons, product_id, user_profile_snapshot, created_at, ingredients(id, name, explanation_source)")
+    .select("id, ingredient_id, reason, reasons, note, product_id, user_profile_snapshot, created_at, ingredients(id, name, explanation_source)")
     .is("reviewed_at", null)
     .order("created_at", { ascending: false })
     .limit(200) as { data: FlagRow[] | null; error: unknown };
@@ -42,6 +43,7 @@ export async function GET() {
     explanation_source: string | null;
     flag_count: number;
     reasons: string[];
+    notes: string[];
     product_ids: string[];
     profiles: { skinTypes?: string[]; climates?: string[] }[];
     latest_flag: string;
@@ -57,6 +59,7 @@ export async function GET() {
         explanation_source: row.ingredients?.explanation_source ?? null,
         flag_count: 0,
         reasons: [],
+        notes: [],
         product_ids: [],
         profiles: [],
         latest_flag: row.created_at,
@@ -68,6 +71,7 @@ export async function GET() {
     // Support both legacy single reason and new multi-select reasons array
     if (row.reasons?.length) g.reasons.push(...row.reasons);
     else if (row.reason) g.reasons.push(row.reason);
+    if (row.note) g.notes.push(row.note);
     if (row.product_id && !g.product_ids.includes(row.product_id)) g.product_ids.push(row.product_id);
     if (row.user_profile_snapshot) g.profiles.push(row.user_profile_snapshot);
     g.flag_ids.push(row.id);
