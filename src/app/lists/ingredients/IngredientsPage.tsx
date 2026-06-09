@@ -5,7 +5,6 @@ import { useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import IngredientListPicker from "@/components/IngredientListPicker";
 import { useSkinProfile } from "@/context/SkinProfileContext";
-import { openSidePanel } from "@/lib/open-side-panel";
 
 type IngredientList = {
   id: string;
@@ -492,32 +491,8 @@ export default function IngredientsPage() {
   return (
     <div className="min-h-screen bg-white">
       <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-10">
-        {/* Page title + skin profile row */}
         <div className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 mb-1">Ingredient Lists</h1>
-          {activeSkinTypes.size > 0 || activeClimates.size > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-0.5">Profile:</span>
-              {skinTypes.map(st => (
-                <span key={st} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{SKIN_TYPE_LABELS[st] ?? st}</span>
-              ))}
-              {climates.filter(c => CLIMATE_WATER_VALUES.has(c)).map(c => (
-                <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                  {[...CLIMATE_TYPES, ...WATER_TYPES].find(t => t.value === c)?.label ?? c}
-                </span>
-              ))}
-              {climates.filter(c => !CLIMATE_WATER_VALUES.has(c)).length > 0 && (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{climates.filter(c => !CLIMATE_WATER_VALUES.has(c)).length} more</span>
-              )}
-              <button type="button" onClick={openSidePanel} className="text-[10px] text-gray-400 hover:text-gray-700 underline underline-offset-2 ml-1">Edit in sidebar</button>
-            </div>
-          ) : (
-            <p className="text-xs text-gray-400">
-              No profile set.{" "}
-              <button type="button" onClick={openSidePanel} className="underline underline-offset-2 hover:text-gray-700">Set it in the sidebar</button>{" "}
-              to personalize your ingredient lists.
-            </p>
-          )}
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Ingredient Lists</h1>
         </div>
 
         <div className="flex flex-col gap-6">

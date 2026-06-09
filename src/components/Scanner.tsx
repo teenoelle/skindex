@@ -12,12 +12,10 @@ import { PROFILE_BENEFIT_CATS } from "@/lib/profile-benefit-cats";
 import { tokenFuzzyFilter } from "@/lib/search";
 import { splitIngredientList } from "@/lib/scanner";
 import ConcernChips from "@/components/ConcernChips";
+import { openSidePanel } from "@/lib/open-side-panel";
 import { useSkinProfile } from "@/context/SkinProfileContext";
 import type { SkinType, ClimateType } from "@/lib/skin-profile";
-import {
-  SKIN_TYPES, CLIMATE_TYPES, WATER_TYPES, DEVICE_TYPES, SUPPLEMENT_TYPES,
-  DIET_TYPES, HORMONE_TYPES, LIFESTYLE_TYPES, ALL_MODIFIER_TYPES, climateNoteStyle,
-} from "@/lib/skin-profile";
+import { SKIN_TYPES, ALL_MODIFIER_TYPES } from "@/lib/skin-profile";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -1230,10 +1228,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [pinnedTopProduct, setPinnedTopProduct] = useState<CommunityVariant | null>(null);
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
   const [typeBodyAreaMap, setTypeBodyAreaMap] = useState<Map<string, string>>(new Map());
-  const { activeSkinTypes, activeClimates, toggleSkinType, toggleClimate } = useSkinProfile();
+  const { activeSkinTypes, activeClimates } = useSkinProfile();
   const [concernExpanded, setConcernExpanded] = useState<Set<string>>(new Set());
   const [neutralGroupOpen, setNeutralGroupOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
   const [showStickyProduct, setShowStickyProduct] = useState(false);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [activeRoutineId, setActiveRoutineId] = useState<string | null>(null);
@@ -1247,14 +1244,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [quickListNewName, setQuickListNewName] = useState("");
   const [ingredientNewListOpen, setIngredientNewListOpen] = useState(false);
   const [ingredientNewListName, setIngredientNewListName] = useState("");
-  const [skinTypeHint, setSkinTypeHint] = useState<SkinType | null>(null);
-  const [climateHint, setClimateHint] = useState<ClimateType | null>(null);
-  const [waterHint, setWaterHint] = useState<ClimateType | null>(null);
-  const [deviceHint, setDeviceHint] = useState<ClimateType | null>(null);
-  const [supplementHint, setSupplementHint] = useState<ClimateType | null>(null);
-  const [dietHint, setDietHint] = useState<ClimateType | null>(null);
-  const [hormoneHint, setHormoneHint] = useState<ClimateType | null>(null);
-  const [lifestyleHint, setLifestyleHint] = useState<ClimateType | null>(null);
   const [flaggedIngredients, setFlaggedIngredients] = useState<Set<string>>(new Set());
   const [flagging, setFlagging] = useState<string | null>(null);
   const [flagPanelIngId, setFlagPanelIngId] = useState<string | null>(null);
@@ -2265,7 +2254,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     setQuickListProductId(null);
   }
 
-  // toggleSkinType and toggleClimate are provided by SkinProfileContext
 
   function isProfileNote(n: SkinClimateNote): boolean {
     const skinMatch = n.dimensions.length === 0 || n.dimensions.some((d) => activeSkinTypes.has(d as SkinType));
@@ -3212,7 +3200,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           <section className="mb-6">
             <button
               type="button"
-              onClick={() => setProfileOpen((v) => !v)}
+              onClick={openSidePanel}
               className="flex items-center gap-2 text-sm font-semibold text-gray-700 uppercase tracking-widest w-full"
             >
               Skin profile
@@ -3221,190 +3209,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   {activeSkinTypes.size + activeClimates.size} active
                 </span>
               )}
-              <span className="text-gray-300 ml-auto">{profileOpen ? "▲" : "▼"}</span>
+              <span className="text-gray-300 ml-auto">→</span>
             </button>
-            {profileOpen && (
-              <div className="mt-2 space-y-2 border border-gray-100 rounded-xl p-3">
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Smile size={12} /> Skin type</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {SKIN_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => toggleSkinType(value)}
-                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                            activeSkinTypes.has(value)
-                              ? "bg-amber-700 text-white border-amber-700"
-                              : "text-gray-500 border-gray-200 hover:border-gray-400"
-                          }`}
-                        >
-                          {label}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSkinTypeHint(h => h === value ? null : value)}
-                          className="text-[10px] text-gray-300 hover:text-gray-500 leading-none"
-                          aria-label={`About ${label}`}
-                        >ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {skinTypeHint && SKIN_TYPE_NOTES[skinTypeHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{SKIN_TYPES.find(s => s.value === skinTypeHint)?.label} — </span>
-                      {SKIN_TYPE_NOTES[skinTypeHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Sun size={12} /> Climate</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {CLIMATE_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setClimateHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {climateHint && CLIMATE_NOTES[climateHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === climateHint)?.label} — </span>
-                      {CLIMATE_NOTES[climateHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Droplets size={12} /> Water quality</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {WATER_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setWaterHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {waterHint && CLIMATE_NOTES[waterHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === waterHint)?.label} — </span>
-                      {CLIMATE_NOTES[waterHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Sparkles size={12} /> Devices</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DEVICE_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-gray-700 text-white border-gray-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setDeviceHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {deviceHint && CLIMATE_NOTES[deviceHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === deviceHint)?.label} — </span>
-                      {CLIMATE_NOTES[deviceHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><FlaskConical size={12} /> Internal factors</p>
-                  <p className="text-xs text-gray-400 mb-1.5">Supplements</p>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {SUPPLEMENT_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-gray-700 text-white border-gray-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setSupplementHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {supplementHint && CLIMATE_NOTES[supplementHint] && (
-                    <div className="mb-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === supplementHint)?.label} — </span>
-                      {CLIMATE_NOTES[supplementHint]}
-                    </div>
-                  )}
-                  <p className="text-xs text-gray-400 mb-1.5">Diet</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DIET_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setDietHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {dietHint && CLIMATE_NOTES[dietHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === dietHint)?.label} — </span>
-                      {CLIMATE_NOTES[dietHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Heart size={12} /> Hormonal profile</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {HORMONE_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-pink-700 text-white border-pink-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setHormoneHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {hormoneHint && CLIMATE_NOTES[hormoneHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{HORMONE_TYPES.find(t => t.value === hormoneHint)?.label} — </span>
-                      {CLIMATE_NOTES[hormoneHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Cigarette size={12} /> Lifestyle</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {LIFESTYLE_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-800 text-white border-amber-800" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setLifestyleHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {lifestyleHint && CLIMATE_NOTES[lifestyleHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{LIFESTYLE_TYPES.find(t => t.value === lifestyleHint)?.label} — </span>
-                      {CLIMATE_NOTES[lifestyleHint]}
-                    </div>
-                  )}
-                </div>
-                {(activeSkinTypes.size + activeClimates.size) > 0 && (
-                  <div className="space-y-1.5 pt-1">
-                    {(() => {
-                      const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
-                      const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
-                      const allWarns = [...suppWarns, ...dietWarns];
-                      return allWarns.length > 0 ? (
-                        <div className="space-y-1.5">
-                          {allWarns.map((w, i) => (
-                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800" : w.type === "caution" ? "border-amber-800" : "border-teal-800"}`}>
-                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : w.type === "caution" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
-                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null;
-                    })()}
-                    {(() => {
-                      const postWash = getPostWashNote(activeSkinTypes, activeClimates);
-                      return postWash ? (
-                        <div className="rounded-xl border border-amber-800 px-3 py-2">
-                          <p className="text-xs font-semibold text-amber-900 mb-0.5">{postWash.title}</p>
-                          <p className="text-xs leading-relaxed text-amber-800">{postWash.body}</p>
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-                )}
-              </div>
-            )}
           </section>
 
           {browseLoading && !browseSelectedType && !browseSelectedArea && (
@@ -4628,11 +4434,11 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           )}
           </div>{/* end summary + alternatives group */}
 
-          {/* Skin profile toggles */}
+          {/* Skin profile */}
           <section>
             <button
               type="button"
-              onClick={() => setProfileOpen((v) => !v)}
+              onClick={openSidePanel}
               className="flex items-center gap-2 text-sm font-semibold text-gray-700 uppercase tracking-widest"
             >
               Skin profile
@@ -4641,192 +4447,38 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                   {activeSkinTypes.size + activeClimates.size} active
                 </span>
               )}
-              <span className="text-gray-300">{profileOpen ? "▲" : "▼"}</span>
+              <span className="text-gray-300">→</span>
             </button>
-            {profileOpen && (
-              <div className="mt-2 space-y-2 border border-gray-100 rounded-xl p-3">
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Smile size={12} /> Skin type</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {SKIN_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => toggleSkinType(value)}
-                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                            activeSkinTypes.has(value)
-                              ? "bg-amber-700 text-white border-amber-700"
-                              : "text-gray-500 border-gray-200 hover:border-gray-400"
-                          }`}
-                        >
-                          {label}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSkinTypeHint(h => h === value ? null : value)}
-                          className="text-[10px] text-gray-300 hover:text-gray-500 leading-none"
-                          aria-label={`About ${label}`}
-                        >ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {skinTypeHint && SKIN_TYPE_NOTES[skinTypeHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{SKIN_TYPES.find(s => s.value === skinTypeHint)?.label} — </span>
-                      {SKIN_TYPE_NOTES[skinTypeHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Sun size={12} /> Climate</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {CLIMATE_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setClimateHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {climateHint && CLIMATE_NOTES[climateHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === climateHint)?.label} — </span>
-                      {CLIMATE_NOTES[climateHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Droplets size={12} /> Water quality</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {WATER_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setWaterHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {waterHint && CLIMATE_NOTES[waterHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === waterHint)?.label} — </span>
-                      {CLIMATE_NOTES[waterHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Sparkles size={12} /> Devices</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DEVICE_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-gray-700 text-white border-gray-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setDeviceHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {deviceHint && CLIMATE_NOTES[deviceHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === deviceHint)?.label} — </span>
-                      {CLIMATE_NOTES[deviceHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><FlaskConical size={12} /> Internal factors</p>
-                  <p className="text-xs text-gray-400 mb-1.5">Supplements</p>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {SUPPLEMENT_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-gray-700 text-white border-gray-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setSupplementHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {supplementHint && CLIMATE_NOTES[supplementHint] && (
-                    <div className="mb-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === supplementHint)?.label} — </span>
-                      {CLIMATE_NOTES[supplementHint]}
-                    </div>
-                  )}
-                  <p className="text-xs text-gray-400 mb-1.5">Diet</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DIET_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setDietHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {dietHint && CLIMATE_NOTES[dietHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{ALL_MODIFIER_TYPES.find(t => t.value === dietHint)?.label} — </span>
-                      {CLIMATE_NOTES[dietHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Heart size={12} /> Hormonal profile</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {HORMONE_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-pink-700 text-white border-pink-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setHormoneHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {hormoneHint && CLIMATE_NOTES[hormoneHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{HORMONE_TYPES.find(t => t.value === hormoneHint)?.label} — </span>
-                      {CLIMATE_NOTES[hormoneHint]}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Cigarette size={12} /> Lifestyle</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {LIFESTYLE_TYPES.map(({ value, label }) => (
-                      <span key={value} className="inline-flex items-center gap-0.5">
-                        <button type="button" onClick={() => toggleClimate(value)} className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${activeClimates.has(value) ? "bg-amber-800 text-white border-amber-800" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>{label}</button>
-                        <button type="button" onClick={() => setLifestyleHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                      </span>
-                    ))}
-                  </div>
-                  {lifestyleHint && CLIMATE_NOTES[lifestyleHint] && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                      <span className="font-medium text-gray-700">{LIFESTYLE_TYPES.find(t => t.value === lifestyleHint)?.label} — </span>
-                      {CLIMATE_NOTES[lifestyleHint]}
-                    </div>
-                  )}
-                </div>
-                {(activeSkinTypes.size + activeClimates.size) > 0 && (
-                  <div className="space-y-1.5 pt-1">
-                    {(() => {
-                      const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
-                      const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
-                      const allWarns = [...suppWarns, ...dietWarns];
-                      return allWarns.length > 0 ? (
-                        <div className="space-y-1.5">
-                          {allWarns.map((w, i) => (
-                            <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800" : w.type === "caution" ? "border-amber-800" : "border-teal-800"}`}>
-                              <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : w.type === "caution" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
-                              <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
-                            </div>
-                          ))}
+            {(activeSkinTypes.size + activeClimates.size) > 0 && (
+              <div className="space-y-1.5 mt-2">
+                {(() => {
+                  const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
+                  const dietWarns = detectDietaryWarnings(activeSkinTypes, activeClimates);
+                  const allWarns = [...suppWarns, ...dietWarns];
+                  return allWarns.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {allWarns.map((w, i) => (
+                        <div key={i} className={`rounded-xl border px-3 py-2 ${w.type === "danger" ? "border-amber-800" : w.type === "caution" ? "border-amber-800" : "border-teal-800"}`}>
+                          <p className={`text-xs font-semibold mb-0.5 ${w.type === "danger" ? "text-amber-900" : w.type === "caution" ? "text-amber-900" : "text-teal-800"}`}>{w.type === "danger" ? "⚠ " : w.type === "caution" ? "◆ " : "✦ "}{w.title}</p>
+                          <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : w.type === "caution" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
                         </div>
-                      ) : null;
-                    })()}
-                    {(() => {
-                      const scanIngredients = [
-                        ...result.safe.map(m => m.ingredient),
-                        ...result.flagged.map(m => m.ingredient),
-                      ];
-                      const postWash = getPostWashNote(activeSkinTypes, activeClimates, scanIngredients);
-                      return postWash ? (
-                        <div className="rounded-xl border border-amber-800 px-3 py-2">
-                          <p className="text-xs font-semibold text-amber-900 mb-0.5">{postWash.title}</p>
-                          <p className="text-xs leading-relaxed text-amber-800">{postWash.body}</p>
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
+                {(() => {
+                  const scanIngredients = [
+                    ...result.safe.map(m => m.ingredient),
+                    ...result.flagged.map(m => m.ingredient),
+                  ];
+                  const postWash = getPostWashNote(activeSkinTypes, activeClimates, scanIngredients);
+                  return postWash ? (
+                    <div className="rounded-xl border border-amber-800 px-3 py-2">
+                      <p className="text-xs font-semibold text-amber-900 mb-0.5">{postWash.title}</p>
+                      <p className="text-xs leading-relaxed text-amber-800">{postWash.body}</p>
+                    </div>
+                  ) : null;
+                })()}
               </div>
             )}
           </section>

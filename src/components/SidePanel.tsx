@@ -195,7 +195,7 @@ export default function SidePanel() {
                       <button
                         type="button"
                         onClick={() => toggleSkinType(t.value)}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${active ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${active ? "bg-amber-700 text-white border-amber-700" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
                       >
                         {t.label}
                       </button>
@@ -251,7 +251,7 @@ export default function SidePanel() {
                             <button
                               type="button"
                               onClick={() => toggleClimate(item.value)}
-                              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${active ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
+                              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${active ? "bg-amber-700 text-white border-amber-700" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
                             >
                               {item.label}
                             </button>
