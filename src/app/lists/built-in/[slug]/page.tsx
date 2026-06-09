@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import IngredientListPicker from "@/components/IngredientListPicker";
+import { useSkinProfile } from "@/context/SkinProfileContext";
+import { openSidePanel } from "@/lib/open-side-panel";
 type ExplanationStructured = {
   formula_role: string | null;
   benefit: string | null;
@@ -39,36 +41,7 @@ const SKIN_TYPE_LABELS: Record<string, string> = {
   keratosis_pilaris: "Keratosis pilaris", body_acne: "Body acne",
 };
 
-const SKIN_TYPE_NOTES: Record<string, string> = {
-  oily: "Oily skin still loses moisture in the minutes after washing. Apply your next product quickly — the itch in that window is what causes barrier damage, not the product itself.",
-  dry: "Dry skin has a thinner lipid layer and loses water fastest in cold or dry air — drying solvents, sulfate surfactants, and clay are worth watching closely.",
-  reactive: "Reactive skin has a lower tolerance threshold — sensitizers, fragrance allergens, and chemical sunscreens are worth watching closely, especially in warm weather.",
-  damaged_barrier: "A compromised barrier lets ingredients penetrate faster and deeper — irritants and sensitizers hit harder and recovery takes longer than it would on intact skin.",
-  acne_prone: "For acne skin, pore-clogging ingredients and film-formers are the main risks — watch the Congestion section after scanning.",
-  mature: "Mature skin benefits most from peptides, ceramides, and emollients, and is more sensitive to the retinoid adjustment period — start at the lowest available concentration.",
-  hyperpigmentation_prone: "For hyperpigmentation-prone skin, UV exposure directly undoes progress — many brightening actives also increase UV sensitivity, making daily SPF essential.",
-  fungal_acne: "Fungal acne (Malassezia folliculitis) is caused by yeast, not bacteria — it looks like regular acne but doesn't respond to antibiotics or most OTC acne treatments. Many 'safe' moisturizing oils and fatty acid esters feed Malassezia. Scanning every formula matters more here than for almost any other skin type.",
-  rosacea: "Rosacea triggers vary but commonly include heat, vasodilation, and chemical absorption. Chemical UV filters, alcohol-based formulas, menthol, warming agents, and high fragrance load are the main ingredient triggers — mineral sunscreens (zinc oxide, titanium dioxide) are strongly preferred.",
-  seborrheic: "Seborrheic dermatitis is driven by Malassezia — a yeast that naturally colonizes everyone's skin and feeds on the fatty acids in sebum. In seborrheic dermatitis, the immune system overreacts to Malassezia's metabolic byproducts, triggering inflammation wherever sebaceous glands are densest. On the scalp it presents as dandruff: flaky, itchy scale that sheds onto shoulders. On the face it clusters in the T-zone — the sides of the nose, brows, and glabella — as reddish, slightly greasy patches with fine yellowish or white scale that clings to skin rather than falling away. All sites respond to the same actives: zinc pyrithione, piroctone olamine, selenium sulfide, ketoconazole, and low-dose salicylic acid. Certain plant oils and fatty acid esters feed Malassezia and worsen all sites.",
-  eczema: "Atopic eczema has specific preservative sensitivities. MI/MCI (methylisothiazolinone/methylchloroisothiazolinone) and IPBC are notorious eczema triggers. Ceramides, colloidal oatmeal, and thick emollients are specifically therapeutic here — unlike for acne, heavy barrier creams help rather than harm.",
-  psoriasis: "Psoriasis causes rapid cell turnover and thick scale. Keratolytics like salicylic acid can help remove scale. Fragrances and harsh surfactants trigger flares. Vitamin D analogues and antioxidants are specifically beneficial.",
-  lupus_rash: "The malar (butterfly) rash of lupus is highly photosensitive — UV exposure triggers flares. Chemical UV filters can also cause reactions; mineral-only sunscreens (zinc oxide, titanium dioxide) are strongly preferred. Photosensitizing ingredients carry significantly higher risk here than for any other type.",
-  keratosis_pilaris: "Keratosis pilaris (the rough, bumpy texture on upper arms and thighs) is caused by keratin plugging follicles. Gentle chemical exfoliants — urea, lactic acid, salicylic acid — dissolve plugs; physical scrubs and harsh stripping cleansers worsen the inflammation that keeps follicles blocked.",
-  body_acne: "Body acne is driven by the same pore-clogging and bacterial mechanisms as face acne, but friction and sweat occlusion under clothing are major amplifiers. The same pore-clogger flags that matter on face apply here.",
-};
 
-const CLIMATE_NOTES: Record<string, string> = {
-  humid: "In humid climates, film-forming and occlusive ingredients are more likely to trap heat and sebum against the skin — lighter formulations are preferable.",
-  dry_climate: "In dry climates, humectants need to be sealed in with an emollient or occlusive — without one, they can pull moisture from deeper skin layers instead of the air.",
-  cold: "Cold air depletes skin lipids fastest — barrier-repairing ingredients (ceramides, fatty acids, emollients) are most effective and most needed in this climate.",
-  hot: "In hot weather, skin permeability increases, making sensitizers and chemical UV filters absorb more readily and triggering stronger reactions.",
-  high_uv: "In high-UV environments (UV Index 6+ on the WHO scale — 6–7 is High, 8–10 Very High, 11+ Extreme), daily broad-spectrum SPF is essential — AHAs, retinoids, and many brightening ingredients all increase UV sensitivity.",
-  hard_water: "Hard (mineral-rich) water is alkaline (pH 7–9) and leaves a calcium/magnesium film on skin after rinsing. This disrupts the skin's natural acid mantle, impairs cleanser rinse-off, and is a documented eczema aggravator. Look for cleansers containing chelating agents (EDTA, phytic acid) and follow with a low-pH toner quickly after washing.",
-  chlorinated_water: "Chlorinated and chloramine-treated tap water can oxidize skin barrier lipids on contact — particularly relevant for eczema and reactive skin. A vitamin C (ascorbic acid) toner applied immediately after washing neutralizes residual disinfectant before it can damage the barrier.",
-  iron_water: "Iron-bearing water introduces ferrous and ferric ions that generate free radicals on contact with skin, accelerating barrier lipid oxidation. Chelating agents and antioxidants (especially vitamins C and E) counteract this.",
-  heavy_metal_water: "Lead or heavy metal contamination in tap water is a public health concern — filtering your water or using bottled/filtered water for face washing is the most effective intervention. Chelating cleansers bind surface metals, and penetration enhancers (drying alcohols) should be avoided as they increase absorption.",
-};
-const SKIN_TYPE_VALUES = Object.keys(SKIN_TYPE_LABELS);
 const CLIMATE_TYPES = [
   { value: "humid", label: "Humid" },
   { value: "dry_climate", label: "Dry" },
@@ -216,14 +189,6 @@ function catBadgeColor(cat: string, isSafePage: boolean): string {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function readProfile() {
-  try {
-    const st = localStorage.getItem("skindex:skinTypes");
-    const cl = localStorage.getItem("skindex:climates");
-    return { skinTypes: st ? JSON.parse(st) as string[] : [], climates: cl ? JSON.parse(cl) as string[] : [] };
-  } catch { return { skinTypes: [], climates: [] }; }
-}
-
 function buildGroups(items: Item[], slug: string, skinTypes: string[], climates: string[]): Group[] {
   if (slug === "universal-concerns") {
     return UNIVERSAL_GROUPS
@@ -291,34 +256,18 @@ export default function BuiltInListPage() {
   // Empty set = all collapsed; populated = those groups expanded
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  const [skinTypes, setSkinTypes] = useState<string[]>([]);
-  const [climates, setClimates] = useState<string[]>([]);
-  const [editingProfile, setEditingProfile] = useState(false);
-  const [profileReady, setProfileReady] = useState(false);
-  const [skinTypeHint, setSkinTypeHint] = useState<string | null>(null);
-  const [climateHint, setClimateHint] = useState<string | null>(null);
-  const [waterHint, setWaterHint] = useState<string | null>(null);
+  const { activeSkinTypes, activeClimates, loaded: profileLoaded } = useSkinProfile();
+  const skinTypes = [...activeSkinTypes];
+  const climates = [...activeClimates];
+  const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
+
   const [userLists, setUserLists] = useState<{ id: string; name: string; items: string[] }[]>([]);
 
-  const hasProfile = skinTypes.length > 0 || climates.length > 0;
-
-  function saveSkinTypes(next: string[]) {
-    setSkinTypes(next);
-    try { localStorage.setItem("skindex:skinTypes", JSON.stringify(next)); } catch {}
-  }
-  function saveClimates(next: string[]) {
-    setClimates(next);
-    try { localStorage.setItem("skindex:climates", JSON.stringify(next)); } catch {}
-  }
   function toggleGroup(cat: string) {
     setExpandedGroups(prev => { const s = new Set(prev); s.has(cat) ? s.delete(cat) : s.add(cat); return s; });
   }
 
   useEffect(() => {
-    const { skinTypes: st, climates: cl } = readProfile();
-    setSkinTypes(st);
-    setClimates(cl);
-    setProfileReady(true);
     try {
       const il = localStorage.getItem("skindex:ingredientLists");
       if (il) setUserLists(JSON.parse(il));
@@ -346,7 +295,7 @@ export default function BuiltInListPage() {
   }
 
   useEffect(() => {
-    if (!meta || !profileReady || editingProfile) return;
+    if (!meta || !profileLoaded) return;
     setLoading(true);
     const params = new URLSearchParams({ list: slug });
     if (skinTypes.length) params.set("skinTypes", skinTypes.join(","));
@@ -355,12 +304,11 @@ export default function BuiltInListPage() {
     fetch(`/api/ingredient-lists/items?${params}`)
       .then(r => r.json())
       .then(d => {
-        const newItems: Item[] = d.items ?? [];
-        setItems(newItems);
+        setItems(d.items ?? []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [slug, skinTypes, climates, rinseOff, profileReady, editingProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [slug, activeSkinTypes, activeClimates, rinseOff, profileLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!meta) {
     return (
@@ -368,7 +316,7 @@ export default function BuiltInListPage() {
 
         <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-16 text-center">
           <p className="text-gray-400 text-sm">List not found.</p>
-          <Link href="/lists" className="text-sm text-gray-700 underline underline-offset-2 mt-4 block">← My Lists</Link>
+          <Link href="/lists/ingredients" className="text-sm text-gray-700 underline underline-offset-2 mt-4 block">← Ingredient Lists</Link>
         </main>
       </div>
     );
@@ -381,102 +329,39 @@ export default function BuiltInListPage() {
   return (
     <div className="min-h-screen bg-white">
       <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-16">
-        <Link href="/lists" className="text-xs text-gray-400 hover:text-gray-700 mb-6 block">← My Lists</Link>
+        <Link href="/lists/ingredients" className="text-xs text-gray-400 hover:text-gray-700 mb-6 block">← Ingredient Lists</Link>
 
         {/* Page header */}
         <div className="mb-6">
           <h1 className={`text-2xl font-semibold tracking-tight mb-1 ${meta.color}`}>{meta.title}</h1>
           <p className="text-xs text-gray-400 leading-relaxed">{meta.description}</p>
 
-          {/* Profile widget — My Sensitivities only */}
+          {/* Profile summary — My Sensitivities only */}
           {slug === "my-sensitivities" && (
-            <div className="mt-4">
-              {editingProfile ? (
-                <div className="border border-gray-200 rounded-xl p-3 space-y-3">
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-gray-700">Skin type</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {SKIN_TYPE_VALUES.map(st => (
-                        <span key={st} className="inline-flex items-center gap-0.5">
-                          <button type="button" onClick={() => saveSkinTypes(skinTypes.includes(st) ? skinTypes.filter(s => s !== st) : [...skinTypes, st])}
-                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${skinTypes.includes(st) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                            {SKIN_TYPE_LABELS[st]}
-                          </button>
-                          {SKIN_TYPE_NOTES[st] && (
-                            <button type="button" onClick={() => setSkinTypeHint(h => h === st ? null : st)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${SKIN_TYPE_LABELS[st]}`}>ⓘ</button>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                    {skinTypeHint && SKIN_TYPE_NOTES[skinTypeHint] && (
-                      <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                        <span className="font-medium text-gray-700">{SKIN_TYPE_LABELS[skinTypeHint]} — </span>
-                        {SKIN_TYPE_NOTES[skinTypeHint]}
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-gray-700">Climate</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {CLIMATE_TYPES.map(({ value, label }) => (
-                        <span key={value} className="inline-flex items-center gap-0.5">
-                          <button type="button" onClick={() => saveClimates(climates.includes(value) ? climates.filter(c => c !== value) : [...climates, value])}
-                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${climates.includes(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                            {label}
-                          </button>
-                          <button type="button" onClick={() => setClimateHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                        </span>
-                      ))}
-                    </div>
-                    {climateHint && CLIMATE_NOTES[climateHint] && (
-                      <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                        <span className="font-medium text-gray-700">{CLIMATE_TYPES.find(t => t.value === climateHint)?.label} — </span>
-                        {CLIMATE_NOTES[climateHint]}
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-gray-700">Water quality</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {WATER_TYPES.map(({ value, label }) => (
-                        <span key={value} className="inline-flex items-center gap-0.5">
-                          <button type="button" onClick={() => saveClimates(climates.includes(value) ? climates.filter(c => c !== value) : [...climates, value])}
-                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${climates.includes(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                            {label}
-                          </button>
-                          <button type="button" onClick={() => setWaterHint(h => h === value ? null : value)} className="text-[10px] text-gray-300 hover:text-gray-500 leading-none" aria-label={`About ${label}`}>ⓘ</button>
-                        </span>
-                      ))}
-                    </div>
-                    {waterHint && CLIMATE_NOTES[waterHint] && (
-                      <div className="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-2 leading-relaxed border border-gray-100">
-                        <span className="font-medium text-gray-700">{WATER_TYPES.find(t => t.value === waterHint)?.label} — </span>
-                        {CLIMATE_NOTES[waterHint]}
-                      </div>
-                    )}
-                  </div>
-                  <button type="button" onClick={() => setEditingProfile(false)} className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2">Done</button>
-                </div>
-              ) : hasProfile ? (
+            <div className="mt-3">
+              {hasProfile ? (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-0.5">Profile:</span>
                   {skinTypes.map(st => (
                     <span key={st} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{SKIN_TYPE_LABELS[st] ?? st}</span>
                   ))}
-                  {climates.map(c => (
+                  {climates.filter(c => new Set(ALL_CLIMATE.map(t => t.value)).has(c)).map(c => (
                     <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{ALL_CLIMATE.find(t => t.value === c)?.label ?? c}</span>
                   ))}
-                  <button type="button" onClick={() => setEditingProfile(true)} className="text-[10px] text-gray-400 hover:text-gray-700 underline underline-offset-2 ml-1">Edit</button>
+                  {climates.filter(c => !new Set(ALL_CLIMATE.map(t => t.value)).has(c)).length > 0 && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{climates.filter(c => !new Set(ALL_CLIMATE.map(t => t.value)).has(c)).length} more</span>
+                  )}
+                  <button type="button" onClick={openSidePanel} className="text-[10px] text-gray-400 hover:text-gray-700 underline underline-offset-2 ml-1">Edit in sidebar</button>
                 </div>
               ) : (
                 <p className="text-xs text-gray-400">
-                  No skin profile set.{" "}
-                  <button type="button" onClick={() => setEditingProfile(true)} className="underline underline-offset-2 hover:text-gray-700">Set it here</button>{" "}
+                  No profile set.{" "}
+                  <button type="button" onClick={openSidePanel} className="underline underline-offset-2 hover:text-gray-700">Set it in the sidebar</button>{" "}
                   to see your personal sensitivity list.
                 </p>
               )}
 
-              {hasProfile && !editingProfile && (
+              {hasProfile && (
                 <div className="flex items-center gap-2 mt-3">
                   <span className="text-xs text-gray-400">Product type:</span>
                   {(["Leave-on", "Rinse-off"] as const).map(label => {

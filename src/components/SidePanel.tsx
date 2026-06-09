@@ -80,6 +80,17 @@ export default function SidePanel() {
     } catch { /* ignore */ }
   }
 
+  // Listen for programmatic open trigger
+  useEffect(() => {
+    function handleOpen() {
+      setOpen(true);
+      try { localStorage.setItem("skindex:sidePanel", "open"); } catch { /* ignore */ }
+      if (!listsLoaded) loadLists();
+    }
+    window.addEventListener("skindex:openPanel", handleOpen);
+    return () => window.removeEventListener("skindex:openPanel", handleOpen);
+  }, [listsLoaded]);
+
   // Swipe-from-left gesture
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);

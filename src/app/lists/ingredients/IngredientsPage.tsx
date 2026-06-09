@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import IngredientListPicker from "@/components/IngredientListPicker";
+import { useSkinProfile } from "@/context/SkinProfileContext";
+import { openSidePanel } from "@/lib/open-side-panel";
 
 type IngredientList = {
   id: string;
@@ -34,7 +36,6 @@ const SKIN_TYPE_LABELS: Record<string, string> = {
   eczema: "Eczema", psoriasis: "Psoriasis", lupus_rash: "Lupus rash",
   keratosis_pilaris: "Keratosis pilaris", body_acne: "Body acne",
 };
-const SKIN_TYPE_VALUES = Object.keys(SKIN_TYPE_LABELS);
 
 const CLIMATE_TYPES = [
   { value: "humid", label: "Humid" },
@@ -76,6 +77,11 @@ const SMART_LIST_COLOR: Record<string, string> = {
   "neutral-beneficial": "text-teal-700",
 };
 
+const UNIVERSAL_CATS_SET = new Set([
+  "fragrance-allergen", "preservative-allergen", "formaldehyde releaser",
+  "sensitizing preservative", "biocide", "Sulfate Surfactant", "Drying Solvent",
+]);
+
 const LOOKUP_PROFILE_MAP: Record<string, string[]> = {
   "pore-clogger":            ["oily","acne_prone","fungal_acne","body_acne","keratosis_pilaris"],
   "occlusive":               ["oily","acne_prone","fungal_acne","body_acne","keratosis_pilaris"],
@@ -99,14 +105,12 @@ const LOOKUP_PROFILE_MAP: Record<string, string[]> = {
 
 export default function IngredientsPage() {
   const { isSignedIn, isLoaded } = useUser();
-
-  const [skinTypes, setSkinTypes] = useState<string[]>([]);
-  const [climates, setClimates] = useState<string[]>([]);
-  const [editingProfile, setEditingProfile] = useState(false);
+  const { activeSkinTypes, activeClimates, loaded: profileLoaded } = useSkinProfile();
+  const skinTypes = [...activeSkinTypes];
+  const climates = [...activeClimates];
 
   const [builtInOpen, setBuiltInOpen] = useState(true);
   const [rinseOff, setRinseOff] = useState(false);
-  const rinseOffMounted = useRef(false);
 
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [editingListName, setEditingListName] = useState("");
@@ -132,6 +136,7 @@ export default function IngredientsPage() {
   const [expandedIngredients, setExpandedIngredients] = useState<Set<string>>(new Set());
   const [ingredientCache, setIngredientCache] = useState<Map<string, IngDetailItem | null>>(new Map());
   const [ingredientFetching, setIngredientFetching] = useState<Set<string>>(new Set());
+  const [expandedLists, setExpandedLists] = useState<Set<string>>(new Set());
 
   const [lookupOpen, setLookupOpen] = useState(true);
   const [lookupQuery, setLookupQuery] = useState("");
@@ -269,8 +274,8 @@ export default function IngredientsPage() {
     const concernBorder = isUniversal ? "border-rose-500" : "border-amber-500";
     const allCats = detail ? [detail.category, ...detail.secondary_categories].filter(Boolean) : [];
     const profileMatchedCats = allCats.filter(cat => {
-      const skinTypeSet = new Set(skinTypes);
-      const climateSet = new Set(climates);
+      const skinTypeSet = new Set<string>(skinTypes);
+      const climateSet = new Set<string>(climates);
       if (cat === "Drying Solvent" && (skinTypeSet.has("rosacea") || climateSet.has("heavy_metal_water"))) return true;
       if (["photo-retinoid","photo-AHA","photo-BHA","photo-brightening","photo-botanical"].includes(cat) && climateSet.has("high_uv")) return true;
       return (LOOKUP_PROFILE_MAP[cat] ?? []).some(st => skinTypeSet.has(st));
@@ -278,8 +283,18 @@ export default function IngredientsPage() {
     if (isFetching) return <p className="text-xs text-gray-400 italic">Loading…</p>;
     if (detail === undefined) return null;
     if (!detail) return <p className="text-xs text-gray-400 italic">Not found in database.</p>;
+    const inUniversalConcerns = isFlagged && UNIVERSAL_CATS_SET.has(detail.category ?? "");
+    const inMySensitivities = isFlagged && profileMatchedCats.length > 0 && (skinTypes.length > 0 || climates.length > 0);
+    const inSavedLists = ingredientLists.filter(l => l.items.includes(item.toLowerCase())).map(l => l.name);
     return (
       <div className="space-y-2">
+        {(inUniversalConcerns || inMySensitivities || inSavedLists.length > 0) && (
+          <div className="flex flex-wrap gap-1">
+            {inUniversalConcerns && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700">In Universal Concerns</span>}
+            {inMySensitivities && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">In My Sensitivities</span>}
+            {inSavedLists.map(n => <span key={n} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">In {n}</span>)}
+          </div>
+        )}
         {structured?.formula_role && (
           <div className="pl-3 border-l-2 border-gray-300">
             <p className="text-xs text-gray-500 leading-relaxed">
@@ -368,27 +383,9 @@ export default function IngredientsPage() {
   }
 
   useEffect(() => {
-    try {
-      const st = localStorage.getItem("skindex:skinTypes");
-      const cl = localStorage.getItem("skindex:climates");
-      const parsedSkinTypes = st ? JSON.parse(st) as string[] : [];
-      const parsedClimates = cl ? JSON.parse(cl) as string[] : [];
-      if (parsedSkinTypes.length) setSkinTypes(parsedSkinTypes);
-      if (parsedClimates.length) setClimates(parsedClimates);
-      fetchSmartCounts(parsedSkinTypes, parsedClimates, false);
-    } catch {}
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!rinseOffMounted.current) { rinseOffMounted.current = true; return; }
-    try {
-      const st = localStorage.getItem("skindex:skinTypes");
-      const cl = localStorage.getItem("skindex:climates");
-      const parsedSkinTypes = st ? JSON.parse(st) as string[] : [];
-      const parsedClimates = cl ? JSON.parse(cl) as string[] : [];
-      fetchSmartCounts(parsedSkinTypes, parsedClimates, rinseOff);
-    } catch {}
-  }, [rinseOff]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!profileLoaded) return;
+    fetchSmartCounts([...activeSkinTypes], [...activeClimates], rinseOff);
+  }, [profileLoaded, activeSkinTypes, activeClimates, rinseOff]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -467,16 +464,6 @@ export default function IngredientsPage() {
     setEditingListId(null);
   }
 
-  function toggleClimate(value: string) {
-    const next = climates.includes(value) ? climates.filter(c => c !== value) : [...climates, value];
-    setClimates(next);
-    try {
-      const all: string[] = JSON.parse(localStorage.getItem("skindex:climates") ?? "[]");
-      const preserved = all.filter(c => !CLIMATE_WATER_VALUES.has(c));
-      localStorage.setItem("skindex:climates", JSON.stringify([...preserved, ...next.filter(c => CLIMATE_WATER_VALUES.has(c))]));
-    } catch {}
-  }
-
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-white">
@@ -507,58 +494,8 @@ export default function IngredientsPage() {
       <main className="max-w-2xl mx-auto px-6 pt-[4.5rem] pb-10">
         {/* Page title + skin profile row */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Ingredient Lists</h1>
-          </div>
-
-          {editingProfile ? (
-            <div className="border border-gray-200 rounded-xl p-3 space-y-3">
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-gray-700">Skin type</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {SKIN_TYPE_VALUES.map(st => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => {
-                        const next = skinTypes.includes(st) ? skinTypes.filter(s => s !== st) : [...skinTypes, st];
-                        setSkinTypes(next);
-                        try { localStorage.setItem("skindex:skinTypes", JSON.stringify(next)); } catch {}
-                      }}
-                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${skinTypes.includes(st) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}
-                    >
-                      {SKIN_TYPE_LABELS[st]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-gray-700">Climate</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {CLIMATE_TYPES.map(({ value, label }) => (
-                    <button key={value} type="button" onClick={() => toggleClimate(value)}
-                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${climates.includes(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-gray-700">Water quality</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {WATER_TYPES.map(({ value, label }) => (
-                    <button key={value} type="button" onClick={() => toggleClimate(value)}
-                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${climates.includes(value) ? "bg-amber-700 text-white border-amber-700" : "text-gray-500 border-gray-200 hover:border-gray-400"}`}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button type="button" onClick={() => setEditingProfile(false)} className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2">
-                Done
-              </button>
-            </div>
-          ) : skinTypes.length > 0 || climates.filter(c => CLIMATE_WATER_VALUES.has(c)).length > 0 ? (
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 mb-1">Ingredient Lists</h1>
+          {activeSkinTypes.size > 0 || activeClimates.size > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-0.5">Profile:</span>
               {skinTypes.map(st => (
@@ -569,20 +506,23 @@ export default function IngredientsPage() {
                   {[...CLIMATE_TYPES, ...WATER_TYPES].find(t => t.value === c)?.label ?? c}
                 </span>
               ))}
-              <button type="button" onClick={() => setEditingProfile(true)} className="text-[10px] text-gray-400 hover:text-gray-700 underline underline-offset-2 ml-1">Edit</button>
+              {climates.filter(c => !CLIMATE_WATER_VALUES.has(c)).length > 0 && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{climates.filter(c => !CLIMATE_WATER_VALUES.has(c)).length} more</span>
+              )}
+              <button type="button" onClick={openSidePanel} className="text-[10px] text-gray-400 hover:text-gray-700 underline underline-offset-2 ml-1">Edit in sidebar</button>
             </div>
           ) : (
             <p className="text-xs text-gray-400">
-              No skin profile set.{" "}
-              <button type="button" onClick={() => setEditingProfile(true)} className="underline underline-offset-2 hover:text-gray-700">Set it here</button>{" "}
+              No profile set.{" "}
+              <button type="button" onClick={openSidePanel} className="underline underline-offset-2 hover:text-gray-700">Set it in the sidebar</button>{" "}
               to personalize your ingredient lists.
             </p>
           )}
         </div>
 
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           {/* Smart lists */}
-          <div>
+          <div className="order-2">
             <button
               type="button"
               onClick={() => setBuiltInOpen(v => !v)}
@@ -592,7 +532,7 @@ export default function IngredientsPage() {
               <span className="text-xs text-gray-300 ml-auto">{builtInOpen ? "▲" : "▼"}</span>
             </button>
             {builtInOpen && (
-              <div className="space-y-2">
+              <div className="divide-y divide-gray-100">
                 {SMART_LISTS.map(sl => {
                   const count = sl.id === "universal-concerns" ? smartCounts?.universalConcerns.count
                     : sl.id === "my-sensitivities" ? smartCounts?.mySensitivities?.count
@@ -600,38 +540,39 @@ export default function IngredientsPage() {
                     : undefined;
                   const hasProfile = skinTypes.length > 0 || climates.filter(c => CLIMATE_WATER_VALUES.has(c)).length > 0;
                   return (
-                    <div key={sl.id} className="border border-gray-200 rounded-xl px-4 py-3 space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <Link href={`/lists/built-in/${sl.id}`} className={`text-sm font-medium leading-snug hover:underline underline-offset-2 ${SMART_LIST_COLOR[sl.id]}`}>{sl.name}</Link>
-                        {count !== undefined && (
-                          <span className="text-[10px] text-gray-400 ml-auto shrink-0">{count.toLocaleString()}</span>
-                        )}
-                        <Link href={`/lists/built-in/${sl.id}`} className="text-[10px] text-gray-300 hover:text-gray-500 shrink-0">View →</Link>
-                      </div>
-                      <p className="text-xs text-gray-400 leading-relaxed">
-                        {sl.requiresProfile && !hasProfile
-                          ? "Set your skin profile above to activate this list."
-                          : sl.description}
-                      </p>
-                      {sl.id === "neutral-beneficial" && smartCounts && (
-                        <p className="text-[10px] text-gray-400">
-                          {smartCounts.neutralBeneficial.neutral.toLocaleString()} neutral · {smartCounts.neutralBeneficial.beneficial.toLocaleString()} beneficial
-                        </p>
-                      )}
-                      {sl.id === "my-sensitivities" && hasProfile && (
-                        <div className="flex items-center gap-2 pt-0.5">
-                          <span className="text-[11px] text-gray-400">Product type:</span>
-                          {(["Leave-on", "Rinse-off"] as const).map(label => {
-                            const isRO = label === "Rinse-off";
-                            const active = rinseOff === isRO;
-                            return (
-                              <button key={label} type="button" onClick={() => setRinseOff(isRO)}
-                                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${active ? "bg-gray-800 text-white border-gray-800" : "text-gray-400 border-gray-200 hover:border-gray-400"}`}>
-                                {label}
-                              </button>
-                            );
-                          })}
+                    <div key={sl.id} className="py-2.5 flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <Link href={`/lists/built-in/${sl.id}`} className={`text-sm font-medium hover:underline underline-offset-2 ${SMART_LIST_COLOR[sl.id]}`}>{sl.name}</Link>
+                          <Link href={`/lists/built-in/${sl.id}`} className="text-[10px] text-gray-300 hover:text-gray-500">View →</Link>
                         </div>
+                        <p className="text-[11px] text-gray-400 leading-relaxed">
+                          {sl.requiresProfile && !hasProfile
+                            ? "Set your skin profile to activate."
+                            : sl.description}
+                        </p>
+                        {sl.id === "neutral-beneficial" && smartCounts && (
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {smartCounts.neutralBeneficial.neutral.toLocaleString()} neutral · {smartCounts.neutralBeneficial.beneficial.toLocaleString()} beneficial
+                          </p>
+                        )}
+                        {sl.id === "my-sensitivities" && hasProfile && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {(["Leave-on", "Rinse-off"] as const).map(label => {
+                              const isRO = label === "Rinse-off";
+                              const active = rinseOff === isRO;
+                              return (
+                                <button key={label} type="button" onClick={() => setRinseOff(isRO)}
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-full border transition-colors ${active ? "bg-gray-800 text-white border-gray-800" : "text-gray-400 border-gray-200 hover:border-gray-400"}`}>
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      {count !== undefined && (
+                        <span className="text-[10px] text-gray-400 shrink-0 mt-0.5">{count.toLocaleString()}</span>
                       )}
                     </div>
                   );
@@ -641,7 +582,7 @@ export default function IngredientsPage() {
           </div>
 
           {/* User-created lists */}
-          <div>
+          <div className="order-3">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">My Ingredient Lists</p>
               {!newIngListOpen && (
@@ -741,11 +682,22 @@ export default function IngredientsPage() {
                           >
                             {list.name}
                           </button>
-                          <span className="text-xs text-gray-400 shrink-0">{list.items.length}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedLists(s => { const n = new Set(s); n.has(list.id) ? n.delete(list.id) : n.add(list.id); return n; })}
+                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 shrink-0"
+                          >
+                            <span>{list.items.length}</span>
+                            {list.items.length > 0 && <span className="text-[9px]">{expandedLists.has(list.id) ? "▼" : "▶"}</span>}
+                          </button>
                           <button
                             type="button"
                             title="Copy ingredients"
-                            onClick={() => setCopyListId(copyListId === list.id ? null : list.id)}
+                            onClick={() => {
+                              const opening = copyListId !== list.id;
+                              setCopyListId(opening ? list.id : null);
+                              if (opening) setExpandedLists(s => { const n = new Set(s); n.add(list.id); return n; });
+                            }}
                             className={`text-[10px] shrink-0 transition-colors ${copyListId === list.id ? "text-gray-700" : "text-gray-300 hover:text-gray-500"}`}
                           >
                             Copy
@@ -767,7 +719,7 @@ export default function IngredientsPage() {
                       )}
                     </div>
 
-                    {copyListId === list.id && (
+                    {expandedLists.has(list.id) && copyListId === list.id && (
                       <div className="border border-gray-100 rounded-xl p-2.5 space-y-2 bg-gray-50">
                         <div className="flex gap-1.5">
                           {(["line", "comma"] as const).map(fmt => (
@@ -793,7 +745,7 @@ export default function IngredientsPage() {
                       </div>
                     )}
 
-                    {list.items.length > 0 && (
+                    {list.items.length > 0 && expandedLists.has(list.id) && (
                       <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
                         {list.items.map(item => {
                           const isExpanded = expandedIngredients.has(item);
@@ -894,7 +846,7 @@ export default function IngredientsPage() {
                       </div>
                     )}
 
-                    {pasteListId === list.id ? (
+                    {expandedLists.has(list.id) && (pasteListId === list.id ? (
                       <div className="space-y-1.5 pt-1 border-t border-gray-100">
                         <p className="text-[11px] text-gray-400">Paste names — one per line or comma-separated</p>
                         <textarea
@@ -999,7 +951,7 @@ export default function IngredientsPage() {
                           + Paste multiple
                         </button>
                       </div>
-                    )}
+                    ))}
                   </div>
                 ))}
               </div>
@@ -1007,7 +959,7 @@ export default function IngredientsPage() {
           </div>
 
           {/* Ingredient Lookup */}
-          <div>
+          <div className="order-1">
             <button
               type="button"
               onClick={() => setLookupOpen(v => !v)}
@@ -1018,7 +970,7 @@ export default function IngredientsPage() {
             </button>
             {lookupOpen && (
               <div className="space-y-3">
-                <div className="relative">
+                <div className="relative sticky top-14 z-10 bg-white pb-1">
                   <input
                     type="text"
                     value={lookupQuery}

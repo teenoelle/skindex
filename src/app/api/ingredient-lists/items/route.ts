@@ -69,7 +69,18 @@ export async function GET(req: NextRequest) {
       .select(`${SELECT}, flagged_category, category, status`)
       .ilike("name", name)
       .limit(1);
-    const row = data?.[0];
+    let row = data?.[0];
+    if (!row) {
+      const stripped = name.replace(/\s*\([^)]*\)\s*$/, "").trim();
+      if (stripped && stripped !== name) {
+        const { data: data2 } = await supabase
+          .from("ingredients")
+          .select(`${SELECT}, flagged_category, category, status`)
+          .ilike("name", stripped)
+          .limit(1);
+        row = data2?.[0];
+      }
+    }
     if (!row) return NextResponse.json({ item: null });
     const isFlagged = row.status === "flagged";
     return NextResponse.json({
