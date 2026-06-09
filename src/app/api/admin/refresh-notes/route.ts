@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { generateNotes } from "@/lib/curated-explanation";
 
 async function guard() {
   const { userId } = await auth();
@@ -18,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   const { structural_category, category, flagged_category, empty_only, preview } = await req.json();
 
-  // At least one filter required to avoid accidentally refreshing every ingredient
+  // At least one filter required to avoid accidentally requeueing every ingredient
   if (!structural_category && !category && !flagged_category && !empty_only) {
     return NextResponse.json({ error: "At least one filter is required" }, { status: 400 });
   }
@@ -41,26 +40,17 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: ingredients, error } = await applyFilters(
-    supabaseAdmin.from("ingredients").select("id, name, status, structural_category, category, flagged_category")
+    supabaseAdmin.from("ingredients").select("id")
   ).limit(500);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!ingredients?.length) return NextResponse.json({ updated: 0 });
+  if (!ingredients?.length) return NextResponse.json({ queued: 0 });
 
-  let updated = 0;
-  for (const ing of ingredients) {
-    const notes = generateNotes({
-      name: ing.name,
-      status: ing.status,
-      structural_category: ing.structural_category,
-      category: ing.category,
-      flagged_category: ing.flagged_category,
-    });
-    await supabaseAdmin
-      .from("ingredients")
-      .update({ skin_climate_notes: notes.length > 0 ? notes : null })
-      .eq("id", ing.id);
-    updated++;
-  }
+  const ids = ingredients.map((i: { id: string }) => i.id);
+  const { error: updateError } = await supabaseAdmin
+    .from("ingredients")
+    .update({ explanation_source: "template_unclassified" })
+    .in("id", ids);
 
-  return NextResponse.json({ updated });
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  return NextResponse.json({ queued: ids.length });
 }

@@ -2150,7 +2150,7 @@ export default function AdminPage() {
                 <button type="button"
                   onClick={() => { setIngredientReviewTab("notes"); setNotesResult(null); setNotesPreviewCount(null); }}
                   className={`text-sm px-3 py-1.5 -mb-px border-b-2 transition-colors ${ingredientReviewTab === "notes" ? "border-gray-900 text-gray-900 font-medium" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
-                  Refresh Notes
+                  Requeue
                 </button>
               </div>
 
@@ -2294,14 +2294,14 @@ export default function AdminPage() {
                   });
                   const data = await res.json();
                   setNotesRefreshing(false);
-                  if (res.ok) setNotesResult(`Updated ${data.updated} ingredient${data.updated !== 1 ? "s" : ""}.`);
+                  if (res.ok) setNotesResult(`Queued ${data.queued} ingredient${data.queued !== 1 ? "s" : ""} — run /generate-explanations to process.`);
                   else setNotesResult(`Error: ${data.error}`);
                   setNotesPreviewCount(null);
                 }
 
                 return (
                   <div className="space-y-4">
-                    <p className="text-xs text-gray-400">Regenerates <code className="bg-gray-100 px-1 rounded">skin_climate_notes</code> from the current curated rules for any ingredients matching the filters below. Does not change classifications or explanations.</p>
+                    <p className="text-xs text-gray-400">Sets <code className="bg-gray-100 px-1 rounded">explanation_source = template_unclassified</code> on matching ingredients so <code className="bg-gray-100 px-1 rounded">/generate-explanations</code> picks them up for full reclassification — updates notes, categories, and AI explanation.</p>
                     <div className="space-y-3">
                       <div className="flex flex-wrap gap-2 items-center">
                         <select value={notesStructural} onChange={e => { setNotesStructural(e.target.value); setNotesPreviewCount(null); }} className={selectClass}>
@@ -2338,7 +2338,7 @@ export default function AdminPage() {
                       )}
                       <button type="button" onClick={runRefresh} disabled={!hasFilter || notesRefreshing}
                         className="text-xs px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50 disabled:opacity-40 transition-colors">
-                        {notesRefreshing ? "Refreshing…" : "Refresh notes"}
+                        {notesRefreshing ? "Requeueing…" : "Requeue"}
                       </button>
                       {notesResult && (
                         <span className={`text-xs ${notesResult.startsWith("Error") ? "text-rose-600" : "text-green-700"}`}>{notesResult}</span>
