@@ -310,7 +310,7 @@ function extractIngredientBlock(text: string): string | null {
     .replace(/^,\s*/, "");
 
   const commaCount = (candidate.match(/,/g) ?? []).length;
-  if (commaCount < 3 || candidate.length < 50) return null;
+  if (commaCount < 2 || candidate.length < 50) return null;
 
   return candidate;
 }
@@ -398,7 +398,7 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
     }
     candidate = candidate.replace(/\s+/g, " ").trim();
     const commaCount = (candidate.match(/,/g) ?? []).length;
-    if (commaCount >= 3 && candidate.length >= 50) ingredients = candidate;
+    if (commaCount >= 2 && candidate.length >= 50) ingredients = candidate;
   }
 
   // Strategy 2: generic label search in full page text
