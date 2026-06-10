@@ -233,7 +233,7 @@ type Tab = "search" | "paste" | "add" | "browse";
 
 type ImportResult = {
   url: string;
-  status: "imported" | "skipped" | "failed";
+  status: "imported" | "skipped" | "failed" | "pending" | "processing";
   name?: string;
   brand?: string;
   reason?: string;
@@ -1206,6 +1206,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [importUrls, setImportUrls] = useState("");
   const [importLoading, setImportLoading] = useState(false);
   const [importResults, setImportResults] = useState<ImportResult[] | null>(null);
+  const [backgroundImport, setBackgroundImport] = useState(true);
+  const [importBatchId, setImportBatchId] = useState<string | null>(null);
+  const [importPolling, setImportPolling] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
@@ -1420,6 +1423,46 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   useEffect(() => {
     try { localStorage.setItem("skindex:ingredientLists", JSON.stringify(ingredientLists)); } catch {}
   }, [ingredientLists]);
+
+  // Restore in-progress background import batch on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("skindex:importBatch");
+      if (saved) { setImportBatchId(saved); setImportPolling(true); }
+    } catch {}
+  }, []);
+
+  // Poll for background import progress
+  useEffect(() => {
+    if (!importBatchId || !importPolling) return;
+    let active = true;
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/import-jobs/${importBatchId}`);
+        if (!res.ok) { setImportPolling(false); return; }
+        const { jobs } = await res.json();
+        if (!jobs?.length) { setImportPolling(false); return; }
+        const mapped: ImportResult[] = jobs.map((j: { url: string; status: string; name?: string; brand?: string; reason?: string; http_status?: number; fetch_error?: string }) => ({
+          url: j.url,
+          status: j.status as ImportResult["status"],
+          name: j.name ?? undefined,
+          brand: j.brand ?? undefined,
+          reason: j.reason ?? undefined,
+          httpStatus: j.http_status ?? undefined,
+          fetchError: j.fetch_error ?? undefined,
+        }));
+        setImportResults(mapped);
+        const done = jobs.every((j: { status: string }) => j.status === "imported" || j.status === "skipped" || j.status === "failed");
+        if (done) {
+          setImportPolling(false);
+          try { localStorage.removeItem("skindex:importBatch"); } catch {}
+        }
+      } catch {}
+      if (active && importPolling) setTimeout(tick, 3000);
+    };
+    const t = setTimeout(tick, 1000);
+    return () => { active = false; clearTimeout(t); };
+  }, [importBatchId, importPolling]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetch("/api/browse")
@@ -3154,7 +3197,22 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       )}
       {tab === "add" && addSubTab === "url" && isSignedIn && (
         addTabUrlCount > 1
-          ? <p className="text-xs text-gray-400 mb-3">{addTabUrlCount} URLs{addTabUrlCount > 50 ? " — first 50 will be imported" : ""}</p>
+          ? (
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-gray-400">{addTabUrlCount} URLs{addTabUrlCount > 50 ? " — first 50 will be imported" : ""}</p>
+              {addTabUrlCount >= 6 && (
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={backgroundImport}
+                    onChange={(e) => setBackgroundImport(e.target.checked)}
+                    className="rounded border-gray-300 text-gray-800 focus:ring-0"
+                  />
+                  <span className="text-xs text-gray-500">Background import</span>
+                </label>
+              )}
+            </div>
+          )
           : <div className="mb-3" />
       )}
       {tab === "add" && addSubTab === "submit" && (
@@ -3293,40 +3351,61 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
               onClick={async () => {
                 const urls = addTabUrls;
                 if (!urls.length) return;
-                setImportLoading(true);
                 setImportResults(null);
-                try {
-                  const res = await fetch("/api/bulk-import", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ urls }),
-                  });
-                  const data = await res.json();
-                  setImportResults(data.results ?? []);
-                } catch {
-                  setImportResults([]);
-                } finally {
-                  setImportLoading(false);
+                const useBackground = addTabUrlCount >= 6 && backgroundImport;
+                if (useBackground) {
+                  try {
+                    const res = await fetch("/api/import-jobs", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ urls }),
+                    });
+                    const data = await res.json();
+                    if (data.batchId) {
+                      try { localStorage.setItem("skindex:importBatch", data.batchId); } catch {}
+                      setImportBatchId(data.batchId);
+                      setImportPolling(true);
+                    }
+                  } catch {}
+                } else {
+                  setImportLoading(true);
+                  try {
+                    const res = await fetch("/api/bulk-import", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ urls }),
+                    });
+                    const data = await res.json();
+                    setImportResults(data.results ?? []);
+                  } catch {
+                    setImportResults([]);
+                  } finally {
+                    setImportLoading(false);
+                  }
                 }
               }}
-              disabled={importLoading || addTabUrlCount === 0}
+              disabled={importLoading || importPolling || addTabUrlCount === 0}
               className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {importLoading ? "Importing…" : "Import all"}
             </button>
-            {importResults && (
+            {(importResults || importPolling) && (
               <div className="border border-gray-100 rounded-xl overflow-hidden">
                 <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest flex-1">Import results</p>
-                  {(() => { const n = importResults.filter((r) => r.status === "imported").length; return <span className={`text-xs ${n > 0 ? "text-green-700" : "text-gray-400"}`}>{n} imported</span>; })()}
-                  {importResults.some((r) => r.status === "skipped") && <span className="text-xs text-gray-400">{importResults.filter((r) => r.status === "skipped").length} skipped</span>}
-                  {importResults.some((r) => r.status === "failed") && <span className="text-xs text-rose-600">{importResults.filter((r) => r.status === "failed").length} failed</span>}
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest flex-1">
+                    {importPolling
+                      ? `Importing… ${importResults ? importResults.filter((r) => r.status !== "pending" && r.status !== "processing").length : 0} / ${importResults?.length ?? "…"}`
+                      : "Import results"}
+                  </p>
+                  {importResults && (() => { const n = importResults.filter((r) => r.status === "imported").length; return <span className={`text-xs ${n > 0 ? "text-green-700" : "text-gray-400"}`}>{n} imported</span>; })()}
+                  {importResults?.some((r) => r.status === "skipped") && <span className="text-xs text-gray-400">{importResults.filter((r) => r.status === "skipped").length} skipped</span>}
+                  {importResults?.some((r) => r.status === "failed") && <span className="text-xs text-rose-600">{importResults.filter((r) => r.status === "failed").length} failed</span>}
                 </div>
                 <div className="divide-y divide-gray-50">
-                  {importResults.map((r, i) => (
+                  {(importResults ?? []).map((r, i) => (
                     <div key={i} className="px-4 py-2 flex items-start gap-3">
-                      <span className={`text-xs shrink-0 mt-0.5 ${r.status === "imported" ? "text-green-600" : r.status === "skipped" ? "text-gray-400" : "text-rose-500"}`}>
-                        {r.status === "imported" ? "✓" : r.status === "skipped" ? "→" : "✗"}
+                      <span className={`text-xs shrink-0 mt-0.5 ${r.status === "imported" ? "text-green-600" : r.status === "skipped" ? "text-gray-400" : r.status === "pending" || r.status === "processing" ? "text-gray-300" : "text-rose-500"}`}>
+                        {r.status === "imported" ? "✓" : r.status === "skipped" ? "→" : r.status === "pending" || r.status === "processing" ? "·" : "✗"}
                       </span>
                       <div className="min-w-0">
                         {r.name ? (
@@ -3335,6 +3414,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                           <p className="text-xs text-gray-400 truncate">{r.url}</p>
                         )}
                         <p className="text-xs text-gray-400">{
+                          r.status === "pending" ? "Queued" :
+                          r.status === "processing" ? "Fetching…" :
                           r.status === "imported" ? "Added to database" :
                           r.status === "skipped" ? "Already in database" :
                           r.reason === "iherb-blocked" ? "iHerb blocks imports — paste ingredients instead" :

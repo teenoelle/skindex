@@ -8,7 +8,7 @@ const MAX_URLS = 50;
 
 export type ImportResult = {
   url: string;
-  status: "imported" | "skipped" | "failed";
+  status: "imported" | "skipped" | "failed" | "pending" | "processing";
   name?: string;
   brand?: string;
   reason?: string;
