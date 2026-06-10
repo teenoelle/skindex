@@ -351,8 +351,9 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
     const stripped = rawTitle
       .replace(/\s*[|–\-]\s*inci\s*decoder.*/i, "")
       .replace(/\s*[-–]\s*ingredients?\s+explained.*/i, "")
+      .replace(/\s+ingredients?\s+\(explained\).*/i, "")
       .trim();
-    if (stripped && stripped !== rawTitle) name = stripped;
+    if (stripped) name = stripped;
   }
   if (!name) name = jsonLd?.name;
   if (!name && productSlug) name = slugToTitle(productSlug);
@@ -372,6 +373,8 @@ function parseINCIDecoder(html: string, url: string): ExtractedProduct | null {
       name = parts.slice(consumed).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
     }
   }
+  // Last-resort fallback: derive name from the slug rather than falling back to the URL
+  if (!name && brandSlug) name = slugToTitle(productSlug ?? brandSlug);
 
   // Strategy 1: INCIDecoder renders the ingredient list in an "ingred" div.
   // The list is split by [more]/[less] toggle markers, but the full text is present in the HTML.
