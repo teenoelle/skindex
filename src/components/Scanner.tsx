@@ -3475,12 +3475,14 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </button>
           </section>
 
+          {browseTypes.length > 0 && (
+            <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
+          )}
           {browseLoading && !browseSelectedType && !browseSelectedArea && (
             <p className="text-sm text-gray-400 text-center py-6">Loading…</p>
           )}
           {!browseLoading && !browseSelectedType && !browseSelectedArea && browseTypes.length > 0 && (
             <>
-            <p className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-3">Browse</p>
             <div className="space-y-5">
               {(() => {
                 const AREA_ORDER = ["Face", "Makeup", "Lip", "Hands", "Nails", "Hair", "Body", "Home"];
