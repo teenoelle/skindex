@@ -57,10 +57,13 @@ async function main() {
     const toInsert: { product_id: string; ingredient_id: string; position: number }[] = [];
     let position = 0;
 
+    const seenIds = new Set<string>();
     for (const item of items) {
       const match = findMatch(item, db);
       if (!match) continue;
       if (match.id.startsWith("comedo-")) continue;
+      if (seenIds.has(match.id)) continue;
+      seenIds.add(match.id);
       position++;
       if (!linked.has(`${product.id}:${match.id}`)) {
         toInsert.push({ product_id: product.id, ingredient_id: match.id, position });
