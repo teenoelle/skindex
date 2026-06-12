@@ -1233,7 +1233,8 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [typeBodyAreaMap, setTypeBodyAreaMap] = useState<Map<string, string>>(new Map());
   const { activeSkinTypes, activeClimates } = useSkinProfile();
   const [concernExpanded, setConcernExpanded] = useState<Set<string>>(new Set());
-  const [neutralGroupOpen, setNeutralGroupOpen] = useState(false);
+  const [neutralGroupOpen, setNeutralGroupOpen] = useState(true);
+  const [formulaInteractionsOpen, setFormulaInteractionsOpen] = useState(false);
   const [profileInteractionsOpen, setProfileInteractionsOpen] = useState(false);
   const [showStickyProduct, setShowStickyProduct] = useState(false);
   const [routines, setRoutines] = useState<Routine[]>([]);
@@ -4712,6 +4713,36 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </button>
           </section>
 
+          {/* Formula interactions */}
+          {(result.formula_warnings ?? []).length > 0 && (
+            <section>
+              <button
+                type="button"
+                onClick={() => setFormulaInteractionsOpen(o => !o)}
+                className="flex items-center gap-2 text-sm font-semibold text-gray-700 uppercase tracking-widest"
+              >
+                Formula interactions
+                <span className="text-amber-800 font-medium normal-case tracking-normal">{result.formula_warnings!.length}</span>
+                <span className="text-gray-300">{formulaInteractionsOpen ? "▲" : "▼"}</span>
+              </button>
+              {formulaInteractionsOpen && (
+                <div className="space-y-2 mt-2">
+                  {result.formula_warnings!.map((w, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-amber-800" : "border-teal-800"}`}
+                    >
+                      <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-amber-900" : "text-teal-800"}`}>
+                        {w.type === "danger" ? "⚠ " : "✦ "}{w.title}
+                      </p>
+                      <p className="text-xs leading-relaxed text-gray-600">{w.body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Profile interactions */}
           {(activeSkinTypes.size + activeClimates.size) > 0 && (() => {
             const suppWarns = detectSupplementWarnings(activeSkinTypes, activeClimates);
@@ -4827,25 +4858,6 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             </section>
           )}
 
-          {/* Formula combination warnings */}
-          {(result.formula_warnings ?? []).length > 0 && (
-            <section className="mb-6">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Formula interactions</p>
-              <div className="space-y-2">
-                {result.formula_warnings!.map((w, i) => (
-                  <div
-                    key={i}
-                    className={`rounded-xl border px-4 py-3 ${w.type === "danger" ? "border-amber-800" : "border-teal-800"}`}
-                  >
-                    <p className={`text-xs font-semibold mb-1 ${w.type === "danger" ? "text-amber-900" : "text-teal-800"}`}>
-                      {w.type === "danger" ? "⚠ " : "✦ "}{w.title}
-                    </p>
-                    <p className={`text-xs leading-relaxed ${w.type === "danger" ? "text-amber-800" : "text-teal-800"}`}>{w.body}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
 
 
 
