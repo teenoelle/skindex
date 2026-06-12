@@ -20,6 +20,7 @@ import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { parseIngredientList } from "../src/lib/ingredient-matcher.js";
 import { generateCuratedExplanation, generateWithReclassification } from "../src/lib/ai-explanation.js";
 import { generateNotes } from "../src/lib/curated-explanation.js";
 import { getFattyAcidProfile } from "../src/lib/fatty-acid-ai.js";
@@ -110,7 +111,7 @@ async function withCuratedChecked(ingredient: Parameters<typeof generateCuratedE
 
 // ── queue drain (new ingredients → AI classify + explain directly) ────────────
 
-async function drainQueuePass(passNum: number): Promise<{ inserted: number; remaining: number }> {
+async function drainQueuePass(passNum: number): Promise<{ inserted: number; remaining: number; newIngredients: { id: string; name: string }[] }> {
   const { data: queue, error } = await supabase
     .from("ingredient_queue")
     .select("id, name")
@@ -118,18 +119,19 @@ async function drainQueuePass(passNum: number): Promise<{ inserted: number; rema
     .limit(BATCH);
 
   if (error) throw new Error(`Queue fetch: ${error.message}`);
-  if (!queue?.length) return { inserted: 0, remaining: 0 };
+  if (!queue?.length) return { inserted: 0, remaining: 0, newIngredients: [] };
 
   if (DRY_RUN) {
     console.log(`\nQueue pass ${passNum} — ${queue.length} item(s) would be processed:\n`);
     for (const item of queue) {
       console.log(`  ${item.name} → classify + AI explanation`);
     }
-    return { inserted: 0, remaining: await getQueueCount() };
+    return { inserted: 0, remaining: await getQueueCount(), newIngredients: [] };
   }
 
   let inserted = 0;
   const doneIds: string[] = [];
+  const newIngredients: { id: string; name: string }[] = [];
 
   for (const item of queue) {
     const label = item.name.length > 50 ? item.name.slice(0, 47) + "…" : item.name;
@@ -144,6 +146,7 @@ async function drainQueuePass(passNum: number): Promise<{ inserted: number; rema
     if (existing) {
       console.log("already exists");
       doneIds.push(item.id);
+      newIngredients.push({ id: existing.id, name: item.name });
       continue;
     }
 
@@ -166,7 +169,7 @@ async function drainQueuePass(passNum: number): Promise<{ inserted: number; rema
       ingContext.structural_category === "Emollient" ||
       ingContext.structural_category === "Plant Extract";
 
-    const { error: insertError } = await supabase
+    const { data: insertedRow, error: insertError } = await supabase
       .from("ingredients")
       .insert({
         name: item.name,
@@ -183,7 +186,9 @@ async function drainQueuePass(passNum: number): Promise<{ inserted: number; rema
         explanation_source: "curated",
         skin_climate_notes: notes.length > 0 ? notes : null,
         profile_status: needsProfile ? "needs_profile" : null,
-      });
+      })
+      .select("id")
+      .single();
 
     if (insertError) {
       console.log(`✗ (${insertError.message})`);
@@ -191,6 +196,7 @@ async function drainQueuePass(passNum: number): Promise<{ inserted: number; rema
       console.log(`✓ classified + AI explanation${needsProfile ? " + queued for profile" : ""}`);
       inserted++;
       doneIds.push(item.id);
+      newIngredients.push({ id: insertedRow.id, name: item.name });
     }
   }
 
@@ -198,7 +204,7 @@ async function drainQueuePass(passNum: number): Promise<{ inserted: number; rema
     await supabase.from("ingredient_queue").delete().in("id", doneIds);
   }
 
-  return { inserted, remaining: await getQueueCount() };
+  return { inserted, remaining: await getQueueCount(), newIngredients };
 }
 
 // ── single pass ───────────────────────────────────────────────────────────────
@@ -477,6 +483,61 @@ async function runProfileBenefitPass(passNum: number): Promise<{ written: number
   return { written, found: toProcess.length };
 }
 
+// ── targeted relink for newly classified ingredients ─────────────────────────
+
+async function relinkNewIngredients(newIngredients: { id: string; name: string }[]): Promise<number> {
+  if (!newIngredients.length) return 0;
+  let linked = 0;
+
+  for (const ing of newIngredients) {
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, name, ingredient_list")
+      .ilike("ingredient_list", `%${ing.name}%`)
+      .eq("is_archived", false)
+      .eq("is_pending", false);
+
+    if (!products?.length) continue;
+
+    const productIds = products.map((p) => p.id);
+    const { data: existing } = await supabase
+      .from("product_ingredients")
+      .select("product_id")
+      .eq("ingredient_id", ing.id)
+      .in("product_id", productIds);
+    const alreadyLinked = new Set((existing ?? []).map((r) => r.product_id));
+
+    const toInsert: { product_id: string; ingredient_id: string; position: number }[] = [];
+
+    for (const product of products) {
+      if (alreadyLinked.has(product.id)) continue;
+      const items = parseIngredientList(product.ingredient_list as string);
+      const n = ing.name.toLowerCase();
+      const pos = items.findIndex((item) => {
+        const lower = item.toLowerCase();
+        const tokenLong = lower.length >= 6;
+        const nameLong = n.length >= 6;
+        return lower === n || (nameLong && lower.includes(n)) || (tokenLong && n.includes(lower));
+      });
+      if (pos === -1) continue; // ILIKE false positive — name not in parsed list
+      toInsert.push({ product_id: product.id, ingredient_id: ing.id, position: pos + 1 });
+    }
+
+    if (!toInsert.length) continue;
+
+    const { error } = await supabase
+      .from("product_ingredients")
+      .upsert(toInsert, { onConflict: "product_id,ingredient_id" });
+    if (error) {
+      console.log(`  [relink] ✗ ${ing.name}: ${error.message}`);
+    } else {
+      linked += toInsert.length;
+    }
+  }
+
+  return linked;
+}
+
 // ── product watch notifications ───────────────────────────────────────────────
 
 async function notifyWatchers(): Promise<void> {
@@ -541,10 +602,14 @@ async function main() {
   while (true) {
     let queueRemaining = 0;
     if (initialQueue > 0 || pass > 1) {
-      const { inserted, remaining } = await drainQueuePass(pass);
+      const { inserted, remaining, newIngredients } = await drainQueuePass(pass);
       queueRemaining = remaining;
       if (!DRY_RUN) {
         console.log(`\n  Queue pass ${pass}: ${inserted} classified, ${remaining} remaining\n`);
+        if (newIngredients.length > 0) {
+          const linked = await relinkNewIngredients(newIngredients);
+          if (linked > 0) console.log(`  Relinked ${linked} product_ingredient(s)\n`);
+        }
         if (inserted > 0) await notifyWatchers();
       }
     }

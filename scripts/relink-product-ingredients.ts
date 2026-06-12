@@ -14,6 +14,7 @@ import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { parseIngredientList, findMatch, type DbIngredient } from "../src/lib/ingredient-matcher.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
@@ -24,33 +25,6 @@ const supabase = createClient(
 );
 
 const DRY_RUN = process.argv.includes("--dry-run");
-
-// Mirrors src/lib/scanner.ts — must stay in sync
-function parseIngredientList(raw: string): string[] {
-  return raw
-    .split(/,(?![^(]*\))(?!\s*\d[-\d])/)
-    .map((s) => s.replace(/[​‌‍﻿]/g, "").trim())
-    .map((s) => s.replace(/\([^)]*\)/g, "").trim().replace(/\s+/g, " "))
-    .filter((s) => s.length > 1);
-}
-
-type DbIngredient = { id: string; name: string; inci_name: string | null; status: string };
-
-function findMatch(item: string, db: DbIngredient[]): DbIngredient | undefined {
-  const lower = item.toLowerCase();
-  return db.find((ing) => {
-    const n = ing.name.toLowerCase();
-    const i = ing.inci_name?.toLowerCase();
-    const tokenLong = lower.length >= 6;
-    const dbNameLong = n.length >= 6;
-    return (
-      lower === n ||
-      (dbNameLong && lower.includes(n)) ||
-      (tokenLong && n.includes(lower)) ||
-      (i && (lower === i || (i.length >= 6 && lower.includes(i)) || (tokenLong && i.includes(lower))))
-    );
-  });
-}
 
 async function main() {
   console.log(`\nRelink Product Ingredients${DRY_RUN ? " (DRY RUN)" : ""}\n`);
