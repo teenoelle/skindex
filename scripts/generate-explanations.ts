@@ -593,7 +593,9 @@ async function main() {
   if (LOOP) console.log(`  Mode                 : LOOP until empty`);
   console.log("");
 
-  if (initialQueue + initial.weak + initial.needsProfile === 0) {
+  if (!LOOP && initialQueue + initial.weak + initial.needsProfile === 0) {
+    // In loop mode, skip early exit — benefit notes are checked per pass and
+    // the loop's own termination condition handles clean exit when all are done.
     console.log("All queues empty — nothing to do.\n");
     return;
   }
