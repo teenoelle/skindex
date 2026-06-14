@@ -118,6 +118,12 @@ export default function SiteHeader() {
                 >
                   Ingredients
                 </Link>
+                <Link
+                  href="/compare"
+                  className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
+                >
+                  Compare
+                </Link>
                 <UserButton />
               </>
             )}
@@ -171,6 +177,13 @@ export default function SiteHeader() {
                     className="block text-sm text-gray-700 hover:text-gray-900 py-1.5"
                   >
                     Ingredients
+                  </Link>
+                  <Link
+                    href="/compare"
+                    onClick={() => setMenuOpen(false)}
+                    className="block text-sm text-gray-700 hover:text-gray-900 py-1.5"
+                  >
+                    Compare
                   </Link>
                   {isAdmin && (
                     <Link
