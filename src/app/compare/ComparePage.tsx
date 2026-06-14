@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSkinProfile } from "@/context/SkinProfileContext";
 import { splitIngredientList } from "@/lib/scanner";
 import { UNIVERSAL_CONCERN_SET } from "@/lib/concern-breakdown";
-import type { DbIngredient, ExplanationStructured } from "@/types";
+import type { DbIngredient, ExplanationStructured, SkinClimateNote } from "@/types";
 import type { SkinType, ClimateType } from "@/lib/skin-profile";
 
 const UUID_RE = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
@@ -271,11 +271,31 @@ function ProductSearchSlot({
   );
 }
 
-function IngredientExplanation({ ing, profileMatch }: { ing: DbIngredient; profileMatch: boolean }) {
+function IngredientExplanation({ ing, profileMatch, activeSkinTypes, activeClimates }: {
+  ing: DbIngredient;
+  profileMatch: boolean;
+  activeSkinTypes: Set<SkinType>;
+  activeClimates: Set<ClimateType>;
+}) {
   const s = ing.explanation_structured as ExplanationStructured | null;
   const isFlagged = ing.status === "flagged";
   const isUniversal = UNIVERSAL_CONCERN_SET.has(ing.flagged_category ?? "");
   const concernBorder = isUniversal ? "border-rose-400" : profileMatch ? "border-amber-400" : "border-orange-300";
+
+  const hasProfile = activeSkinTypes.size > 0 || activeClimates.size > 0;
+  const allNotes: SkinClimateNote[] = Array.isArray(ing.skin_climate_notes) ? ing.skin_climate_notes : [];
+  const matchesNote = (n: SkinClimateNote) =>
+    n.dimensions.some(d => activeSkinTypes.has(d as SkinType)) ||
+    n.climate.some(c => activeClimates.has(c as ClimateType));
+  const profileBenefitNotes = hasProfile ? allNotes.filter(n => n.sentiment === "benefit" && matchesNote(n)) : [];
+  const profileCautionNotes = hasProfile ? allNotes.filter(n => (n.sentiment === "caution" || n.sentiment === "strong_caution") && matchesNote(n)) : [];
+
+  const benefitProfilesSuffix = s?.benefit_profiles?.length ? ` · ${s.benefit_profiles.join(", ")}` : "";
+  const benefitHeader = !isFlagged
+    ? (ing.category ? `${ing.category}${benefitProfilesSuffix}` : (s?.benefit_category ? `${s.benefit_category}${benefitProfilesSuffix}` : null))
+    : null;
+
+  const concernProfilesSuffix = s?.concern_profiles?.length ? ` · ${s.concern_profiles.join(", ")}` : "";
 
   return (
     <div className="space-y-1.5 mt-1.5">
@@ -287,15 +307,20 @@ function IngredientExplanation({ ing, profileMatch }: { ing: DbIngredient; profi
           </p>
         </div>
       )}
-      {s?.benefit && (
-        <div className="pl-2 border-l-2 border-teal-400">
-          <p className="text-[11px] text-gray-600 leading-relaxed">
-            {!isFlagged && ing.category && <span className="font-semibold text-teal-700">{ing.category} — </span>}
-            {s.benefit}
-          </p>
+      {(s?.benefit || profileBenefitNotes.length > 0) && (
+        <div className="pl-2 border-l-2 border-teal-400 space-y-0.5">
+          {s?.benefit && (
+            <p className="text-[11px] text-gray-600 leading-relaxed">
+              {benefitHeader && <span className="font-semibold text-teal-700">{benefitHeader} — </span>}
+              {s.benefit}
+            </p>
+          )}
+          {profileBenefitNotes.map((note, i) => (
+            <p key={i} className="text-[11px] text-gray-600 leading-relaxed">{note.text}</p>
+          ))}
         </div>
       )}
-      {isFlagged && (s?.concern_items?.length || s?.concern || (!s && ing.explanation)) && (
+      {isFlagged && (s?.concern_items?.length || s?.concern || (!s && ing.explanation) || profileCautionNotes.length > 0) && (
         <div className={`pl-2 border-l-2 ${concernBorder} space-y-1`}>
           {s?.concern_items ? s.concern_items.map((ci) => {
             const ciUniversal = UNIVERSAL_CONCERN_SET.has(ci.category);
@@ -307,15 +332,18 @@ function IngredientExplanation({ ing, profileMatch }: { ing: DbIngredient; profi
             );
           }) : s?.concern ? (
             <p className="text-[11px] text-gray-600 leading-relaxed">
-              {ing.flagged_category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{ing.flagged_category} — </span>}
+              {ing.flagged_category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{ing.flagged_category}{concernProfilesSuffix} — </span>}
               {s.concern}
             </p>
           ) : (
             <p className="text-[11px] text-gray-600 leading-relaxed">
-              {ing.flagged_category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{ing.flagged_category} — </span>}
+              {ing.flagged_category && <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{ing.flagged_category}{concernProfilesSuffix} — </span>}
               {ing.explanation}
             </p>
           )}
+          {profileCautionNotes.map((note, i) => (
+            <p key={i} className="text-[11px] text-gray-600 leading-relaxed">{note.text}</p>
+          ))}
         </div>
       )}
       {!isFlagged && !s && ing.explanation && (
@@ -637,7 +665,7 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                       </button>
                       {isExpanded && ing && (
                         <div className="px-3 pb-2 bg-gray-50/80 border-t border-gray-100">
-                          <IngredientExplanation ing={ing} profileMatch={profileMatch} />
+                          <IngredientExplanation ing={ing} profileMatch={profileMatch} activeSkinTypes={activeSkinTypes} activeClimates={activeClimates} />
                         </div>
                       )}
                     </div>
