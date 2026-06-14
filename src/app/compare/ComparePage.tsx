@@ -331,7 +331,7 @@ function IngredientExplanation({ ing, profileMatch }: { ing: DbIngredient; profi
 }
 
 export default function ComparePageClient({ ids }: { ids: string }) {
-  const { activeSkinTypes, activeClimates, loaded: profileLoaded } = useSkinProfile();
+  const { activeSkinTypes, activeClimates } = useSkinProfile();
   const router = useRouter();
   const [products, setProducts] = useState<CompareProduct[] | null>(null);
   const [loading, setLoading] = useState(!!ids);
@@ -541,16 +541,20 @@ export default function ComparePageClient({ ids }: { ids: string }) {
           const nameMap = nameMaps[colIdx] ?? new Map();
           const rawItems = splitIngredientList(p.ingredient_list ?? "");
 
-          let flaggedCount = 0, profileMatchCount = 0, universalCount = 0;
+          let universalCount = 0, profileOnlyCount = 0, otherFlaggedCount = 0;
           for (const l of p.linked) {
             const ing = l.ingredient as DbIngredient | null;
             if (!ing || ing.status !== "flagged") continue;
-            flaggedCount++;
             const fc = ing.flagged_category ?? "";
-            if (UNIVERSAL_CONCERN_SET.has(fc)) universalCount++;
+            const isUniv = UNIVERSAL_CONCERN_SET.has(fc);
             const allCats = [fc, ...(ing.secondary_flagged_categories ?? [])].filter(Boolean);
-            if (hasProfile && allCats.some(c => isFcProfileMatch(c, activeSkinTypes, activeClimates))) profileMatchCount++;
+            const isProf = hasProfile && allCats.some(c => isFcProfileMatch(c, activeSkinTypes, activeClimates));
+            if (isUniv) universalCount++;
+            else if (isProf) profileOnlyCount++;
+            else otherFlaggedCount++;
           }
+          const flaggedCount = universalCount + profileOnlyCount + otherFlaggedCount;
+          const neutralCount = rawItems.length - flaggedCount;
 
           return (
             <div key={p.id} className="border-r border-gray-200 last:border-r-0">
@@ -574,23 +578,15 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                       )}
                     </div>
                   )}
-                  {(flaggedCount > 0 || rawItems.length > 0) && (
-                    <div className="flex flex-wrap gap-1.5 text-[11px]">
-                      <span className="text-gray-400">{rawItems.length} ingredients</span>
-                      {flaggedCount > 0 && (
-                        <>
-                          <span className="text-gray-300">·</span>
-                          <span className={universalCount > 0 ? "text-rose-600" : "text-amber-600"}>
-                            {flaggedCount} flagged
-                          </span>
-                        </>
-                      )}
-                      {hasProfile && profileLoaded && profileMatchCount > 0 && (
-                        <>
-                          <span className="text-gray-300">·</span>
-                          <span className="text-amber-700 font-medium">{profileMatchCount} match your profile</span>
-                        </>
-                      )}
+                  {rawItems.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
+                      {universalCount > 0 && <span className="text-rose-700">{universalCount} universal</span>}
+                      {universalCount > 0 && (profileOnlyCount > 0 || otherFlaggedCount > 0 || neutralCount > 0) && <span className="text-gray-300">·</span>}
+                      {profileOnlyCount > 0 && <span className="text-amber-700">{profileOnlyCount} profile</span>}
+                      {profileOnlyCount > 0 && (otherFlaggedCount > 0 || neutralCount > 0) && <span className="text-gray-300">·</span>}
+                      {otherFlaggedCount > 0 && <span className="text-orange-700">{otherFlaggedCount} other</span>}
+                      {otherFlaggedCount > 0 && neutralCount > 0 && <span className="text-gray-300">·</span>}
+                      {neutralCount > 0 && <span className="text-gray-400">{neutralCount} neutral</span>}
                     </div>
                   )}
                 </div>
@@ -611,16 +607,7 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                   const isExclusive = ing?.id ? presenceCount.get(ing.id) === 1 : false;
                   const isPartial = ing?.id ? (presenceCount.get(ing.id) ?? 0) > 1 && (presenceCount.get(ing.id) ?? 0) < products.length : false;
 
-                  let nameColor = "text-gray-500";
-                  if (ing) {
-                    if (isFlagged) {
-                      nameColor = isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-orange-600";
-                    } else if (hasBenefit) {
-                      nameColor = "text-teal-700";
-                    } else {
-                      nameColor = "text-gray-700";
-                    }
-                  }
+                  const nameColor = ing ? "text-gray-800" : "text-gray-400";
 
                   return (
                     <div key={expandKey} className={isExclusive ? "bg-amber-50/60" : ""}>
@@ -638,12 +625,12 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                           <span className="text-[9px] text-gray-300 shrink-0" title="Not in all products">◇</span>
                         )}
                         {isFlagged && fc && (
-                          <span className={`text-[10px] shrink-0 ${isUniversal ? "text-rose-500" : profileMatch ? "text-amber-600" : "text-orange-500"}`}>
+                          <span className={`text-[10px] shrink-0 ${isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-orange-700"}`}>
                             {fc.length > 18 ? fc.slice(0, 18) + "…" : fc}
                           </span>
                         )}
                         {hasBenefit && ing?.category && (
-                          <span className="text-[10px] text-teal-500 shrink-0">
+                          <span className="text-[10px] text-teal-700 shrink-0">
                             {ing.category.length > 18 ? ing.category.slice(0, 18) + "…" : ing.category}
                           </span>
                         )}
