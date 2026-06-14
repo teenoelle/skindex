@@ -129,8 +129,15 @@ function InlineSearch({ onSelect, onCancel }: {
         placeholder="Search product…"
         // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus
-        className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-gray-400 bg-white"
+        className="w-full text-xs border border-gray-200 rounded-lg pl-2.5 pr-7 py-1.5 focus:outline-none focus:border-gray-400 bg-white"
       />
+      <button
+        type="button"
+        onMouseDown={e => e.preventDefault()}
+        onClick={onCancel}
+        aria-label="Cancel"
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 text-base leading-none"
+      >×</button>
       {results.length > 0 && (
         <ul className="absolute z-30 top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-[220px]">
           {results.slice(0, 6).map(p => (
@@ -446,12 +453,13 @@ export default function ComparePageClient({ ids }: { ids: string }) {
 
   const colCount = products.length;
   const colClass = `grid-cols-${colCount}`;
+  const maxWClass = colCount === 2 ? "max-w-2xl" : colCount === 3 ? "max-w-4xl" : "max-w-6xl";
 
   return (
     <div className="pt-14 bg-white">
       {/* Shared sticky header — image, name, brand, swap arrows, change/add controls */}
       <div className="sticky top-14 z-10 bg-white border-b border-gray-100">
-        <div className="flex">
+        <div className={`${maxWClass} mx-auto flex`}>
           <div className={`flex-1 grid ${colClass} min-w-0`}>
             {products.map((p, idx) => (
               <div key={p.id} className="border-r border-gray-200 px-3 py-2.5">
@@ -470,8 +478,8 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                       </a>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-gray-900 leading-snug truncate">{p.name}</p>
-                      {p.brand && <p className="text-[10px] text-gray-400 leading-tight truncate">{p.brand}</p>}
+                      {p.brand && <p className="text-[10px] text-gray-400 leading-tight">{p.brand}</p>}
+                      <p className="text-xs font-semibold text-gray-900 leading-snug line-clamp-3">{p.name}</p>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button
@@ -528,7 +536,7 @@ export default function ComparePageClient({ ids }: { ids: string }) {
       </div>
 
       {/* Column area — scrolls with the page */}
-      <div className={`grid ${colClass}`}>
+      <div className={`${maxWClass} mx-auto grid ${colClass}`}>
         {products.map((p, colIdx) => {
           const nameMap = nameMaps[colIdx] ?? new Map();
           const rawItems = splitIngredientList(p.ingredient_list ?? "");
@@ -658,8 +666,10 @@ export default function ComparePageClient({ ids }: { ids: string }) {
       </div>
 
       {/* Legend strip */}
-      <div className="px-4 h-8 flex items-center border-t border-gray-100">
-        <p className="text-[11px] text-gray-400">◆ only in this product · ◇ not in all · click ingredient for details</p>
+      <div className="border-t border-gray-100">
+        <div className={`${maxWClass} mx-auto px-4 h-8 flex items-center`}>
+          <p className="text-[11px] text-gray-400">◆ only in this product · ◇ not in all · click ingredient for details</p>
+        </div>
       </div>
     </div>
   );
