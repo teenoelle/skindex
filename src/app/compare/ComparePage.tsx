@@ -6,7 +6,7 @@ import { useSkinProfile } from "@/context/SkinProfileContext";
 import { splitIngredientList } from "@/lib/scanner";
 import { UNIVERSAL_CONCERN_SET } from "@/lib/concern-breakdown";
 import type { DbIngredient, ExplanationStructured, SkinClimateNote } from "@/types";
-import type { SkinType, ClimateType } from "@/lib/skin-profile";
+import { SKIN_TYPES, ALL_MODIFIER_TYPES, type SkinType, type ClimateType } from "@/lib/skin-profile";
 
 const UUID_RE = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
@@ -90,6 +90,12 @@ function productSlug(p: { brand: string | null; name: string; id: string }) {
 
 function normalizeIngName(s: string): string {
   return s.replace(/\s*\([^)]*\)/g, "").trim().toLowerCase();
+}
+
+function noteLabel(n: SkinClimateNote): string {
+  const skinLabels = n.dimensions.map(d => SKIN_TYPES.find(s => s.value === d)?.label ?? d);
+  const climateLabels = n.climate.map(c => ALL_MODIFIER_TYPES.find(t => t.value === c)?.label ?? c);
+  return [...skinLabels, ...climateLabels].join(", ");
 }
 
 function InlineSearch({ onSelect, onCancel }: {
@@ -316,7 +322,10 @@ function IngredientExplanation({ ing, profileMatch, activeSkinTypes, activeClima
             </p>
           )}
           {profileBenefitNotes.map((note, i) => (
-            <p key={i} className="text-[11px] text-gray-600 leading-relaxed">{note.text}</p>
+            <p key={i} className="text-[11px] text-gray-600 leading-relaxed">
+              <span className="font-semibold text-teal-700">{noteLabel(note)} — </span>
+              {note.text}
+            </p>
           ))}
         </div>
       )}
@@ -342,7 +351,10 @@ function IngredientExplanation({ ing, profileMatch, activeSkinTypes, activeClima
             </p>
           )}
           {profileCautionNotes.map((note, i) => (
-            <p key={i} className="text-[11px] text-gray-600 leading-relaxed">{note.text}</p>
+            <p key={i} className="text-[11px] text-gray-600 leading-relaxed">
+              <span className={`font-semibold ${isUniversal ? "text-rose-700" : "text-amber-700"}`}>{noteLabel(note)} — </span>
+              {note.text}
+            </p>
           ))}
         </div>
       )}
@@ -485,82 +497,79 @@ export default function ComparePageClient({ ids }: { ids: string }) {
 
   return (
     <div className="pt-14 bg-white">
-      {/* Shared sticky header — image, name, brand, swap arrows, change/add controls */}
-      <div className="sticky top-14 z-10 bg-white border-b border-gray-100">
-        <div className={`${maxWClass} mx-auto flex`}>
-          <div className={`flex-1 grid ${colClass} min-w-0`}>
-            {products.map((p, idx) => (
-              <div key={p.id} className="border-r border-gray-200 px-3 py-2.5">
-                {editingSlot === idx ? (
-                  <InlineSearch onSelect={r => handleChangeProduct(idx, r)} onCancel={() => setEditingSlot(null)} />
-                ) : (
-                  <div className="flex gap-2 items-start min-w-0">
-                    {p.image_url && (
+      {/* Shared sticky header — image, brand+controls, name */}
+      <div className="sticky top-14 z-10 bg-white border-b border-gray-100 relative">
+        <div className={`${maxWClass} mx-auto grid ${colClass}`}>
+          {products.map((p, idx) => (
+            <div key={p.id} className="border-r border-gray-200 last:border-r-0 px-3 py-2.5">
+              {editingSlot === idx ? (
+                <InlineSearch onSelect={r => handleChangeProduct(idx, r)} onCancel={() => setEditingSlot(null)} />
+              ) : (
+                <div className="flex gap-2 items-start min-w-0">
+                  {p.image_url && (
+                    <a
+                      href={p.image_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 rounded-lg overflow-hidden border border-gray-100 hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 transition-shadow"
+                    >
+                      <img src={p.image_url} alt={p.name} className="w-9 h-9 object-cover block" />
+                    </a>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1 mb-0.5">
+                      {p.brand && <p className="text-[10px] text-gray-400 leading-tight truncate flex-1 min-w-0">{p.brand}</p>}
+                      <button
+                        type="button"
+                        onClick={() => setEditingSlot(idx)}
+                        className="shrink-0 text-[10px] text-gray-400 hover:text-gray-600"
+                      >Change</button>
+                      <button
+                        type="button"
+                        onClick={() => handleSwap(idx, idx - 1)}
+                        disabled={idx === 0}
+                        aria-label="Move left"
+                        className="shrink-0 text-[11px] text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:pointer-events-none"
+                      >←</button>
+                      <button
+                        type="button"
+                        onClick={() => handleSwap(idx, idx + 1)}
+                        disabled={idx === colCount - 1}
+                        aria-label="Move right"
+                        className="shrink-0 text-[11px] text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:pointer-events-none"
+                      >→</button>
                       <a
-                        href={p.image_url}
+                        href={`/product/${productSlug(p)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="shrink-0 rounded-lg overflow-hidden border border-gray-100 hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 transition-shadow"
-                      >
-                        <img src={p.image_url} alt={p.name} className="w-9 h-9 object-cover block" />
-                      </a>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-gray-900 leading-snug line-clamp-3">{p.name}</p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        {p.brand && <p className="text-[10px] text-gray-400 leading-tight truncate flex-1 min-w-0">{p.brand}</p>}
-                        <button
-                          type="button"
-                          onClick={() => setEditingSlot(idx)}
-                          className="shrink-0 text-[10px] text-gray-400 hover:text-gray-600"
-                        >Change</button>
-                        <button
-                          type="button"
-                          onClick={() => handleSwap(idx, idx - 1)}
-                          disabled={idx === 0}
-                          aria-label="Move left"
-                          className="shrink-0 text-[11px] text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:pointer-events-none"
-                        >←</button>
-                        <button
-                          type="button"
-                          onClick={() => handleSwap(idx, idx + 1)}
-                          disabled={idx === colCount - 1}
-                          aria-label="Move right"
-                          className="shrink-0 text-[11px] text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:pointer-events-none"
-                        >→</button>
-                        <a
-                          href={`/product/${productSlug(p)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label="View product page"
-                          className="shrink-0 text-[10px] text-gray-300 hover:text-gray-600"
-                        >↗</a>
-                      </div>
+                        aria-label="View product page"
+                        className="shrink-0 text-[10px] text-gray-300 hover:text-gray-600"
+                      >↗</a>
                     </div>
+                    <p className="text-xs font-semibold text-gray-900 leading-snug line-clamp-3">{p.name}</p>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {colCount < 4 && (
-            <div className="shrink-0 border-l border-gray-200 px-2.5 py-2.5 flex items-center justify-center">
-              {editingSlot === colCount ? (
-                <div className="w-52">
-                  <InlineSearch onSelect={r => handleAddProduct(r)} onCancel={() => setEditingSlot(null)} />
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setEditingSlot(colCount)}
-                  className="text-[11px] text-gray-400 hover:text-gray-600 whitespace-nowrap"
-                >
-                  + Add
-                </button>
               )}
             </div>
-          )}
+          ))}
         </div>
+        {colCount < 4 && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20">
+            {editingSlot === colCount ? (
+              <div className="w-52 bg-white rounded-lg shadow border border-gray-200 p-1.5">
+                <InlineSearch onSelect={r => handleAddProduct(r)} onCancel={() => setEditingSlot(null)} />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingSlot(colCount)}
+                className="text-[11px] text-gray-400 hover:text-gray-600 whitespace-nowrap bg-white"
+              >
+                + Add
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Column area — scrolls with the page */}
