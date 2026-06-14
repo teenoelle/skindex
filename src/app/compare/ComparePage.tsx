@@ -651,45 +651,46 @@ export default function ComparePageClient({ ids }: { ids: string }) {
 
                   const nameColor = ing ? "text-gray-800" : "text-gray-400";
 
+                  const structCat = ing?.structural_category ?? null;
+                  const concernCats = isFlagged
+                    ? [fc, ...(ing?.secondary_flagged_categories ?? [])].filter(Boolean)
+                    : [];
+                  const benefitCats = !isFlagged && hasBenefit
+                    ? [...new Set([ing?.category, ...(ing?.secondary_benefit_categories ?? [])].filter((c): c is string => !!c))]
+                    : [];
+                  const labelItems: { text: string; cls: string }[] = [
+                    ...(structCat ? [{ text: structCat, cls: "text-gray-500" }] : []),
+                    ...concernCats.map(cat => ({
+                      text: cat,
+                      cls: UNIVERSAL_CONCERN_SET.has(cat) ? "text-rose-700"
+                        : (hasProfile && isFcProfileMatch(cat, activeSkinTypes, activeClimates)) ? "text-amber-700"
+                        : "text-yellow-700",
+                    })),
+                    ...benefitCats.map(cat => ({ text: cat, cls: "text-teal-700" })),
+                  ];
+
                   return (
                     <div key={expandKey} className={isExclusive ? "bg-amber-50/60" : ""}>
-                      {colCount >= 3 ? (
-                        <button
-                          type="button"
-                          onClick={() => ing && toggleExpand(expandKey)}
-                          className={`w-full text-left px-3 py-1.5 flex gap-2 items-start ${ing ? "hover:bg-gray-50" : ""} transition-colors`}
-                        >
-                          <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right mt-px">{idx + 1}</span>
-                          <span className="flex-1 min-w-0">
-                            <span className={`text-xs leading-snug ${nameColor}`}>{rawName}</span>
-                            {isFlagged && fc && (
-                              <span className={`block text-[10px] ${isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-yellow-700"}`}>{fc}</span>
-                            )}
-                            {hasBenefit && ing?.category && (
-                              <span className="block text-[10px] text-teal-700">{ing.category}</span>
-                            )}
-                          </span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => ing && toggleExpand(expandKey)}
-                          className={`w-full text-left px-3 py-1.5 flex items-baseline gap-2 ${ing ? "hover:bg-gray-50" : ""} transition-colors`}
-                        >
-                          <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right">{idx + 1}</span>
-                          <span className={`text-xs leading-snug flex-1 ${nameColor}`}>{rawName}</span>
-                          {isFlagged && fc && (
-                            <span className={`text-[10px] shrink-0 ${isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-yellow-700"}`}>
-                              {fc.length > 18 ? fc.slice(0, 18) + "…" : fc}
+                      <button
+                        type="button"
+                        onClick={() => ing && toggleExpand(expandKey)}
+                        className={`w-full text-left px-3 py-1.5 flex gap-2 items-start ${ing ? "hover:bg-gray-50" : ""} transition-colors`}
+                      >
+                        <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right mt-px">{idx + 1}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className={`text-xs leading-snug ${nameColor}`}>{rawName}</span>
+                          {labelItems.length > 0 && (
+                            <span className="flex flex-wrap items-baseline gap-x-0.5 mt-0.5">
+                              {labelItems.map((item, i) => (
+                                <span key={i} className={`text-[10px] ${item.cls}`}>
+                                  {i > 0 && <span className="text-gray-300"> · </span>}
+                                  {item.text}
+                                </span>
+                              ))}
                             </span>
                           )}
-                          {hasBenefit && ing?.category && (
-                            <span className="text-[10px] text-teal-700 shrink-0">
-                              {ing.category.length > 18 ? ing.category.slice(0, 18) + "…" : ing.category}
-                            </span>
-                          )}
-                        </button>
-                      )}
+                        </span>
+                      </button>
                       {isExpanded && ing && (
                         <div className="px-3 pb-2 bg-gray-50/80 border-t border-gray-100">
                           <IngredientExplanation ing={ing} profileMatch={profileMatch} activeSkinTypes={activeSkinTypes} activeClimates={activeClimates} />
