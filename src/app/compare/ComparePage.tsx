@@ -466,7 +466,7 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                 {editingSlot === idx ? (
                   <InlineSearch onSelect={r => handleChangeProduct(idx, r)} onCancel={() => setEditingSlot(null)} />
                 ) : (
-                  <div className="flex gap-2 items-center min-w-0">
+                  <div className="flex gap-2 items-start min-w-0">
                     {p.image_url && (
                       <a
                         href={p.image_url}
@@ -478,36 +478,36 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                       </a>
                     )}
                     <div className="min-w-0 flex-1">
-                      {p.brand && <p className="text-[10px] text-gray-400 leading-tight">{p.brand}</p>}
                       <p className="text-xs font-semibold text-gray-900 leading-snug line-clamp-3">{p.name}</p>
-                    </div>
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleSwap(idx, idx - 1)}
-                        disabled={idx === 0}
-                        aria-label="Move left"
-                        className="p-1 text-[11px] text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:pointer-events-none"
-                      >←</button>
-                      <button
-                        type="button"
-                        onClick={() => handleSwap(idx, idx + 1)}
-                        disabled={idx === colCount - 1}
-                        aria-label="Move right"
-                        className="p-1 text-[11px] text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:pointer-events-none"
-                      >→</button>
-                      <a
-                        href={`/product/${productSlug(p)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="View product page"
-                        className="p-1 text-[10px] text-gray-300 hover:text-gray-600"
-                      >↗</a>
-                      <button
-                        type="button"
-                        onClick={() => setEditingSlot(idx)}
-                        className="p-1 text-[10px] text-gray-400 hover:text-gray-600 ml-0.5"
-                      >Change</button>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        {p.brand && <p className="text-[10px] text-gray-400 leading-tight truncate flex-1 min-w-0">{p.brand}</p>}
+                        <button
+                          type="button"
+                          onClick={() => setEditingSlot(idx)}
+                          className="shrink-0 text-[10px] text-gray-400 hover:text-gray-600"
+                        >Change</button>
+                        <button
+                          type="button"
+                          onClick={() => handleSwap(idx, idx - 1)}
+                          disabled={idx === 0}
+                          aria-label="Move left"
+                          className="shrink-0 text-[11px] text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:pointer-events-none"
+                        >←</button>
+                        <button
+                          type="button"
+                          onClick={() => handleSwap(idx, idx + 1)}
+                          disabled={idx === colCount - 1}
+                          aria-label="Move right"
+                          className="shrink-0 text-[11px] text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:pointer-events-none"
+                        >→</button>
+                        <a
+                          href={`/product/${productSlug(p)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label="View product page"
+                          className="shrink-0 text-[10px] text-gray-300 hover:text-gray-600"
+                        >↗</a>
+                      </div>
                     </div>
                   </div>
                 )}
