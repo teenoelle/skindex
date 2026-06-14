@@ -1023,8 +1023,8 @@ export default function IngredientsPage() {
                           }
                           return (
                             <div key={item} className="border border-gray-200 rounded-xl px-3 py-3 space-y-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-xs font-medium text-gray-800 flex-1 min-w-0 truncate">{item}</span>
+                              <div className="flex items-start gap-2 min-w-0">
+                                <span className="text-xs font-medium text-gray-800 flex-1 min-w-0 break-words leading-snug">{item}</span>
                                 {compareActiveFor === item ? (
                                   <button type="button" onClick={() => setCompareActiveFor(null)} className="text-[10px] text-gray-400 hover:text-gray-700 whitespace-nowrap shrink-0">Cancel</button>
                                 ) : (

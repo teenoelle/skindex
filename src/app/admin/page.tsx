@@ -586,6 +586,11 @@ function getDomain(url: string) {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
 }
 
+function productSlug(p: { brand: string | null; name: string; id: string }) {
+  const parts = [p.brand, p.name].filter(Boolean).join(" ");
+  return `${parts.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${p.id}`;
+}
+
 function DuplicateClusterBucket({
   cluster,
   products,
@@ -606,11 +611,19 @@ function DuplicateClusterBucket({
   dismissing: boolean;
 }) {
   const maxSimilarity = Math.max(...cluster.pairs.map((p) => p.similarity));
-  const primaryPair = [...cluster.pairs].sort((a, b) => b.similarity - a.similarity)[0];
-  const diff = primaryPair
+  const sortedPairs = [...cluster.pairs].sort((a, b) => b.similarity - a.similarity);
+  const primaryPair = sortedPairs[0];
+  const [activePairKey, setActivePairKey] = useState(
+    () => primaryPair ? `${primaryPair.product_a_id}:${primaryPair.product_b_id}` : ""
+  );
+  const activePair = cluster.pairs.find(
+    (p) => `${p.product_a_id}:${p.product_b_id}` === activePairKey
+  ) ?? primaryPair;
+
+  const diff = activePair
     ? computeIngredientDiff(
-        products.find((p) => p.id === primaryPair.product_a_id)?.ingredient_list ?? null,
-        products.find((p) => p.id === primaryPair.product_b_id)?.ingredient_list ?? null,
+        products.find((p) => p.id === activePair.product_a_id)?.ingredient_list ?? null,
+        products.find((p) => p.id === activePair.product_b_id)?.ingredient_list ?? null,
       )
     : null;
 
@@ -620,9 +633,14 @@ function DuplicateClusterBucket({
     return "Manual";
   }
 
-  const diffCols = diff && primaryPair ? [
-    { list: diff.aList, exclusive: new Set(diff.onlyInA.map((x) => x.name)), product: products.find((p) => p.id === primaryPair.product_a_id) },
-    { list: diff.bList, exclusive: new Set(diff.onlyInB.map((x) => x.name)), product: products.find((p) => p.id === primaryPair.product_b_id) },
+  function shortName(p: AllProduct | undefined) {
+    if (!p) return "?";
+    return p.name.split(" ").slice(0, 2).join(" ");
+  }
+
+  const diffCols = diff && activePair ? [
+    { list: diff.aList, exclusive: new Set(diff.onlyInA.map((x) => x.name)), product: products.find((p) => p.id === activePair.product_a_id) },
+    { list: diff.bList, exclusive: new Set(diff.onlyInB.map((x) => x.name)), product: products.find((p) => p.id === activePair.product_b_id) },
   ] : [];
 
   return (
@@ -656,7 +674,9 @@ function DuplicateClusterBucket({
             <div key={p.id} className="p-4 space-y-3">
               <div className="flex gap-3">
                 {p.image_url && (
-                  <img src={p.image_url} alt={p.name} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-100" />
+                  <a href={p.image_url} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-lg overflow-hidden border border-gray-100 hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 transition-shadow">
+                    <img src={p.image_url} alt={p.name} className="w-10 h-10 object-cover block" />
+                  </a>
                 )}
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-800 leading-snug">{p.name}</p>
@@ -674,6 +694,8 @@ function DuplicateClusterBucket({
                   <span>{sourceLabel(p.source)}</span>
                 </div>
                 <div className="flex gap-2 flex-wrap">
+                  <a href={`/product/${productSlug(p)}`} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-700 hover:underline underline-offset-2">Scan ↗</a>
+                  <span className="text-gray-300">·</span>
                   <span className={p.image_url ? "text-teal-600" : "text-gray-300"}>{p.image_url ? "✓" : "✗"} image</span>
                   {p.iherb_url
                     ? <a href={p.iherb_url} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:text-teal-700 hover:underline underline-offset-2">✓ iHerb ↗</a>
@@ -699,12 +721,34 @@ function DuplicateClusterBucket({
       </div>
 
       {/* Exclusive ingredient chips + full diff */}
-      {diff && (diff.onlyInA.length > 0 || diff.onlyInB.length > 0) && primaryPair && (
+      {diff && (diff.onlyInA.length > 0 || diff.onlyInB.length > 0) && activePair && (
         <div className="px-4 py-3 border-t border-orange-100 space-y-2.5">
+          {sortedPairs.length > 1 && (
+            <div className="flex gap-1.5 flex-wrap">
+              {sortedPairs.map((pair) => {
+                const key = `${pair.product_a_id}:${pair.product_b_id}`;
+                const active = key === activePairKey;
+                const pA = products.find((p) => p.id === pair.product_a_id);
+                const pB = products.find((p) => p.id === pair.product_b_id);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActivePairKey(key)}
+                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                      active ? "bg-gray-800 text-white border-gray-800" : "border-gray-200 text-gray-500 hover:border-gray-400"
+                    }`}
+                  >
+                    {shortName(pA)} × {shortName(pB)} · {Math.round(pair.similarity * 100)}%
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             {([
-              { items: diff.onlyInA, label: products.find((p) => p.id === primaryPair.product_a_id)?.name },
-              { items: diff.onlyInB, label: products.find((p) => p.id === primaryPair.product_b_id)?.name },
+              { items: diff.onlyInA, label: products.find((p) => p.id === activePair.product_a_id)?.name },
+              { items: diff.onlyInB, label: products.find((p) => p.id === activePair.product_b_id)?.name },
             ] as { items: { name: string; position: number }[]; label: string | undefined }[]).map(({ items, label }, colIdx) => (
               <div key={colIdx}>
                 {items.length > 0 ? (
@@ -730,13 +774,26 @@ function DuplicateClusterBucket({
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={onToggleDiff}
-            className="text-[11px] text-indigo-500 hover:text-indigo-700 transition-colors"
-          >
-            {expandedDiff ? "Hide full diff ↑" : "Show full diff ↓"}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onToggleDiff}
+              className="text-[11px] text-indigo-500 hover:text-indigo-700 transition-colors"
+            >
+              {expandedDiff ? "Hide full diff ↑" : "Show full diff ↓"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const pA = products.find((p) => p.id === activePair.product_a_id);
+                const pB = products.find((p) => p.id === activePair.product_b_id);
+                [pA, pB].forEach((p) => p && window.open(`/product/${productSlug(p)}`, "_blank"));
+              }}
+              className="text-[11px] text-indigo-500 hover:text-indigo-700 transition-colors"
+            >
+              Scan pair ↗
+            </button>
+          </div>
 
           {expandedDiff && (
             <div className="grid grid-cols-2 gap-2">
