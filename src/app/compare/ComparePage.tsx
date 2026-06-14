@@ -383,7 +383,7 @@ export default function ComparePageClient({ ids }: { ids: string }) {
               className={`flex flex-col border-r border-gray-200 last:border-r-0 min-h-0${!isGrid ? " shrink-0 w-[300px]" : ""}`}
             >
               {/* Product header — sticky, does not scroll */}
-              <div className="shrink-0 p-4 border-b border-gray-100 space-y-2">
+              <div className="shrink-0 p-4 border-b border-gray-100 space-y-2 min-h-[7rem]">
                 <div className="flex gap-3">
                   {p.image_url && (
                     <a
