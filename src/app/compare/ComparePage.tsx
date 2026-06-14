@@ -492,7 +492,7 @@ export default function ComparePageClient({ ids }: { ids: string }) {
   );
 
   const colCount = products.length;
-  const colClass = `grid-cols-${colCount}`;
+  const colClass = colCount === 2 ? "grid-cols-2" : colCount === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4";
   const maxWClass = colCount === 2 ? "max-w-2xl" : colCount === 3 ? "max-w-4xl" : "max-w-6xl";
 
   return (
@@ -501,7 +501,7 @@ export default function ComparePageClient({ ids }: { ids: string }) {
       <div className="sticky top-14 z-10 bg-white border-b border-gray-100 relative">
         <div className={`${maxWClass} mx-auto grid ${colClass}`}>
           {products.map((p, idx) => (
-            <div key={p.id} className="border-r border-gray-200 last:border-r-0 px-3 py-2.5">
+            <div key={p.id} className={`border-r border-gray-200 last:border-r-0 px-3 py-2.5${idx >= 2 ? " hidden sm:block" : ""}`}>
               {editingSlot === idx ? (
                 <InlineSearch onSelect={r => handleChangeProduct(idx, r)} onCancel={() => setEditingSlot(null)} />
               ) : (
@@ -572,6 +572,12 @@ export default function ComparePageClient({ ids }: { ids: string }) {
         )}
       </div>
 
+      {colCount > 2 && (
+        <div className="sm:hidden px-4 py-1.5 bg-gray-50 border-b border-gray-100">
+          <p className="text-[11px] text-gray-400">Showing 2 of {colCount} — view on a wider screen to compare all</p>
+        </div>
+      )}
+
       {/* Column area — scrolls with the page */}
       <div className={`${maxWClass} mx-auto grid ${colClass}`}>
         {products.map((p, colIdx) => {
@@ -594,7 +600,7 @@ export default function ComparePageClient({ ids }: { ids: string }) {
           const neutralCount = rawItems.length - flaggedCount;
 
           return (
-            <div key={p.id} className="border-r border-gray-200 last:border-r-0">
+            <div key={p.id} className={`border-r border-gray-200 last:border-r-0${colIdx >= 2 ? " hidden sm:block" : ""}`}>
               {/* Non-sticky intro — type, iHerb, stats (scrolls away) */}
               {(p.type || p.iherb_url || flaggedCount > 0 || rawItems.length > 0) && (
                 <div className="px-3 py-2 space-y-1 border-b border-gray-100">
@@ -648,30 +654,53 @@ export default function ComparePageClient({ ids }: { ids: string }) {
 
                   return (
                     <div key={expandKey} className={isExclusive ? "bg-amber-50/60" : ""}>
-                      <button
-                        type="button"
-                        onClick={() => ing && toggleExpand(expandKey)}
-                        className={`w-full text-left px-3 py-1.5 flex items-baseline gap-2 ${ing ? "hover:bg-gray-50" : ""} transition-colors`}
-                      >
-                        <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right">{idx + 1}</span>
-                        <span className={`text-xs leading-snug flex-1 ${nameColor}`}>{rawName}</span>
-                        {isExclusive && (
-                          <span className="text-[9px] text-amber-500 shrink-0" title="Only in this product">◆</span>
-                        )}
-                        {isPartial && !isExclusive && (
-                          <span className="text-[9px] text-gray-300 shrink-0" title="Not in all products">◇</span>
-                        )}
-                        {isFlagged && fc && (
-                          <span className={`text-[10px] shrink-0 ${isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-orange-700"}`}>
-                            {fc.length > 18 ? fc.slice(0, 18) + "…" : fc}
+                      {colCount >= 3 ? (
+                        <button
+                          type="button"
+                          onClick={() => ing && toggleExpand(expandKey)}
+                          className={`w-full text-left px-3 py-1.5 flex gap-2 items-start ${ing ? "hover:bg-gray-50" : ""} transition-colors`}
+                        >
+                          <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right mt-px">{idx + 1}</span>
+                          <span className="flex-1 min-w-0">
+                            <span className="flex items-baseline gap-1">
+                              <span className={`text-xs leading-snug ${nameColor}`}>{rawName}</span>
+                              {isExclusive && <span className="text-[9px] text-amber-500 shrink-0" title="Only in this product">◆</span>}
+                              {isPartial && !isExclusive && <span className="text-[9px] text-gray-300 shrink-0" title="Not in all products">◇</span>}
+                            </span>
+                            {isFlagged && fc && (
+                              <span className={`block text-[10px] ${isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-orange-700"}`}>{fc}</span>
+                            )}
+                            {hasBenefit && ing?.category && (
+                              <span className="block text-[10px] text-teal-700">{ing.category}</span>
+                            )}
                           </span>
-                        )}
-                        {hasBenefit && ing?.category && (
-                          <span className="text-[10px] text-teal-700 shrink-0">
-                            {ing.category.length > 18 ? ing.category.slice(0, 18) + "…" : ing.category}
-                          </span>
-                        )}
-                      </button>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => ing && toggleExpand(expandKey)}
+                          className={`w-full text-left px-3 py-1.5 flex items-baseline gap-2 ${ing ? "hover:bg-gray-50" : ""} transition-colors`}
+                        >
+                          <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right">{idx + 1}</span>
+                          <span className={`text-xs leading-snug flex-1 ${nameColor}`}>{rawName}</span>
+                          {isExclusive && (
+                            <span className="text-[9px] text-amber-500 shrink-0" title="Only in this product">◆</span>
+                          )}
+                          {isPartial && !isExclusive && (
+                            <span className="text-[9px] text-gray-300 shrink-0" title="Not in all products">◇</span>
+                          )}
+                          {isFlagged && fc && (
+                            <span className={`text-[10px] shrink-0 ${isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-orange-700"}`}>
+                              {fc.length > 18 ? fc.slice(0, 18) + "…" : fc}
+                            </span>
+                          )}
+                          {hasBenefit && ing?.category && (
+                            <span className="text-[10px] text-teal-700 shrink-0">
+                              {ing.category.length > 18 ? ing.category.slice(0, 18) + "…" : ing.category}
+                            </span>
+                          )}
+                        </button>
+                      )}
                       {isExpanded && ing && (
                         <div className="px-3 pb-2 bg-gray-50/80 border-t border-gray-100">
                           <IngredientExplanation ing={ing} profileMatch={profileMatch} activeSkinTypes={activeSkinTypes} activeClimates={activeClimates} />
