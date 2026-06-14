@@ -8,6 +8,8 @@ import { UNIVERSAL_CONCERN_SET } from "@/lib/concern-breakdown";
 import type { DbIngredient, ExplanationStructured } from "@/types";
 import type { SkinType, ClimateType } from "@/lib/skin-profile";
 
+const UUID_RE = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
 // Copied from Scanner.tsx — kept in sync manually
 function isFcProfileMatch(fc: string, activeSkinTypes: Set<SkinType>, activeClimates: Set<ClimateType>): boolean {
   return (
@@ -88,6 +90,73 @@ function productSlug(p: { brand: string | null; name: string; id: string }) {
 
 function normalizeIngName(s: string): string {
   return s.replace(/\s*\([^)]*\)/g, "").trim().toLowerCase();
+}
+
+function InlineSearch({ onSelect, onCancel }: {
+  onSelect: (p: SearchResult) => void;
+  onCancel: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function search(q: string) {
+    setQuery(q);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (q.length < 2) { setResults([]); return; }
+    timerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const d = await res.json();
+          setResults(d.products ?? []);
+        }
+      } catch {}
+    }, 200);
+  }
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={e => search(e.target.value)}
+        onKeyDown={e => e.key === "Escape" && onCancel()}
+        onBlur={() => {
+          if (timerRef.current) clearTimeout(timerRef.current);
+          setTimeout(() => setResults([]), 150);
+        }}
+        placeholder="Search product…"
+        // eslint-disable-next-line jsx-a11y/no-autofocus
+        autoFocus
+        className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-gray-400 bg-white"
+      />
+      {results.length > 0 && (
+        <ul className="absolute z-30 top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-[220px]">
+          {results.slice(0, 6).map(p => (
+            <li key={p.id}>
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => onSelect(p)}
+                className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+              >
+                {p.image_url ? (
+                  <img src={p.image_url} alt={p.name} className="w-7 h-7 rounded-md object-cover border border-gray-100 shrink-0" />
+                ) : (
+                  <div className="w-7 h-7 rounded-md bg-gray-100 shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-800 truncate">{p.name}</p>
+                  {p.brand && <p className="text-[10px] text-gray-400 truncate">{p.brand}</p>}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function ProductSearchSlot({
@@ -262,11 +331,14 @@ export default function ComparePageClient({ ids }: { ids: string }) {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [emptySlots, setEmptySlots] = useState<(SearchResult | null)[]>([null, null]);
+  const [editingSlot, setEditingSlot] = useState<number | null>(null);
 
   useEffect(() => {
     if (!ids) { setLoading(false); return; }
+    const rawIds = ids.split(",").map(seg => seg.match(UUID_RE)?.[1] ?? seg).filter(Boolean);
+    if (rawIds.length === 0) { setLoading(false); return; }
     setLoading(true);
-    fetch(`/api/compare?ids=${encodeURIComponent(ids)}`)
+    fetch(`/api/compare?ids=${encodeURIComponent(rawIds.join(","))}`)
       .then(r => r.json())
       .then(d => { setProducts(d.products ?? null); setLoading(false); })
       .catch(() => { setError("Failed to load products."); setLoading(false); });
@@ -309,13 +381,35 @@ export default function ComparePageClient({ ids }: { ids: string }) {
     setExpanded(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
   }
 
+  function handleSwap(fromIdx: number, toIdx: number) {
+    if (!products) return;
+    const reordered = [...products];
+    [reordered[fromIdx], reordered[toIdx]] = [reordered[toIdx], reordered[fromIdx]];
+    router.push(`/compare?ids=${reordered.map(p => productSlug(p)).join(",")}`);
+  }
+
+  function handleChangeProduct(slotIdx: number, result: SearchResult) {
+    if (!products) return;
+    setEditingSlot(null);
+    const slugs = products.map(p => productSlug(p));
+    slugs[slotIdx] = productSlug(result);
+    router.push(`/compare?ids=${slugs.join(",")}`);
+  }
+
+  function handleAddProduct(result: SearchResult) {
+    if (!products || products.length >= 4) return;
+    setEditingSlot(null);
+    const slugs = [...products.map(p => productSlug(p)), productSlug(result)];
+    router.push(`/compare?ids=${slugs.join(",")}`);
+  }
+
   function handleSlotSelect(slotIdx: number, product: SearchResult) {
     const newSlots = [...emptySlots];
     newSlots[slotIdx] = product;
     setEmptySlots(newSlots);
     const filled = newSlots.filter(Boolean) as SearchResult[];
     if (filled.length >= 2) {
-      router.push(`/compare?ids=${filled.map(p => p.id).join(",")}`);
+      router.push(`/compare?ids=${filled.map(p => productSlug(p)).join(",")}`);
     }
   }
 
@@ -323,13 +417,13 @@ export default function ComparePageClient({ ids }: { ids: string }) {
 
   if (!ids) {
     return (
-      <div className="fixed inset-0 pt-14 bg-white flex flex-col overflow-hidden">
-        <div className="shrink-0 px-6 py-3 border-b border-gray-100">
+      <div className="pt-14 bg-white">
+        <div className="px-6 py-3 border-b border-gray-100">
           <p className="text-xs text-gray-400">Choose two products to compare their ingredients side by side.</p>
         </div>
-        <div className="flex-1 overflow-hidden grid grid-cols-2">
+        <div className="grid grid-cols-2">
           {[0, 1].map(i => (
-            <div key={i} className={`p-6 overflow-y-auto${i === 1 ? " border-l border-gray-100" : ""}`}>
+            <div key={i} className={`p-6${i === 1 ? " border-l border-gray-100" : ""}`}>
               <ProductSearchSlot slotIndex={i} onSelect={p => handleSlotSelect(i, p)} />
             </div>
           ))}
@@ -339,29 +433,102 @@ export default function ComparePageClient({ ids }: { ids: string }) {
   }
 
   if (loading) return (
-    <div className="fixed inset-0 pt-14 bg-white flex items-center justify-center">
+    <div className="pt-14 min-h-screen bg-white flex items-center justify-center">
       <p className="text-sm text-gray-400">Loading…</p>
     </div>
   );
 
   if (error || !products || products.length === 0) return (
-    <div className="fixed inset-0 pt-14 bg-white flex items-center justify-center">
+    <div className="pt-14 min-h-screen bg-white flex items-center justify-center">
       <p className="text-sm text-gray-400">{error ?? "No products found."}</p>
     </div>
   );
 
-  const isGrid = products.length <= 3;
-  const colClass = products.length === 3 ? "grid-cols-3" : "grid-cols-2";
+  const colCount = products.length;
+  const colClass = `grid-cols-${colCount}`;
 
   return (
-    <div className="fixed inset-0 pt-14 bg-white flex flex-col overflow-hidden">
-      {/* Legend strip */}
-      <div className="shrink-0 px-4 h-8 flex items-center border-b border-gray-100">
-        <p className="text-[11px] text-gray-300">◆ only in this product · ◇ not in all · click ingredient for details</p>
+    <div className="pt-14 bg-white">
+      {/* Shared sticky header — image, name, brand, swap arrows, change/add controls */}
+      <div className="sticky top-14 z-10 bg-white border-b border-gray-100">
+        <div className="flex">
+          <div className={`flex-1 grid ${colClass} min-w-0`}>
+            {products.map((p, idx) => (
+              <div key={p.id} className="border-r border-gray-200 px-3 py-2.5">
+                {editingSlot === idx ? (
+                  <InlineSearch onSelect={r => handleChangeProduct(idx, r)} onCancel={() => setEditingSlot(null)} />
+                ) : (
+                  <div className="flex gap-2 items-center min-w-0">
+                    {p.image_url && (
+                      <a
+                        href={p.image_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 rounded-lg overflow-hidden border border-gray-100 hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 transition-shadow"
+                      >
+                        <img src={p.image_url} alt={p.name} className="w-9 h-9 object-cover block" />
+                      </a>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-gray-900 leading-snug truncate">{p.name}</p>
+                      {p.brand && <p className="text-[10px] text-gray-400 leading-tight truncate">{p.brand}</p>}
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleSwap(idx, idx - 1)}
+                        disabled={idx === 0}
+                        aria-label="Move left"
+                        className="p-1 text-[11px] text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:pointer-events-none"
+                      >←</button>
+                      <button
+                        type="button"
+                        onClick={() => handleSwap(idx, idx + 1)}
+                        disabled={idx === colCount - 1}
+                        aria-label="Move right"
+                        className="p-1 text-[11px] text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:pointer-events-none"
+                      >→</button>
+                      <a
+                        href={`/product/${productSlug(p)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="View product page"
+                        className="p-1 text-[10px] text-gray-300 hover:text-gray-600"
+                      >↗</a>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSlot(idx)}
+                        className="p-1 text-[10px] text-gray-400 hover:text-gray-600 ml-0.5"
+                      >Change</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {colCount < 4 && (
+            <div className="shrink-0 border-l border-gray-200 px-2.5 py-2.5 flex items-center justify-center">
+              {editingSlot === colCount ? (
+                <div className="w-52">
+                  <InlineSearch onSelect={r => handleAddProduct(r)} onCancel={() => setEditingSlot(null)} />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditingSlot(colCount)}
+                  className="text-[11px] text-gray-400 hover:text-gray-600 whitespace-nowrap"
+                >
+                  + Add
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Columns */}
-      <div className={`flex-1 overflow-hidden ${isGrid ? `grid ${colClass}` : "flex overflow-x-auto"}`}>
+      {/* Column area — scrolls with the page */}
+      <div className={`grid ${colClass}`}>
         {products.map((p, colIdx) => {
           const nameMap = nameMaps[colIdx] ?? new Map();
           const rawItems = splitIngredientList(p.ingredient_list ?? "");
@@ -378,78 +545,51 @@ export default function ComparePageClient({ ids }: { ids: string }) {
           }
 
           return (
-            <div
-              key={p.id}
-              className={`flex flex-col border-r border-gray-200 last:border-r-0 min-h-0${!isGrid ? " shrink-0 w-[300px]" : ""}`}
-            >
-              {/* Product header — sticky, does not scroll */}
-              <div className="shrink-0 p-4 border-b border-gray-100 space-y-2 min-h-[7rem]">
-                <div className="flex gap-3">
-                  {p.image_url && (
-                    <a
-                      href={p.image_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 rounded-lg overflow-hidden border border-gray-100 hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 transition-shadow"
-                    >
-                      <img src={p.image_url} alt={p.name} className="w-14 h-14 object-cover block" />
-                    </a>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start gap-1">
-                      <p className="text-sm font-semibold text-gray-900 leading-snug flex-1">{p.name}</p>
-                      <a
-                        href={`/product/${productSlug(p)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-gray-400 hover:text-gray-700 whitespace-nowrap shrink-0 mt-0.5"
-                      >
-                        View ↗
-                      </a>
+            <div key={p.id} className="border-r border-gray-200 last:border-r-0">
+              {/* Non-sticky intro — type, iHerb, stats (scrolls away) */}
+              {(p.type || p.iherb_url || flaggedCount > 0 || rawItems.length > 0) && (
+                <div className="px-3 py-2 space-y-1 border-b border-gray-100">
+                  {(p.type || p.iherb_url) && (
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                      {p.type && (
+                        <span className="bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">{p.type}</span>
+                      )}
+                      {p.iherb_url && (
+                        <a
+                          href={p.iherb_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-teal-600 hover:underline underline-offset-2"
+                        >
+                          iHerb ↗
+                        </a>
+                      )}
                     </div>
-                    {p.brand && <p className="text-xs text-gray-400">{p.brand}</p>}
-                    {p.type && (
-                      <span className="text-[11px] bg-gray-100 text-gray-500 rounded-full px-2 py-0.5 inline-block mt-1">{p.type}</span>
-                    )}
-                  </div>
+                  )}
+                  {(flaggedCount > 0 || rawItems.length > 0) && (
+                    <div className="flex flex-wrap gap-1.5 text-[11px]">
+                      <span className="text-gray-400">{rawItems.length} ingredients</span>
+                      {flaggedCount > 0 && (
+                        <>
+                          <span className="text-gray-300">·</span>
+                          <span className={universalCount > 0 ? "text-rose-600" : "text-amber-600"}>
+                            {flaggedCount} flagged
+                          </span>
+                        </>
+                      )}
+                      {hasProfile && profileLoaded && profileMatchCount > 0 && (
+                        <>
+                          <span className="text-gray-300">·</span>
+                          <span className="text-amber-700 font-medium">{profileMatchCount} match your profile</span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
+              )}
 
-                {p.iherb_url && (
-                  <div>
-                    <a
-                      href={p.iherb_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] text-teal-600 hover:underline underline-offset-2"
-                    >
-                      iHerb ↗
-                    </a>
-                  </div>
-                )}
-
-                {(flaggedCount > 0 || rawItems.length > 0) && (
-                  <div className="flex flex-wrap gap-1.5 text-[11px]">
-                    <span className="text-gray-400">{rawItems.length} ingredients</span>
-                    {flaggedCount > 0 && (
-                      <>
-                        <span className="text-gray-300">·</span>
-                        <span className={universalCount > 0 ? "text-rose-600" : "text-amber-600"}>
-                          {flaggedCount} flagged
-                        </span>
-                      </>
-                    )}
-                    {hasProfile && profileLoaded && profileMatchCount > 0 && (
-                      <>
-                        <span className="text-gray-300">·</span>
-                        <span className="text-amber-700 font-medium">{profileMatchCount} match your profile</span>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Ingredient list — scrolls independently */}
-              <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-50">
+              {/* Ingredient list */}
+              <div className="divide-y divide-gray-50">
                 {rawItems.map((rawName, idx) => {
                   const ing = lookupIng(rawName, nameMap) as DbIngredient | null;
                   const isFlagged = ing?.status === "flagged";
@@ -515,6 +655,11 @@ export default function ComparePageClient({ ids }: { ids: string }) {
             </div>
           );
         })}
+      </div>
+
+      {/* Legend strip */}
+      <div className="px-4 h-8 flex items-center border-t border-gray-100">
+        <p className="text-[11px] text-gray-400">◆ only in this product · ◇ not in all · click ingredient for details</p>
       </div>
     </div>
   );
