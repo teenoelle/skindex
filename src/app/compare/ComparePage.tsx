@@ -627,7 +627,7 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                       {universalCount > 0 && (profileOnlyCount > 0 || otherFlaggedCount > 0 || neutralCount > 0) && <span className="text-gray-300">·</span>}
                       {profileOnlyCount > 0 && <span className="text-amber-700">{profileOnlyCount} profile</span>}
                       {profileOnlyCount > 0 && (otherFlaggedCount > 0 || neutralCount > 0) && <span className="text-gray-300">·</span>}
-                      {otherFlaggedCount > 0 && <span className="text-orange-700">{otherFlaggedCount} other</span>}
+                      {otherFlaggedCount > 0 && <span className="text-yellow-700">{otherFlaggedCount} other</span>}
                       {otherFlaggedCount > 0 && neutralCount > 0 && <span className="text-gray-300">·</span>}
                       {neutralCount > 0 && <span className="text-gray-400">{neutralCount} neutral</span>}
                     </div>
@@ -648,7 +648,6 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                   const expandKey = `${p.id}::${idx}`;
                   const isExpanded = expanded.has(expandKey);
                   const isExclusive = ing?.id ? presenceCount.get(ing.id) === 1 : false;
-                  const isPartial = ing?.id ? (presenceCount.get(ing.id) ?? 0) > 1 && (presenceCount.get(ing.id) ?? 0) < products.length : false;
 
                   const nameColor = ing ? "text-gray-800" : "text-gray-400";
 
@@ -662,13 +661,9 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                         >
                           <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right mt-px">{idx + 1}</span>
                           <span className="flex-1 min-w-0">
-                            <span className="flex items-baseline gap-1">
-                              <span className={`text-xs leading-snug ${nameColor}`}>{rawName}</span>
-                              {isExclusive && <span className="text-[9px] text-amber-500 shrink-0" title="Only in this product">◆</span>}
-                              {isPartial && !isExclusive && <span className="text-[9px] text-gray-300 shrink-0" title="Not in all products">◇</span>}
-                            </span>
+                            <span className={`text-xs leading-snug ${nameColor}`}>{rawName}</span>
                             {isFlagged && fc && (
-                              <span className={`block text-[10px] ${isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-orange-700"}`}>{fc}</span>
+                              <span className={`block text-[10px] ${isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-yellow-700"}`}>{fc}</span>
                             )}
                             {hasBenefit && ing?.category && (
                               <span className="block text-[10px] text-teal-700">{ing.category}</span>
@@ -683,14 +678,8 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                         >
                           <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right">{idx + 1}</span>
                           <span className={`text-xs leading-snug flex-1 ${nameColor}`}>{rawName}</span>
-                          {isExclusive && (
-                            <span className="text-[9px] text-amber-500 shrink-0" title="Only in this product">◆</span>
-                          )}
-                          {isPartial && !isExclusive && (
-                            <span className="text-[9px] text-gray-300 shrink-0" title="Not in all products">◇</span>
-                          )}
                           {isFlagged && fc && (
-                            <span className={`text-[10px] shrink-0 ${isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-orange-700"}`}>
+                            <span className={`text-[10px] shrink-0 ${isUniversal ? "text-rose-700" : profileMatch ? "text-amber-700" : "text-yellow-700"}`}>
                               {fc.length > 18 ? fc.slice(0, 18) + "…" : fc}
                             </span>
                           )}
@@ -718,12 +707,6 @@ export default function ComparePageClient({ ids }: { ids: string }) {
         })}
       </div>
 
-      {/* Legend strip */}
-      <div className="border-t border-gray-100">
-        <div className={`${maxWClass} mx-auto px-4 h-8 flex items-center`}>
-          <p className="text-[11px] text-gray-400">◆ only in this product · ◇ not in all · click ingredient for details</p>
-        </div>
-      </div>
     </div>
   );
 }
