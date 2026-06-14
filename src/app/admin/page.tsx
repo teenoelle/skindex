@@ -656,14 +656,24 @@ function DuplicateClusterBucket({
             {Math.round(maxSimilarity * 100)}% match
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onDismissCluster}
-          disabled={dismissing || keepingId !== null}
-          className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-40 transition-colors"
-        >
-          {dismissing ? "Dismissing…" : "Not duplicates"}
-        </button>
+        <div className="flex items-center gap-3">
+          <a
+            href={`/compare?ids=${products.map((p) => p.id).join(",")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
+          >
+            Compare ↗
+          </a>
+          <button
+            type="button"
+            onClick={onDismissCluster}
+            disabled={dismissing || keepingId !== null}
+            className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-40 transition-colors"
+          >
+            {dismissing ? "Dismissing…" : "Not duplicates"}
+          </button>
+        </div>
       </div>
 
       {/* Product cards */}
@@ -782,17 +792,14 @@ function DuplicateClusterBucket({
             >
               {expandedDiff ? "Hide full diff ↑" : "Show full diff ↓"}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                const pA = products.find((p) => p.id === activePair.product_a_id);
-                const pB = products.find((p) => p.id === activePair.product_b_id);
-                [pA, pB].forEach((p) => p && window.open(`/product/${productSlug(p)}`, "_blank"));
-              }}
+            <a
+              href={`/compare?ids=${activePair.product_a_id},${activePair.product_b_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-[11px] text-indigo-500 hover:text-indigo-700 transition-colors"
             >
               Scan pair ↗
-            </button>
+            </a>
           </div>
 
           {expandedDiff && (
