@@ -25,6 +25,14 @@ After each queue pass, `benefit_profiles` / `concern_profiles` are auto-derived 
 
 ### 1. Check queue counts
 
+First, sweep all products for ingredients that may have been silently dropped by the API (e.g. due to the anon-client bug fixed 2026-06-16). This is fast and safe to re-run.
+
+```bash
+npx tsx scripts/queue-unreviewed.ts 2>&1
+```
+
+Then check the queue counts:
+
 ```bash
 npx tsx scripts/generate-explanations.ts --dry-run 2>&1 | head -10
 ```

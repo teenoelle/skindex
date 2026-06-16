@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -21,18 +21,18 @@ async function rescanIngredients(productId: string, productName: string, newList
     }
 
     for (const name of unreviewed) {
-      const { data: existing } = await supabase
+      const { data: existing } = await supabaseAdmin
         .from("ingredient_queue")
         .select("id, times_seen")
         .ilike("name", name)
         .maybeSingle();
       if (existing) {
-        await supabase
+        await supabaseAdmin
           .from("ingredient_queue")
           .update({ times_seen: existing.times_seen + 1, last_seen: new Date().toISOString() })
           .eq("id", existing.id);
       } else {
-        await supabase
+        await supabaseAdmin
           .from("ingredient_queue")
           .insert({ name, found_in: productName, times_seen: 1 });
       }
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
   const newList = patch.ingredient_list;
   if (newList && newList !== existing?.ingredient_list) {
     const productDisplayName = patch.name ?? existing?.name ?? productId;
-    rescanIngredients(productId, productDisplayName, newList);
+    after(() => rescanIngredients(productId, productDisplayName, newList));
   }
 
   return NextResponse.json({ ok: true });

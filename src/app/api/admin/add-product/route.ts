@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -48,10 +48,8 @@ export async function POST(req: NextRequest) {
 
   await writeAuditLog(userId, "add_product", "product", inserted.id, { name: inserted.name });
 
-  // Fire-and-forget: match, link, and queue ingredients for /generate-explanations
-  Promise.resolve()
-    .then(() => queueIngredients(inserted.id, inserted.name, ingredient_list.trim()))
-    .catch(() => {});
+  // Run after response: match, link, and queue ingredients for /generate-explanations
+  after(() => queueIngredients(inserted.id, inserted.name, ingredient_list.trim()));
 
   return NextResponse.json({ product: inserted });
 }

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { extractIngredientsFromUrlWithStatus } from "@/lib/extract-ingredients";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -80,11 +80,9 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Fire-and-forget: match, link, and queue ingredients
+      // Run after response: match, link, and queue ingredients
       if (inserted && extracted.ingredients) {
-        Promise.resolve()
-          .then(() => queueIngredients(inserted.id, name, extracted.ingredients!))
-          .catch(() => {});
+        after(() => queueIngredients(inserted.id, name, extracted.ingredients!));
       }
 
       results.push({ url, status: "imported", name, brand: brand ?? undefined });

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -30,11 +30,9 @@ export async function POST(req: NextRequest) {
     name: existing?.name ?? productId,
   });
 
-  // Fire-and-forget: match, link, and queue ingredients now that the product is live
+  // Run after response: match, link, and queue ingredients now that the product is live
   if (existing?.ingredient_list) {
-    Promise.resolve()
-      .then(() => queueIngredients(productId, existing.name, existing.ingredient_list!))
-      .catch(() => {});
+    after(() => queueIngredients(productId, existing.name, existing.ingredient_list!));
   }
 
   return NextResponse.json({ ok: true });
