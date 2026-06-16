@@ -29,9 +29,20 @@ const DRY_RUN = process.argv.includes("--dry-run");
 async function main() {
   console.log(`\nRelink Product Ingredients${DRY_RUN ? " (DRY RUN)" : ""}\n`);
 
-  // Load all ingredients and all existing product_ingredient links
-  const [{ data: allIngredients }, { data: products }] = await Promise.all([
-    supabase.from("ingredients").select("id, name, inci_name, status").limit(10000),
+  // Load all ingredients (paginated — table exceeds PostgREST default 1000-row cap)
+  const allIngredients: DbIngredient[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("ingredients")
+      .select("id, name, inci_name, status")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Failed to fetch ingredients: ${error.message}`);
+    allIngredients.push(...((data ?? []) as DbIngredient[]));
+    if (!data || data.length < PAGE) break;
+  }
+
+  const [{ data: products }] = await Promise.all([
     supabase
       .from("products")
       .select("id, name, ingredient_list")
@@ -40,7 +51,7 @@ async function main() {
       .not("ingredient_list", "is", null),
   ]);
 
-  const db = (allIngredients ?? []) as DbIngredient[];
+  const db = allIngredients;
   const productList = products ?? [];
 
   // Build a set of existing links: "productId:ingredientId"

@@ -38,17 +38,20 @@ function parseIngredientList(raw: string): string[] {
 async function main() {
   console.log(`\nQueue Unreviewed Ingredients${DRY_RUN ? " — DRY RUN" : ""}\n`);
 
-  // Load all known ingredient names + inci_names for matching
-  const { data: dbIngredients, error: ingErr } = await supabase
-    .from("ingredients")
-    .select("name, inci_name")
-    .limit(10000);
-  if (ingErr) throw new Error(`Failed to fetch ingredients: ${ingErr.message}`);
-
+  // Load all known ingredient names + inci_names for matching (paginated — table exceeds PostgREST default 1000-row cap)
   const known = new Set<string>();
-  for (const ing of dbIngredients ?? []) {
-    known.add(ing.name.toLowerCase());
-    if (ing.inci_name) known.add(ing.inci_name.toLowerCase());
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("ingredients")
+      .select("name, inci_name")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Failed to fetch ingredients: ${error.message}`);
+    for (const ing of data ?? []) {
+      known.add(ing.name.toLowerCase());
+      if (ing.inci_name) known.add(ing.inci_name.toLowerCase());
+    }
+    if (!data || data.length < PAGE) break;
   }
 
   // Load all existing queue names so we can skip already-queued items
