@@ -625,28 +625,28 @@ export default function ComparePageClient({ ids }: { ids: string }) {
         })}
       </div>
 
-      {/* Ingredient rows — row-major so same-index rows share a grid row height */}
+      {/* Ingredient rows — row-major, two sub-rows per index: button row + explanation row.
+          Keeping both sub-rows in the DOM at all times prevents grid reflow on expand.
+          border-b (row separator) lives on the explanation sub-row so it always appears
+          after the explanation when expanded, or as a hairline after the button when collapsed. */}
       {(() => {
         const maxIngCount = productData.length > 0 ? Math.max(...productData.map(pd => pd.rawItems.length)) : 0;
         return (
           <div className={`${maxWClass} mx-auto grid ${colClass}`}>
-            {Array.from({ length: maxIngCount }, (_, idx) =>
-              products.map((p, colIdx) => {
+            {Array.from({ length: maxIngCount }, (_, idx) => {
+              const isExpanded = expanded.has(idx);
+
+              // Precompute per-column data for this index so both sub-rows can share it
+              const cells = products.map((p, colIdx) => {
                 const pd = productData[colIdx];
-                const rawName = pd?.rawItems[idx];
-                const borderR = colIdx < products.length - 1 ? " border-r border-gray-200" : "";
-                const hiddenCls = colIdx >= 2 ? " hidden sm:block" : "";
-                const cellBase = `border-b border-gray-50${borderR}${hiddenCls}`;
-
-                if (!rawName) return <div key={`${colIdx}-${idx}`} className={cellBase} />;
-
+                const rawName = pd?.rawItems[idx] ?? null;
+                if (!rawName) return { colIdx, rawName: null as null, ing: null, profileMatch: false, isExclusive: false, nameColor: "text-gray-400", labelItems: [] as { text: string; cls: string }[] };
                 const ing = lookupIng(rawName, pd.nameMap);
                 const isFlagged = ing?.status === "flagged";
                 const fc = ing?.flagged_category ?? "";
                 const allCats = ing ? [fc, ...(ing.secondary_flagged_categories ?? [])].filter(Boolean) : [];
                 const profileMatch = hasProfile && allCats.some(c => isFcProfileMatch(c, activeSkinTypes, activeClimates));
                 const hasBenefit = !isFlagged && (ing?.category || (ing?.explanation_structured as ExplanationStructured | null)?.benefit);
-                const isExpanded = expanded.has(idx);
                 const isExclusive = ing?.id ? presenceCount.get(ing.id) === 1 : false;
                 const nameColor = ing ? "text-gray-800" : "text-gray-400";
                 const structCat = ing?.structural_category ?? null;
@@ -664,38 +664,58 @@ export default function ComparePageClient({ ids }: { ids: string }) {
                   })),
                   ...benefitCats.map(cat => ({ text: cat, cls: "text-teal-700" })),
                 ];
+                return { colIdx, rawName, ing, profileMatch, isExclusive, nameColor, labelItems };
+              });
 
-                return (
-                  <div key={`${colIdx}-${idx}`} className={`${cellBase}${isExclusive ? " bg-amber-50/60" : ""}`}>
-                    <button
-                      type="button"
-                      onClick={() => ing && toggleExpand(idx)}
-                      className={`w-full text-left px-3 py-1.5 flex gap-2 items-start ${ing ? "hover:bg-gray-50" : ""} transition-colors`}
-                    >
-                      <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right mt-px">{idx + 1}</span>
-                      <span className="flex-1 min-w-0">
-                        <span className={`text-xs leading-snug ${nameColor}`}>{rawName}</span>
-                        {labelItems.length > 0 && (
-                          <span className="flex flex-wrap items-baseline gap-x-0.5 mt-0.5">
-                            {labelItems.map((item, i) => (
-                              <span key={i} className={`text-[10px] ${item.cls}`}>
-                                {i > 0 && <span className="text-gray-300"> · </span>}
-                                {item.text}
-                              </span>
-                            ))}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                    {isExpanded && ing && (
-                      <div className="px-3 pb-2 bg-gray-50/80 border-t border-gray-100">
-                        <IngredientExplanation ing={ing} profileMatch={profileMatch} activeSkinTypes={activeSkinTypes} activeClimates={activeClimates} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+              return [
+                // Button sub-row: name + labels. No border-b — separator is on the explanation sub-row.
+                ...cells.map(cell => {
+                  const borderR = cell.colIdx < products.length - 1 ? " border-r border-gray-200" : "";
+                  const hiddenCls = cell.colIdx >= 2 ? " hidden sm:block" : "";
+                  const exclusiveCls = cell.isExclusive ? " bg-amber-50/60" : "";
+                  if (!cell.rawName) return <div key={`btn-${cell.colIdx}-${idx}`} className={`${borderR}${hiddenCls}`} />;
+                  return (
+                    <div key={`btn-${cell.colIdx}-${idx}`} className={`${borderR}${hiddenCls}${exclusiveCls}`}>
+                      <button
+                        type="button"
+                        onClick={() => cell.ing && toggleExpand(idx)}
+                        className={`w-full text-left px-3 py-1.5 flex gap-2 items-start ${cell.ing ? "hover:bg-gray-50" : ""} transition-colors`}
+                      >
+                        <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right mt-px">{idx + 1}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className={`text-xs leading-snug ${cell.nameColor}`}>{cell.rawName}</span>
+                          {cell.labelItems.length > 0 && (
+                            <span className="flex flex-wrap items-baseline gap-x-0.5 mt-0.5">
+                              {cell.labelItems.map((item, i) => (
+                                <span key={i} className={`text-[10px] ${item.cls}`}>
+                                  {i > 0 && <span className="text-gray-300"> · </span>}
+                                  {item.text}
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    </div>
+                  );
+                }),
+                // Explanation sub-row: always rendered to keep grid stable; border-b is the row separator.
+                ...cells.map(cell => {
+                  const borderR = cell.colIdx < products.length - 1 ? " border-r border-gray-200" : "";
+                  const hiddenCls = cell.colIdx >= 2 ? " hidden sm:block" : "";
+                  const exclusiveCls = cell.isExclusive ? " bg-amber-50/60" : "";
+                  return (
+                    <div key={`exp-${cell.colIdx}-${idx}`} className={`border-b border-gray-50${borderR}${hiddenCls}${exclusiveCls}`}>
+                      {isExpanded && cell.ing && (
+                        <div className="px-3 pb-2 bg-gray-50/80 border-t border-gray-100">
+                          <IngredientExplanation ing={cell.ing} profileMatch={cell.profileMatch} activeSkinTypes={activeSkinTypes} activeClimates={activeClimates} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                }),
+              ];
+            })}
           </div>
         );
       })()}
