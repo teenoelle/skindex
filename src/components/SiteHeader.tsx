@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Camera } from "lucide-react";
 import { useUser, UserButton } from "@clerk/nextjs";
 
 export default function SiteHeader() {
@@ -52,6 +52,14 @@ export default function SiteHeader() {
   function handleLogoClick() {
     window.dispatchEvent(new CustomEvent("skindex:reset"));
     if (pathname !== "/") router.push("/");
+  }
+
+  function handleCameraClick() {
+    if (pathname === "/") {
+      window.dispatchEvent(new CustomEvent("skindex:camera"));
+    } else {
+      router.push("/?camera=scan");
+    }
   }
 
   return (
@@ -136,6 +144,16 @@ export default function SiteHeader() {
               </Link>
             )}
           </nav>
+
+          {/* Mobile camera shortcut */}
+          <button
+            type="button"
+            onClick={handleCameraClick}
+            className="sm:hidden p-1.5 text-gray-400 hover:text-gray-700 transition-colors"
+            aria-label="Scan"
+          >
+            <Camera size={18} />
+          </button>
 
           {/* Mobile hamburger */}
           <button

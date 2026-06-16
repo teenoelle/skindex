@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useUser, UserButton, SignInButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater, Cigarette } from "lucide-react";
+import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater, Cigarette, Camera, ScanBarcode } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, Routine, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 import { SENSORY_PROFILE_MAP, CONCERN_PROFILE_TYPES } from "@/lib/sensory";
@@ -12,6 +12,8 @@ import { PROFILE_BENEFIT_CATS } from "@/lib/profile-benefit-cats";
 import { tokenFuzzyFilter } from "@/lib/search";
 import { splitIngredientList } from "@/lib/scanner";
 import ConcernChips from "@/components/ConcernChips";
+import BarcodeScanner from "@/components/BarcodeScanner";
+import IngredientOCR from "@/components/IngredientOCR";
 import { openSidePanel } from "@/lib/open-side-panel";
 import { useSkinProfile } from "@/context/SkinProfileContext";
 import type { SkinType, ClimateType } from "@/lib/skin-profile";
@@ -1128,7 +1130,7 @@ function getWaitTimeAfter(p: RoutineProduct): string | null {
   return "30 sec";
 }
 
-export default function Scanner({ initialProductId }: { initialProductId?: string | null }) {
+export default function Scanner({ initialProductId, initialCamera }: { initialProductId?: string | null; initialCamera?: string | null }) {
   const { isSignedIn, isLoaded } = useUser();
 
   const [tab, setTab] = useState<Tab>("search");
@@ -1267,6 +1269,9 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
   const [searchCleanOnly, setSearchCleanOnly] = useState(false);
   const [searchPhotosafe, setSearchPhotosafe] = useState(false);
   const [searchListModes, setSearchListModes] = useState<Record<string, "include" | "exclude" | "off">>({});
+  const [barcodeOpen, setBarcodeOpen] = useState(false);
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
+  const [ocrOpen, setOcrOpen] = useState(false);
 
   // Derived routine state — all reads of routineProducts work unchanged
   const activeRoutine = routines.find(r => r.id === activeRoutineId) ?? routines[0] ?? null;
@@ -1281,7 +1286,20 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
     if (initialProductIdRef.current) {
       scanVariant({ productId: initialProductIdRef.current });
     }
+    if (initialCamera === "scan") {
+      setTab("paste");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    function handleCameraEvent() {
+      setTab("paste");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    window.addEventListener("skindex:camera", handleCameraEvent);
+    return () => window.removeEventListener("skindex:camera", handleCameraEvent);
+  }, []);
 
   useEffect(() => {
     fetch("/api/product-types")
@@ -1869,6 +1887,36 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       });
       setActiveVariantId(data.product.id);
     }
+  }
+
+  async function handleBarcodeDetected(barcode: string) {
+    setBarcodeOpen(false);
+    setBarcodeLoading(true);
+    try {
+      const res = await fetch(`/api/scan/barcode?code=${encodeURIComponent(barcode)}`);
+      const data = await res.json() as { notFound?: boolean; name?: string | null; brand?: string | null; ingredients?: string | null };
+      setBarcodeLoading(false);
+      if (data.notFound || !data.name) {
+        // Nothing found in OBF — put the raw barcode in the search box
+        setQuery(barcode);
+        return;
+      }
+      if (data.ingredients) {
+        await scanVariant({ pasteIngredients: data.ingredients, productName: data.name, productBrand: data.brand ?? null });
+      } else {
+        // Name found but no ingredients — fall back to a name search
+        setQuery(data.name);
+        handleScan({ tab: "search", query: data.name });
+      }
+    } catch {
+      setBarcodeLoading(false);
+    }
+  }
+
+  async function handleOCRExtracted(text: string) {
+    setOcrOpen(false);
+    setIngredients(text);
+    await scanVariant({ pasteIngredients: text });
   }
 
   async function handleDymVariantClick(variantId: string) {
@@ -2978,7 +3026,7 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
       <div className="flex mb-3 rounded-full border border-gray-200 overflow-hidden">
         {([
           ["search", "Search Product"],
-          ["paste", "Scan Ingredients"],
+          ["paste", "Scan"],
           ["add", "Add Product(s)"],
         ] as [Tab, string][]).map(([t, label], i) => (
           <button
@@ -3029,6 +3077,18 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
                 placeholder="e.g. CeraVe Moisturizing Cream"
                 className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-400"
               />
+              <button
+                type="button"
+                onClick={() => setBarcodeOpen(true)}
+                disabled={barcodeLoading}
+                title="Scan barcode"
+                className="shrink-0 flex items-center justify-center w-8 h-[46px] rounded-xl border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40"
+              >
+                {barcodeLoading
+                  ? <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" className="opacity-25" /><path d="M4 12a8 8 0 018-8" className="opacity-75" /></svg>
+                  : <Camera className="w-3.5 h-3.5" />
+                }
+              </button>
               <div className="relative shrink-0">
                 <button
                   type="button"
@@ -3165,6 +3225,26 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
             className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${isRinseOff ? "bg-gray-800 text-white border-gray-800" : "text-gray-400 border-gray-200 hover:border-gray-400"}`}
           >
             Rinse-off
+          </button>
+        </div>
+      )}
+      {tab === "paste" && (
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setBarcodeOpen(true)}
+            className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <ScanBarcode className="w-5 h-5" />
+            <span className="text-xs font-medium">Scan barcode</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setOcrOpen(true)}
+            className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Camera className="w-5 h-5" />
+            <span className="text-xs font-medium">Photo ingredients</span>
           </button>
         </div>
       )}
@@ -5637,6 +5717,19 @@ export default function Scanner({ initialProductId }: { initialProductId?: strin
           {renderRoutinePanel()}
         </div>
       </div>
+
+      {barcodeOpen && (
+        <BarcodeScanner
+          onDetected={handleBarcodeDetected}
+          onClose={() => setBarcodeOpen(false)}
+        />
+      )}
+      {ocrOpen && (
+        <IngredientOCR
+          onExtracted={handleOCRExtracted}
+          onClose={() => setOcrOpen(false)}
+        />
+      )}
     </div>
   );
 }
