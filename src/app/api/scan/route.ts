@@ -618,11 +618,21 @@ export async function POST(req: NextRequest) {
     // Enrich communityVariants with images and concern counts
     if (communityVariants?.length) {
       const variantIds = communityVariants.map((v) => v.id);
-      const [{ data: variantData }, { data: allIngredientsDb }] = await Promise.all([
+      // Paginate ingredients (table exceeds PostgREST 1000-row cap) in parallel with variant product fetch
+      const PAGE = 1000;
+      const [{ data: variantData }, firstPage] = await Promise.all([
         supabase.from("products").select("id, image_url, ingredient_list").in("id", variantIds),
-        supabase.from("ingredients").select("id, name, inci_name, status, flagged_category, secondary_flagged_categories, structural_category"),
+        supabase.from("ingredients").select("id, name, inci_name, status, flagged_category, secondary_flagged_categories, structural_category").range(0, PAGE - 1),
       ]);
-      const allIngredients = (allIngredientsDb ?? []) as import("@/lib/compute-concerns").IngredientRow[];
+      const allIngredientsDb: import("@/lib/compute-concerns").IngredientRow[] = [...((firstPage.data ?? []) as import("@/lib/compute-concerns").IngredientRow[])];
+      if (firstPage.data && firstPage.data.length === PAGE) {
+        for (let from = PAGE; ; from += PAGE) {
+          const { data } = await supabase.from("ingredients").select("id, name, inci_name, status, flagged_category, secondary_flagged_categories, structural_category").range(from, from + PAGE - 1);
+          if (data) allIngredientsDb.push(...(data as import("@/lib/compute-concerns").IngredientRow[]));
+          if (!data || data.length < PAGE) break;
+        }
+      }
+      const allIngredients = allIngredientsDb;
       const listMap = new Map((variantData ?? []).map((p) => [p.id, { list: p.ingredient_list as string | null, image_url: p.image_url as string | null }]));
       communityVariants = communityVariants.map((v) => {
         const entry = listMap.get(v.id);

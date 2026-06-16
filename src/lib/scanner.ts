@@ -23,8 +23,15 @@ function parseIngredientList(raw: string): string[] {
 
 export async function matchIngredients(raw: string) {
   const items = parseIngredientList(raw);
-  const { data } = await supabase.from("ingredients").select("*").limit(10000);
-  const db = (data || []) as DbIngredient[];
+  // Paginate — ingredients table exceeds PostgREST default 1000-row cap; .limit(N) is silently overridden
+  const allData: DbIngredient[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data } = await supabase.from("ingredients").select("*").range(from, from + PAGE - 1);
+    if (data) allData.push(...(data as DbIngredient[]));
+    if (!data || data.length < PAGE) break;
+  }
+  const db = allData;
 
   const safe: IngredientMatch[] = [];
   const flagged: IngredientMatch[] = [];
