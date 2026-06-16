@@ -376,7 +376,7 @@ export default function ComparePageClient({ ids }: { ids: string }) {
   const [products, setProducts] = useState<CompareProduct[] | null>(null);
   const [loading, setLoading] = useState(!!ids);
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [emptySlots, setEmptySlots] = useState<(SearchResult | null)[]>([null, null]);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
 
@@ -391,20 +391,33 @@ export default function ComparePageClient({ ids }: { ids: string }) {
       .catch(() => { setError("Failed to load products."); setLoading(false); });
   }, [ids]);
 
-  const nameMaps = useMemo(() => {
+  const productData = useMemo(() => {
     if (!products) return [];
+    const hp = activeSkinTypes.size > 0 || activeClimates.size > 0;
     return products.map(p => {
-      const m = new Map<string, DbIngredient>();
+      const nameMap = new Map<string, DbIngredient>();
       for (const l of p.linked) {
         if (!l.ingredient) continue;
         const ing = l.ingredient as DbIngredient;
-        m.set(ing.name.toLowerCase(), ing);
-        if (ing.inci_name) m.set(ing.inci_name.toLowerCase(), ing);
-        m.set(normalizeIngName(ing.name), ing);
+        nameMap.set(ing.name.toLowerCase(), ing);
+        if (ing.inci_name) nameMap.set(ing.inci_name.toLowerCase(), ing);
+        nameMap.set(normalizeIngName(ing.name), ing);
       }
-      return m;
+      const rawItems = splitIngredientList(p.ingredient_list ?? "");
+      let universalCount = 0, profileOnlyCount = 0, otherFlaggedCount = 0;
+      for (const l of p.linked) {
+        const ing = l.ingredient as DbIngredient | null;
+        if (!ing || ing.status !== "flagged") continue;
+        const fc = ing.flagged_category ?? "";
+        const allCats = [fc, ...(ing.secondary_flagged_categories ?? [])].filter(Boolean);
+        if (UNIVERSAL_CONCERN_SET.has(fc)) universalCount++;
+        else if (hp && allCats.some(c => isFcProfileMatch(c, activeSkinTypes, activeClimates))) profileOnlyCount++;
+        else otherFlaggedCount++;
+      }
+      const neutralCount = rawItems.length - universalCount - profileOnlyCount - otherFlaggedCount;
+      return { nameMap, rawItems, universalCount, profileOnlyCount, otherFlaggedCount, neutralCount };
     });
-  }, [products]);
+  }, [products, activeSkinTypes, activeClimates]);
 
   const presenceCount = useMemo(() => {
     if (!products) return new Map<string, number>();
@@ -424,8 +437,8 @@ export default function ComparePageClient({ ids }: { ids: string }) {
     return nameMap.get(lower) ?? nameMap.get(normalizeIngName(rawName)) ?? null;
   }
 
-  function toggleExpand(key: string) {
-    setExpanded(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
+  function toggleExpand(idx: number) {
+    setExpanded(prev => { const s = new Set(prev); s.has(idx) ? s.delete(idx) : s.add(idx); return s; });
   }
 
   function handleSwap(fromIdx: number, toIdx: number) {
@@ -578,135 +591,114 @@ export default function ComparePageClient({ ids }: { ids: string }) {
         </div>
       )}
 
-      {/* Column area — scrolls with the page */}
+      {/* Intro sections — column-major (type, iHerb, stats) */}
       <div className={`${maxWClass} mx-auto grid ${colClass}`}>
         {products.map((p, colIdx) => {
-          const nameMap = nameMaps[colIdx] ?? new Map();
-          const rawItems = splitIngredientList(p.ingredient_list ?? "");
-
-          let universalCount = 0, profileOnlyCount = 0, otherFlaggedCount = 0;
-          for (const l of p.linked) {
-            const ing = l.ingredient as DbIngredient | null;
-            if (!ing || ing.status !== "flagged") continue;
-            const fc = ing.flagged_category ?? "";
-            const isUniv = UNIVERSAL_CONCERN_SET.has(fc);
-            const allCats = [fc, ...(ing.secondary_flagged_categories ?? [])].filter(Boolean);
-            const isProf = hasProfile && allCats.some(c => isFcProfileMatch(c, activeSkinTypes, activeClimates));
-            if (isUniv) universalCount++;
-            else if (isProf) profileOnlyCount++;
-            else otherFlaggedCount++;
-          }
-          const flaggedCount = universalCount + profileOnlyCount + otherFlaggedCount;
-          const neutralCount = rawItems.length - flaggedCount;
-
+          const pd = productData[colIdx];
+          if (!pd) return null;
+          const { universalCount, profileOnlyCount, otherFlaggedCount, neutralCount, rawItems } = pd;
           return (
-            <div key={p.id} className={`border-r border-gray-200 last:border-r-0${colIdx >= 2 ? " hidden sm:block" : ""}`}>
-              {/* Non-sticky intro — type, iHerb, stats (scrolls away) */}
-              {(p.type || p.iherb_url || flaggedCount > 0 || rawItems.length > 0) && (
-                <div className="px-3 py-2 space-y-1 border-b border-gray-100">
-                  {(p.type || p.iherb_url) && (
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                      {p.type && (
-                        <span className="bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">{p.type}</span>
-                      )}
-                      {p.iherb_url && (
-                        <a
-                          href={p.iherb_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-teal-600 hover:underline underline-offset-2"
-                        >
-                          iHerb ↗
-                        </a>
-                      )}
-                    </div>
-                  )}
-                  {rawItems.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
-                      {universalCount > 0 && <span className="text-rose-700">{universalCount} universal</span>}
-                      {universalCount > 0 && (profileOnlyCount > 0 || otherFlaggedCount > 0 || neutralCount > 0) && <span className="text-gray-300">·</span>}
-                      {profileOnlyCount > 0 && <span className="text-amber-700">{profileOnlyCount} profile</span>}
-                      {profileOnlyCount > 0 && (otherFlaggedCount > 0 || neutralCount > 0) && <span className="text-gray-300">·</span>}
-                      {otherFlaggedCount > 0 && <span className="text-yellow-700">{otherFlaggedCount} other</span>}
-                      {otherFlaggedCount > 0 && neutralCount > 0 && <span className="text-gray-300">·</span>}
-                      {neutralCount > 0 && <span className="text-gray-400">{neutralCount} neutral</span>}
-                    </div>
+            <div key={p.id} className={`border-r border-gray-200 last:border-r-0 px-3 py-2 space-y-1 border-b border-gray-100${colIdx >= 2 ? " hidden sm:block" : ""}`}>
+              {(p.type || p.iherb_url) && (
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  {p.type && <span className="bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">{p.type}</span>}
+                  {p.iherb_url && (
+                    <a href={p.iherb_url} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline underline-offset-2">iHerb ↗</a>
                   )}
                 </div>
               )}
-
-              {/* Ingredient list */}
-              <div className="divide-y divide-gray-50">
-                {rawItems.map((rawName, idx) => {
-                  const ing = lookupIng(rawName, nameMap) as DbIngredient | null;
-                  const isFlagged = ing?.status === "flagged";
-                  const fc = ing?.flagged_category ?? "";
-                  const isUniversal = UNIVERSAL_CONCERN_SET.has(fc);
-                  const allCats = ing ? [fc, ...(ing.secondary_flagged_categories ?? [])].filter(Boolean) : [];
-                  const profileMatch = hasProfile && allCats.some(c => isFcProfileMatch(c, activeSkinTypes, activeClimates));
-                  const hasBenefit = !isFlagged && (ing?.category || ing?.explanation_structured?.benefit);
-                  const expandKey = `${p.id}::${idx}`;
-                  const isExpanded = expanded.has(expandKey);
-                  const isExclusive = ing?.id ? presenceCount.get(ing.id) === 1 : false;
-
-                  const nameColor = ing ? "text-gray-800" : "text-gray-400";
-
-                  const structCat = ing?.structural_category ?? null;
-                  const concernCats = isFlagged
-                    ? [fc, ...(ing?.secondary_flagged_categories ?? [])].filter(Boolean)
-                    : [];
-                  const benefitCats = !isFlagged && hasBenefit
-                    ? [...new Set([ing?.category, ...(ing?.secondary_benefit_categories ?? [])].filter((c): c is string => !!c))]
-                    : [];
-                  const labelItems: { text: string; cls: string }[] = [
-                    ...(structCat ? [{ text: structCat, cls: "text-gray-500" }] : []),
-                    ...concernCats.map(cat => ({
-                      text: cat,
-                      cls: UNIVERSAL_CONCERN_SET.has(cat) ? "text-rose-700"
-                        : (hasProfile && isFcProfileMatch(cat, activeSkinTypes, activeClimates)) ? "text-amber-700"
-                        : "text-yellow-700",
-                    })),
-                    ...benefitCats.map(cat => ({ text: cat, cls: "text-teal-700" })),
-                  ];
-
-                  return (
-                    <div key={expandKey} className={isExclusive ? "bg-amber-50/60" : ""}>
-                      <button
-                        type="button"
-                        onClick={() => ing && toggleExpand(expandKey)}
-                        className={`w-full text-left px-3 py-1.5 flex gap-2 items-start ${ing ? "hover:bg-gray-50" : ""} transition-colors`}
-                      >
-                        <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right mt-px">{idx + 1}</span>
-                        <span className="flex-1 min-w-0">
-                          <span className={`text-xs leading-snug ${nameColor}`}>{rawName}</span>
-                          {labelItems.length > 0 && (
-                            <span className="flex flex-wrap items-baseline gap-x-0.5 mt-0.5">
-                              {labelItems.map((item, i) => (
-                                <span key={i} className={`text-[10px] ${item.cls}`}>
-                                  {i > 0 && <span className="text-gray-300"> · </span>}
-                                  {item.text}
-                                </span>
-                              ))}
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                      {isExpanded && ing && (
-                        <div className="px-3 pb-2 bg-gray-50/80 border-t border-gray-100">
-                          <IngredientExplanation ing={ing} profileMatch={profileMatch} activeSkinTypes={activeSkinTypes} activeClimates={activeClimates} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {rawItems.length === 0 && (
-                  <p className="text-xs text-gray-400 italic px-4 py-3">No ingredient list available.</p>
-                )}
-              </div>
+              {rawItems.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
+                  {universalCount > 0 && <span className="text-rose-700">{universalCount} universal</span>}
+                  {universalCount > 0 && (profileOnlyCount > 0 || otherFlaggedCount > 0 || neutralCount > 0) && <span className="text-gray-300">·</span>}
+                  {profileOnlyCount > 0 && <span className="text-amber-700">{profileOnlyCount} profile</span>}
+                  {profileOnlyCount > 0 && (otherFlaggedCount > 0 || neutralCount > 0) && <span className="text-gray-300">·</span>}
+                  {otherFlaggedCount > 0 && <span className="text-yellow-700">{otherFlaggedCount} other</span>}
+                  {otherFlaggedCount > 0 && neutralCount > 0 && <span className="text-gray-300">·</span>}
+                  {neutralCount > 0 && <span className="text-gray-400">{neutralCount} neutral</span>}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 italic">No ingredient list available.</p>
+              )}
             </div>
           );
         })}
       </div>
+
+      {/* Ingredient rows — row-major so same-index rows share a grid row height */}
+      {(() => {
+        const maxIngCount = productData.length > 0 ? Math.max(...productData.map(pd => pd.rawItems.length)) : 0;
+        return (
+          <div className={`${maxWClass} mx-auto grid ${colClass}`}>
+            {Array.from({ length: maxIngCount }, (_, idx) =>
+              products.map((p, colIdx) => {
+                const pd = productData[colIdx];
+                const rawName = pd?.rawItems[idx];
+                const borderR = colIdx < products.length - 1 ? " border-r border-gray-200" : "";
+                const hiddenCls = colIdx >= 2 ? " hidden sm:block" : "";
+                const cellBase = `border-b border-gray-50${borderR}${hiddenCls}`;
+
+                if (!rawName) return <div key={`${colIdx}-${idx}`} className={cellBase} />;
+
+                const ing = lookupIng(rawName, pd.nameMap);
+                const isFlagged = ing?.status === "flagged";
+                const fc = ing?.flagged_category ?? "";
+                const allCats = ing ? [fc, ...(ing.secondary_flagged_categories ?? [])].filter(Boolean) : [];
+                const profileMatch = hasProfile && allCats.some(c => isFcProfileMatch(c, activeSkinTypes, activeClimates));
+                const hasBenefit = !isFlagged && (ing?.category || (ing?.explanation_structured as ExplanationStructured | null)?.benefit);
+                const isExpanded = expanded.has(idx);
+                const isExclusive = ing?.id ? presenceCount.get(ing.id) === 1 : false;
+                const nameColor = ing ? "text-gray-800" : "text-gray-400";
+                const structCat = ing?.structural_category ?? null;
+                const concernCats = isFlagged ? [fc, ...(ing?.secondary_flagged_categories ?? [])].filter(Boolean) : [];
+                const benefitCats = !isFlagged && hasBenefit
+                  ? [...new Set([ing?.category, ...(ing?.secondary_benefit_categories ?? [])].filter((c): c is string => !!c))]
+                  : [];
+                const labelItems: { text: string; cls: string }[] = [
+                  ...(structCat ? [{ text: structCat, cls: "text-gray-500" }] : []),
+                  ...concernCats.map(cat => ({
+                    text: cat,
+                    cls: UNIVERSAL_CONCERN_SET.has(cat) ? "text-rose-700"
+                      : (hasProfile && isFcProfileMatch(cat, activeSkinTypes, activeClimates)) ? "text-amber-700"
+                      : "text-yellow-700",
+                  })),
+                  ...benefitCats.map(cat => ({ text: cat, cls: "text-teal-700" })),
+                ];
+
+                return (
+                  <div key={`${colIdx}-${idx}`} className={`${cellBase}${isExclusive ? " bg-amber-50/60" : ""}`}>
+                    <button
+                      type="button"
+                      onClick={() => ing && toggleExpand(idx)}
+                      className={`w-full text-left px-3 py-1.5 flex gap-2 items-start ${ing ? "hover:bg-gray-50" : ""} transition-colors`}
+                    >
+                      <span className="text-[10px] text-gray-300 shrink-0 w-5 text-right mt-px">{idx + 1}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className={`text-xs leading-snug ${nameColor}`}>{rawName}</span>
+                        {labelItems.length > 0 && (
+                          <span className="flex flex-wrap items-baseline gap-x-0.5 mt-0.5">
+                            {labelItems.map((item, i) => (
+                              <span key={i} className={`text-[10px] ${item.cls}`}>
+                                {i > 0 && <span className="text-gray-300"> · </span>}
+                                {item.text}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                    {isExpanded && ing && (
+                      <div className="px-3 pb-2 bg-gray-50/80 border-t border-gray-100">
+                        <IngredientExplanation ing={ing} profileMatch={profileMatch} activeSkinTypes={activeSkinTypes} activeClimates={activeClimates} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        );
+      })()}
 
     </div>
   );
