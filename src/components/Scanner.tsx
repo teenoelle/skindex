@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useUser, UserButton, SignInButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater, Cigarette, Camera, ScanBarcode } from "lucide-react";
+import { Pipette, FlaskConical, Droplet, Droplets, Waves, Sun, Sparkles, Wind, Bandage, Brush, Smile, Palette, Heart, PersonStanding, Scissors, Hand, Fingerprint, Home, Eye, Shield, Layers, Moon, Pencil, Pen, Footprints, GlassWater, Cigarette, Camera, ScanBarcode, PackageSearch } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DbIngredient, ExplanationStructured, IngredientMatch, PhotosensitiveItem, Routine, RoutineProduct, SensoryTriggerItem, ScanResult, AlternativeProduct, CommunityVariant, SkinClimateNote } from "@/types";
 import { SENSORY_PROFILE_MAP, CONCERN_PROFILE_TYPES } from "@/lib/sensory";
@@ -1272,6 +1272,7 @@ export default function Scanner({ initialProductId, initialCamera }: { initialPr
   const [barcodeOpen, setBarcodeOpen] = useState(false);
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const [ocrOpen, setOcrOpen] = useState(false);
+  const [productPhotoOpen, setProductPhotoOpen] = useState(false);
 
   // Derived routine state — all reads of routineProducts work unchanged
   const activeRoutine = routines.find(r => r.id === activeRoutineId) ?? routines[0] ?? null;
@@ -1897,8 +1898,10 @@ export default function Scanner({ initialProductId, initialCamera }: { initialPr
       const data = await res.json() as { notFound?: boolean; name?: string | null; brand?: string | null; ingredients?: string | null };
       setBarcodeLoading(false);
       if (data.notFound || !data.name) {
-        // Nothing found in OBF — put the raw barcode in the search box
+        // Nothing found in OBF — search by barcode number so the "not found" UI appears
+        setTab("search");
         setQuery(barcode);
+        handleScan({ tab: "search", query: barcode });
         return;
       }
       if (data.ingredients) {
@@ -1917,6 +1920,14 @@ export default function Scanner({ initialProductId, initialCamera }: { initialPr
     setOcrOpen(false);
     setIngredients(text);
     await scanVariant({ pasteIngredients: text });
+  }
+
+  function handleProductPhotoDetected(name: string) {
+    setProductPhotoOpen(false);
+    if (!name) return;
+    setTab("search");
+    setQuery(name);
+    handleScan({ tab: "search", query: name });
   }
 
   async function handleDymVariantClick(variantId: string) {
@@ -3229,22 +3240,30 @@ export default function Scanner({ initialProductId, initialCamera }: { initialPr
         </div>
       )}
       {tab === "paste" && (
-        <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="grid grid-cols-3 gap-2 mb-3">
           <button
             type="button"
             onClick={() => setBarcodeOpen(true)}
-            className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-xl border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <ScanBarcode className="w-5 h-5" />
-            <span className="text-xs font-medium">Scan barcode</span>
+            <span className="text-[11px] font-medium leading-tight">Scan barcode</span>
           </button>
           <button
             type="button"
             onClick={() => setOcrOpen(true)}
-            className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-xl border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <Camera className="w-5 h-5" />
-            <span className="text-xs font-medium">Photo ingredients</span>
+            <span className="text-[11px] font-medium leading-tight">Photo ingredients</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setProductPhotoOpen(true)}
+            className="flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-xl border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <PackageSearch className="w-5 h-5" />
+            <span className="text-[11px] font-medium leading-tight">Photo product</span>
           </button>
         </div>
       )}
@@ -5728,6 +5747,13 @@ export default function Scanner({ initialProductId, initialCamera }: { initialPr
         <IngredientOCR
           onExtracted={handleOCRExtracted}
           onClose={() => setOcrOpen(false)}
+        />
+      )}
+      {productPhotoOpen && (
+        <IngredientOCR
+          mode="product"
+          onExtracted={handleProductPhotoDetected}
+          onClose={() => setProductPhotoOpen(false)}
         />
       )}
     </div>

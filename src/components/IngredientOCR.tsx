@@ -5,37 +5,60 @@ import { useEffect, useRef, useState } from "react";
 type Phase = "camera" | "processing" | "error";
 
 interface Props {
+  mode?: "ingredients" | "product";
   onExtracted: (text: string) => void;
   onClose: () => void;
 }
 
-export default function IngredientOCR({ onExtracted, onClose }: Props) {
+const LABELS = {
+  ingredients: {
+    camera: "Frame the ingredient list",
+    processing: "Reading ingredients…",
+    error: "Couldn't read — try again",
+    hint: "Keep the label flat and fully in frame",
+    fallbackError: "Couldn't read the ingredient list. Try a clearer, flatter photo.",
+    spinner: "Reading ingredients…",
+  },
+  product: {
+    camera: "Frame the front of the product",
+    processing: "Identifying product…",
+    error: "Couldn't identify — try again",
+    hint: "Frame the product name and brand clearly",
+    fallbackError: "Couldn't identify the product. Try a clearer photo of the front label.",
+    spinner: "Identifying product…",
+  },
+};
+
+// Max longest-side dimension before encoding — keeps payload under ~300 KB
+const MAX_PX = 1600;
+
+export default function IngredientOCR({ mode = "ingredients", onExtracted, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<Phase>("camera");
   const [capturedSrc, setCapturedSrc] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [camError, setCamError] = useState<string | null>(null);
+  const labels = LABELS[mode];
+
+  function startCamera(video: HTMLVideoElement, onStream: (s: MediaStream) => void, onErr: () => void) {
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } })
+      .then((s) => { onStream(s); video.srcObject = s; video.play().catch(() => {}); })
+      .catch(onErr);
+  }
 
   useEffect(() => {
     let stream: MediaStream | null = null;
     let done = false;
+    const video = videoRef.current;
+    if (!video) return;
 
-    navigator.mediaDevices
-      .getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
-      })
-      .then((s) => {
-        if (done) { s.getTracks().forEach((t) => t.stop()); return; }
-        stream = s;
-        const video = videoRef.current;
-        if (!video) return;
-        video.srcObject = s;
-        video.play().catch(() => {});
-      })
-      .catch(() => {
-        if (!done) setCamError("Camera access denied. Allow camera access and try again.");
-      });
+    startCamera(
+      video,
+      (s) => { if (done) { s.getTracks().forEach((t) => t.stop()); return; } stream = s; },
+      () => { if (!done) setCamError("Camera access denied. Allow camera access and try again."); }
+    );
 
     return () => {
       done = true;
@@ -48,27 +71,29 @@ export default function IngredientOCR({ onExtracted, onClose }: Props) {
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    // Resize to MAX_PX on longest side before encoding to keep payload manageable
+    const scale = Math.min(1, MAX_PX / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
     setCapturedSrc(dataUrl);
     setPhase("processing");
 
-    // Stop stream now that we have the still
     (video.srcObject as MediaStream | null)?.getTracks().forEach((t) => t.stop());
 
     try {
       const res = await fetch("/api/scan/ocr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: dataUrl.split(",")[1] }),
+        body: JSON.stringify({ image: dataUrl.split(",")[1], mode }),
       });
-      const data = await res.json() as { ingredients?: string; error?: string };
-      if (data.ingredients) {
-        onExtracted(data.ingredients);
+      const data = await res.json() as { ingredients?: string; name?: string; error?: string };
+      const result = mode === "product" ? data.name : data.ingredients;
+      if (result) {
+        onExtracted(result);
       } else {
-        setErrorMsg(data.error ?? "Couldn't read the ingredient list. Try a clearer, flatter photo.");
+        setErrorMsg(data.error ?? labels.fallbackError);
         setPhase("error");
       }
     } catch {
@@ -81,26 +106,18 @@ export default function IngredientOCR({ onExtracted, onClose }: Props) {
     setErrorMsg(null);
     setCapturedSrc(null);
     setPhase("camera");
-
-    // Restart camera
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } })
-      .then((s) => {
-        const video = videoRef.current;
-        if (!video) { s.getTracks().forEach((t) => t.stop()); return; }
-        video.srcObject = s;
-        video.play().catch(() => {});
-      })
-      .catch(() => setCamError("Camera access denied."));
+    const video = videoRef.current;
+    if (!video) return;
+    startCamera(video, () => {}, () => setCamError("Camera access denied."));
   }
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       <div className="flex items-center justify-between px-4 py-3">
         <p className="text-white text-sm font-medium">
-          {phase === "camera" && "Frame the ingredient list"}
-          {phase === "processing" && "Reading ingredients…"}
-          {phase === "error" && "Couldn't read — try again"}
+          {phase === "camera" && labels.camera}
+          {phase === "processing" && labels.processing}
+          {phase === "error" && labels.error}
         </p>
         <button type="button" onClick={onClose} className="text-white/70 hover:text-white text-sm underline">
           Cancel
@@ -138,7 +155,7 @@ export default function IngredientOCR({ onExtracted, onClose }: Props) {
                 <circle cx="12" cy="12" r="10" className="opacity-25" />
                 <path d="M4 12a8 8 0 018-8" className="opacity-75" />
               </svg>
-              <span className="text-sm">Reading ingredients…</span>
+              <span className="text-sm">{labels.spinner}</span>
             </div>
           </div>
         </div>
@@ -146,7 +163,7 @@ export default function IngredientOCR({ onExtracted, onClose }: Props) {
         <div className="flex-1 relative overflow-hidden">
           <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
           <p className="absolute top-0 left-0 right-0 text-center text-white/50 text-xs pt-3 px-6">
-            Keep the label flat and fully in frame
+            {labels.hint}
           </p>
           <div className="absolute bottom-10 left-0 right-0 flex justify-center">
             <button
